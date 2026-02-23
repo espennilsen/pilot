@@ -103,8 +103,15 @@ function renderTextBlock(text: string): React.ReactNode[] {
   }).filter(Boolean);
 }
 
+/** Shared counter object threaded through all inline processing so every
+ *  React key is unique within a single renderInline() call. */
+interface KeyCounter {
+  value: number;
+}
+
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
+  const counter: KeyCounter = { value: 0 };
   let currentText = '';
   let index = 0;
   
@@ -112,7 +119,7 @@ function renderInline(text: string): React.ReactNode[] {
     // Inline code
     if (text[index] === '`') {
       if (currentText) {
-        parts.push(...processSimpleInline(currentText));
+        parts.push(...processSimpleInline(currentText, counter));
         currentText = '';
       }
       
@@ -120,7 +127,7 @@ function renderInline(text: string): React.ReactNode[] {
       if (endIndex !== -1) {
         const code = text.slice(index + 1, endIndex);
         parts.push(
-          <code key={parts.length} className="bg-bg-surface px-1 rounded text-accent font-mono text-sm">
+          <code key={`code-${counter.value++}`} className="bg-bg-surface px-1 rounded text-accent font-mono text-sm">
             {code}
           </code>
         );
@@ -134,67 +141,63 @@ function renderInline(text: string): React.ReactNode[] {
   }
   
   if (currentText) {
-    parts.push(...processSimpleInline(currentText));
+    parts.push(...processSimpleInline(currentText, counter));
   }
   
   return parts;
 }
 
-function processSimpleInline(text: string): React.ReactNode[] {
+function processSimpleInline(text: string, counter: KeyCounter): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let key = 0;
   
   // Process bold (**text**)
   const boldRegex = /\*\*(.+?)\*\*/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   
-  while ((match = boldRegex.exec(remaining)) !== null) {
-    if (match.index > lastIndex) {
-      const before = remaining.slice(lastIndex, match.index);
-      parts.push(...processItalic(before, key++));
-    }
-    parts.push(<strong key={`bold-${key++}`}>{processItalic(match[1], key++)}</strong>);
-    lastIndex = match.index + match[0].length;
-  }
-  
-  if (lastIndex < remaining.length) {
-    parts.push(...processItalic(remaining.slice(lastIndex), key++));
-  }
-  
-  return parts;
-}
-
-function processItalic(text: string, startKey: number): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const italicRegex = /\*(.+?)\*/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = startKey;
-  
-  while ((match = italicRegex.exec(text)) !== null) {
+  while ((match = boldRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
       const before = text.slice(lastIndex, match.index);
-      parts.push(...processLinks(before, key++));
+      parts.push(...processItalic(before, counter));
     }
-    parts.push(<em key={`italic-${key++}`}>{processLinks(match[1], key++)}</em>);
+    parts.push(<strong key={`bold-${counter.value++}`}>{processItalic(match[1], counter)}</strong>);
     lastIndex = match.index + match[0].length;
   }
   
   if (lastIndex < text.length) {
-    parts.push(...processLinks(text.slice(lastIndex), key++));
+    parts.push(...processItalic(text.slice(lastIndex), counter));
   }
   
   return parts;
 }
 
-function processLinks(text: string, startKey: number): React.ReactNode[] {
+function processItalic(text: string, counter: KeyCounter): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const italicRegex = /\*(.+?)\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  
+  while ((match = italicRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const before = text.slice(lastIndex, match.index);
+      parts.push(...processLinks(before, counter));
+    }
+    parts.push(<em key={`italic-${counter.value++}`}>{processLinks(match[1], counter)}</em>);
+    lastIndex = match.index + match[0].length;
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push(...processLinks(text.slice(lastIndex), counter));
+  }
+  
+  return parts;
+}
+
+function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const linkRegex = /\[(.+?)\]\((.+?)\)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  let key = startKey;
   
   while ((match = linkRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
@@ -202,7 +205,7 @@ function processLinks(text: string, startKey: number): React.ReactNode[] {
     }
     parts.push(
       <a
-        key={`link-${key++}`}
+        key={`link-${counter.value++}`}
         href={match[2]}
         className="text-accent hover:underline"
         target="_blank"
