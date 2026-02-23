@@ -1261,7 +1261,7 @@ function CompanionSettings() {
                     </p>
                     {qrHost && (
                       <p className="text-[10px] font-mono text-gray-400">
-                        https://{qrHost}:{qrPort || status.port}
+                        https://{qrHost}{qrPort ? `:${qrPort}` : ''}
                       </p>
                     )}
                   </div>
