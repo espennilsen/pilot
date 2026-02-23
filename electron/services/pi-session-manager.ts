@@ -36,6 +36,7 @@ import { createTaskTools } from './task-tools';
 import { companionBridge } from './companion-ipc-bridge';
 import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
+import { createWebFetchTool } from './web-fetch-tool';
 
 /**
  * Encode a path separator as `+` so that hyphens in directory names round-trip safely.
@@ -201,7 +202,7 @@ export class PilotSessionManager {
       settingsManager,
       resourceLoader,
       tools: [],  // No built-in tools (we provide sandboxed versions)
-      customTools: [...tools, ...readOnlyTools, ...taskTools, ...subagentTools],
+      customTools: [...tools, ...readOnlyTools, ...taskTools, ...subagentTools, createWebFetchTool()],
     });
 
     // Subscribe to events and forward to renderer
