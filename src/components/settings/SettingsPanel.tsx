@@ -1028,8 +1028,6 @@ function CompanionSettings() {
     setActivationUrl(null);
     // Clear previous output and open the output popup so the user sees live progress
     useTunnelOutputStore.getState().clearOutput(provider);
-    const tunnelId = provider === 'tailscale' ? TUNNEL_IDS.tailscale : TUNNEL_IDS.cloudflare;
-    useOutputWindowStore.getState().openOutput(tunnelId);
     try {
       // Disable existing tunnel first if switching providers
       if (status?.remoteUrl) {
