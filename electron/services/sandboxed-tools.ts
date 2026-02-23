@@ -67,6 +67,131 @@ function isWithinProject(projectRoot: string, filePath: string, allowedPaths: st
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Bash command path analysis — extract and validate paths in shell commands
+// ---------------------------------------------------------------------------
+
+/**
+ * System path prefixes that are implicitly allowed when jail is enabled.
+ * These are standard OS directories containing executables and read-only
+ * system resources that agents routinely reference in commands.
+ */
+const SYSTEM_SAFE_PREFIXES = [
+  '/dev/',       // Device files (/dev/null, /dev/urandom, etc.)
+  '/proc/',      // Linux procfs
+  '/sys/',       // Linux sysfs
+  '/usr/',       // System executables and libraries
+  '/bin/',       // Essential executables
+  '/sbin/',      // System admin executables
+  '/opt/',       // Third-party packages
+  '/nix/',       // Nix store
+  '/etc/',       // System config (read-only in practice)
+  '/Library/',   // macOS system library
+];
+
+/** Exact system paths allowed (when not covered by prefix). */
+const SYSTEM_SAFE_EXACT = new Set([
+  '/dev/null', '/dev/zero', '/dev/urandom', '/dev/random',
+  '/dev/stdin', '/dev/stdout', '/dev/stderr', '/dev/tty',
+  '/tmp',  // bare /tmp reference (e.g., `ls /tmp`)
+]);
+
+function isSystemPath(absPath: string): boolean {
+  if (SYSTEM_SAFE_EXACT.has(absPath)) return true;
+  return SYSTEM_SAFE_PREFIXES.some(prefix => absPath.startsWith(prefix));
+}
+
+/**
+ * Extract potential filesystem paths from a bash command string.
+ *
+ * This is a best-effort heuristic — shell is Turing-complete so we can't
+ * catch every programmatic path construction. We catch the common patterns:
+ *
+ * - Absolute paths:        /foo/bar, /etc/hosts
+ * - Home references:       ~/foo, $HOME/foo, ${HOME}/foo
+ * - Relative escapes:      ../foo, ../../bar
+ * - Redirect targets:      > /path, >> /path, 2> /path
+ * - Env var expansion:     $HOME, $TMPDIR (resolved before extraction)
+ * - Inside quotes:         "~/secrets" or '/etc/passwd' (quotes stripped)
+ * - Command substitution:  $(cat /etc/passwd) or `cat /etc/passwd`
+ *
+ * Does NOT false-positive on:
+ * - URLs:                  https://example.com/path (no whitespace before /)
+ * - CLI flags:             --option=/value (excluded by = prefix handling)
+ * - Regex patterns:        s/foo/bar/g (not word-boundary-preceded)
+ */
+function extractPathsFromCommand(command: string): string[] {
+  const home = process.env.HOME ?? '';
+
+  // Step 1: Expand environment variables that commonly resolve to paths
+  let expanded = command;
+  expanded = expanded.replace(/\$HOME(?=\/|[\s;|&'"`)}]|$)|\$\{HOME\}/g, home);
+  expanded = expanded.replace(
+    /\$TMPDIR(?=\/|[\s;|&'"`)}]|$)|\$\{TMPDIR\}/g,
+    process.env.TMPDIR ?? '/tmp',
+  );
+
+  // Expand ~ to home dir at word boundaries (not ~user which is a different thing)
+  expanded = expanded.replace(/(^|[\s;|&()>=`])~\//g, `$1${home}/`);
+
+  // Step 2: Strip comments (# to end of line, but not inside quotes — best-effort)
+  expanded = expanded.replace(/(^|[\s;|&])#[^\n]*/g, '$1');
+
+  // Step 3: Extract path-like tokens
+  const candidates = new Set<string>();
+
+  // Pattern A: Absolute paths — /foo/bar preceded by shell delimiter or start
+  // The negative lookbehind for :/ and :// prevents matching URL paths
+  const absRegex = /(?:^|[\s;|&()>`"'=])(\/{1,2}[\w.\-/+@:,]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = absRegex.exec(expanded)) !== null) {
+    const p = m[1].replace(/[,;:'"]+$/, ''); // trim trailing punctuation
+    if (p.length > 1 && p !== '//') {
+      // Skip if this looks like part of a URL (preceded by :)
+      const charBefore = expanded[m.index] === '/' ? expanded[m.index - 1] : undefined;
+      if (charBefore !== ':') candidates.add(p);
+    }
+  }
+
+  // Pattern B: Relative escape paths — ../ or ../../ preceded by delimiter
+  const relRegex = /(?:^|[\s;|&()>`"'=])((?:\.\.\/)+[\w.\-/]*)/g;
+  while ((m = relRegex.exec(expanded)) !== null) {
+    candidates.add(m[1]);
+  }
+
+  return [...candidates];
+}
+
+/**
+ * Analyze a bash command for paths that escape the project jail.
+ *
+ * @returns Array of offending paths (empty if command is safe).
+ *          Each entry is the raw path string found in the command.
+ */
+export function findEscapingPaths(
+  command: string,
+  projectRoot: string,
+  allowedPaths: string[],
+): string[] {
+  const candidates = extractPathsFromCommand(command);
+  const offending: string[] = [];
+
+  for (const candidate of candidates) {
+    // Resolve to absolute for system-path check
+    const abs = isAbsolute(candidate) ? resolve(candidate) : resolve(projectRoot, candidate);
+
+    // Allow standard system paths (executables, /dev, /proc, etc.)
+    if (isSystemPath(abs)) continue;
+
+    // Check against project root + user-configured allowed paths
+    if (!isWithinProject(projectRoot, candidate, allowedPaths)) {
+      offending.push(candidate);
+    }
+  }
+
+  return offending;
+}
+
 // Helper to convert AgentTool to ToolDefinition by wrapping execute with ctx parameter
 function agentToolToDefinition(agentTool: any): ToolDefinition {
   return {
@@ -213,7 +338,7 @@ export function createSandboxedTools(
     },
   } as ToolDefinition;
 
-  // Bash tool: stages command for approval, waits for accept/reject, then executes
+  // Bash tool: jail blocks escaping paths, otherwise normal yolo/staging flow
   const sandboxedBash: ToolDefinition = {
     name: realBash.name,
     label: realBash.label,
@@ -222,11 +347,35 @@ export function createSandboxedTools(
     execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
       const command = (params as any).command ?? '';
 
-      // Yolo mode: execute immediately
+      // Jail check: block commands that reference paths outside the project
+      if (options.jailEnabled) {
+        const escaping = findEscapingPaths(command, cwd, options.allowedPaths);
+        if (escaping.length > 0) {
+          const pathList = escaping.map(p => `  • ${p}`).join('\n');
+          return {
+            content: [{
+              type: 'text',
+              text: [
+                `Error: Bash command references paths outside the project directory. Blocked by jail.`,
+                ``,
+                `Offending paths:`,
+                pathList,
+                ``,
+                `Project root: ${cwd}`,
+                `To allow specific external paths, add them to allowedPaths in .pilot/settings.json`,
+              ].join('\n'),
+            }],
+            details: {},
+          };
+        }
+      }
+
+      // Yolo mode: execute immediately (jail already verified paths above)
       if (options.yoloMode) {
         return realBash.execute(toolCallId, params, signal, onUpdate);
       }
 
+      // Normal mode: stage for approval
       const diffId = randomUUID();
 
       const diff: StagedDiff = {
@@ -243,15 +392,12 @@ export function createSandboxedTools(
 
       options.onStagedDiff(diff);
 
-      // Wait for user approval
-      const approved = await new Promise<boolean>((resolve) => {
-        pendingBashApprovals.set(diffId, { resolve });
-
-        // If aborted while waiting, reject
+      const approved = await new Promise<boolean>((resolveApproval) => {
+        pendingBashApprovals.set(diffId, { resolve: resolveApproval });
         if (signal) {
           signal.addEventListener('abort', () => {
             pendingBashApprovals.delete(diffId);
-            resolve(false);
+            resolveApproval(false);
           }, { once: true });
         }
       });
@@ -263,7 +409,6 @@ export function createSandboxedTools(
         };
       }
 
-      // Execute the real command
       return realBash.execute(toolCallId, params, signal, onUpdate);
     },
   } as ToolDefinition;

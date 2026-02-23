@@ -58,7 +58,9 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
       },
     }));
 
-    // If auto-accept is on for this tool, immediately accept
+    // If auto-accept is on for this tool, immediately accept.
+    // Jail enforcement for bash happens in the main process (findEscapingPaths)
+    // before the diff is even staged, so auto-accept is safe here.
     if (autoAccepted && diff.status === 'pending') {
       get().acceptDiff(tabId, diff.id);
     }
