@@ -11,6 +11,7 @@ interface AppSettingsStore {
   developerMode: boolean;
   autoStartDevServer: boolean;
   keybindOverrides: Record<string, string | null>;
+  hiddenPaths: string[];
   isLoading: boolean;
   error: string | null;
 
@@ -21,6 +22,7 @@ interface AppSettingsStore {
   setEditorCli: (cli: string | null) => Promise<void>;
   setDeveloperMode: (enabled: boolean) => Promise<void>;
   setAutoStartDevServer: (enabled: boolean) => Promise<void>;
+  setHiddenPaths: (paths: string[]) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   setKeybindOverride: (id: string, combo: string | null) => Promise<void>;
   clearKeybindOverride: (id: string) => Promise<void>;
@@ -36,6 +38,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
   developerMode: false,
   autoStartDevServer: false,
   keybindOverrides: {},
+  hiddenPaths: [],
   isLoading: false,
   error: null,
 
@@ -51,6 +54,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
         developerMode: settings.developerMode ?? false,
         autoStartDevServer: settings.autoStartDevServer ?? false,
         keybindOverrides: settings.keybindOverrides ?? {},
+        hiddenPaths: settings.hiddenPaths ?? [],
         isLoading: false,
       });
     } catch (error) {
@@ -70,6 +74,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
         developerMode: updated.developerMode ?? false,
         autoStartDevServer: updated.autoStartDevServer ?? false,
         keybindOverrides: updated.keybindOverrides ?? {},
+        hiddenPaths: updated.hiddenPaths ?? [],
         isLoading: false,
       });
     } catch (error) {
@@ -87,6 +92,10 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
   setAutoStartDevServer: async (enabled: boolean) => {
     set({ autoStartDevServer: enabled }); // optimistic update
     await get().update({ autoStartDevServer: enabled });
+  },
+  setHiddenPaths: async (paths: string[]) => {
+    set({ hiddenPaths: paths });
+    await get().update({ hiddenPaths: paths });
   },
   completeOnboarding: async () => get().update({ onboardingComplete: true }),
   setKeybindOverride: async (id: string, combo: string | null) => {

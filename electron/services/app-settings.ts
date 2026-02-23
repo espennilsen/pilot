@@ -7,6 +7,25 @@ import {
 import type { PilotAppSettings } from '../../shared/types';
 import { expandHome } from '../utils/paths';
 
+export const DEFAULT_HIDDEN_PATHS = [
+  'node_modules',
+  '.git',
+  '.DS_Store',
+  'dist',
+  'out',
+  'build',
+  '.next',
+  '.nuxt',
+  '.cache',
+  'coverage',
+  '__pycache__',
+  '.tox',
+  '.mypy_cache',
+  'target',
+  '.gradle',
+  '*.pyc',
+];
+
 const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   piAgentDir: DEFAULT_PI_AGENT_DIR,
   terminalApp: null,
@@ -14,6 +33,7 @@ const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   onboardingComplete: false,
   developerMode: false,
   keybindOverrides: {},
+  hiddenPaths: DEFAULT_HIDDEN_PATHS,
 };
 
 // ─── Singleton ───────────────────────────────────────────────────────────
@@ -42,6 +62,7 @@ export function loadAppSettings(): PilotAppSettings {
       keybindOverrides: parsed.keybindOverrides ?? {},
       companionPort: parsed.companionPort ?? undefined,
       companionProtocol: parsed.companionProtocol ?? undefined,
+      hiddenPaths: Array.isArray(parsed.hiddenPaths) ? parsed.hiddenPaths : DEFAULT_HIDDEN_PATHS,
     };
     return cachedSettings;
   } catch {

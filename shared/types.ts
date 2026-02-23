@@ -34,6 +34,8 @@ export interface PilotAppSettings {
   companionProtocol?: 'http' | 'https';
   /** Whether to automatically start persistent dev commands on project launch */
   autoStartDevServer?: boolean;
+  /** Glob patterns to hide in the file tree, using .gitignore syntax (e.g. 'node_modules', '*.log', 'dist/'). */
+  hiddenPaths?: string[];
 }
 
 // Sandbox settings

@@ -2,22 +2,17 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { readdirSync, readFileSync, writeFileSync, statSync, renameSync, mkdirSync, rmSync, existsSync, appendFileSync, watch, type FSWatcher } from 'fs';
 import { join, relative, resolve, sep } from 'path';
+import ignore from 'ignore';
 import type { FileNode } from '../../shared/types';
 import { companionBridge } from '../services/companion-ipc-bridge';
+import { loadAppSettings, DEFAULT_HIDDEN_PATHS } from '../services/app-settings';
 
-// Directories/files to skip
-const IGNORED = new Set([
-  'node_modules', '.git', '.DS_Store', 'dist', 'out', 'build',
-  '.next', '.nuxt', '.cache', 'coverage', '.pilot', '.pi',
-  '__pycache__', '.tox', '.mypy_cache', 'target', '.gradle',
-]);
-
-function buildFileTree(dirPath: string, depth = 0, maxDepth = 5): FileNode[] {
+function buildFileTree(dirPath: string, ig: ReturnType<typeof ignore>, depth = 0, maxDepth = 5): FileNode[] {
   if (depth >= maxDepth) return [];
   try {
     const entries = readdirSync(dirPath, { withFileTypes: true });
     return entries
-      .filter(e => !IGNORED.has(e.name) && !e.name.startsWith('.'))
+      .filter(e => !ig.ignores(e.isDirectory() ? e.name + '/' : e.name))
       .sort((a, b) => {
         // Directories first, then alphabetical
         if (a.isDirectory() && !b.isDirectory()) return -1;
@@ -31,7 +26,7 @@ function buildFileTree(dirPath: string, depth = 0, maxDepth = 5): FileNode[] {
             name: entry.name,
             path: fullPath,
             type: 'directory' as const,
-            children: buildFileTree(fullPath, depth + 1, maxDepth),
+            children: buildFileTree(fullPath, ig, depth + 1, maxDepth),
           };
         }
         return {
@@ -76,8 +71,10 @@ export function registerProjectIpc() {
         // Ignore changes in directories we don't show in the tree
         if (filename) {
           const topDir = filename.split(/[/\\]/)[0];
-          if (IGNORED.has(topDir)) return;
-          if (topDir.startsWith('.')) return;
+          const settings = loadAppSettings();
+          const patterns = settings.hiddenPaths ?? DEFAULT_HIDDEN_PATHS;
+          const ig = ignore().add(patterns);
+          if (ig.ignores(topDir) || ig.ignores(topDir + '/')) return;
         }
         // Debounce — batch rapid changes into one notification
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -106,7 +103,10 @@ export function registerProjectIpc() {
 
   ipcMain.handle(IPC.PROJECT_FILE_TREE, async () => {
     if (!currentProjectPath) return [];
-    return buildFileTree(currentProjectPath);
+    const settings = loadAppSettings();
+    const patterns = settings.hiddenPaths ?? DEFAULT_HIDDEN_PATHS;
+    const ig = ignore().add(patterns);
+    return buildFileTree(currentProjectPath, ig);
   });
 
   ipcMain.handle(IPC.PROJECT_FILE_SEARCH, async (_event, query: string, includeDirs?: boolean) => {
