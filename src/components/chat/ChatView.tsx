@@ -32,13 +32,20 @@ export default function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const prevTabIdRef = useRef(activeTabId);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Instant scroll to bottom on tab switch, smooth scroll for new messages
   useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, autoScroll]);
+    if (!autoScroll || !messagesEndRef.current) return;
+    const isTabSwitch = prevTabIdRef.current !== activeTabId;
+    prevTabIdRef.current = activeTabId;
+    messagesEndRef.current.scrollIntoView({ behavior: isTabSwitch ? 'instant' : 'smooth' });
+  }, [messages, autoScroll, activeTabId]);
+
+  // Reset auto-scroll when switching tabs
+  useEffect(() => {
+    setAutoScroll(true);
+  }, [activeTabId]);
 
   // Smart scroll pause: stop auto-scroll when user scrolls up
   const handleScroll = () => {
