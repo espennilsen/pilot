@@ -6,10 +6,12 @@ Sessions are the core of Pilot's workflow. Each session is an independent conver
 
 ## What is a Session?
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+
 A **session** is:
 - A persistent chat conversation with the AI agent
 - Associated with zero or one project
-- Stored as a `.jsonl` file in `~/.config/.pilot/sessions/`
+- Stored as a `.jsonl` file in `<PILOT_DIR>/sessions/`
 - Resumable at any time — full context is preserved
 - Isolated from other sessions (no cross-session context leakage)
 
@@ -32,7 +34,7 @@ When you create a new session:
 - A new tab opens in the tab bar
 - You're prompted to assign a project (optional)
 - A unique session ID is generated
-- The session is saved to `~/.config/.pilot/sessions/<session-id>.jsonl`
+- The session is saved to `<PILOT_DIR>/sessions/<session-id>.jsonl`
 
 ### Naming Sessions
 
@@ -184,7 +186,7 @@ Sessions can be created without a project assignment:
 
 Sessions are saved in the Pi SDK's session directory:
 ```
-~/.config/.pilot/sessions/<session-id>.jsonl
+<PILOT_DIR>/sessions/<session-id>.jsonl
 ```
 
 Each session file is a **JSON Lines** file where:
@@ -209,7 +211,7 @@ Delete old sessions:
    Right-click a session → "Delete Session"
 
 2. **Manual Deletion**  
-   Remove the `.jsonl` file from `~/.config/.pilot/sessions/`
+   Remove the `.jsonl` file from `<PILOT_DIR>/sessions/`
 
 **Warning**: Deleted sessions cannot be recovered.
 
@@ -227,7 +229,7 @@ Every agent message includes:
    - Project-specific context (if assigned)
 
 2. **Memory Injection**  
-   - [Global memory](./memory.md#global-memory) from `~/.config/.pilot/MEMORY.md`
+   - [Global memory](./memory.md#global-memory) from `<PILOT_DIR>/MEMORY.md`
    - [Project memory](./memory.md#project-memory) from `.pilot/MEMORY.md`
 
 3. **Chat History**  

@@ -4,6 +4,7 @@ import { useHighlight } from '../../hooks/useHighlight';
 import { useTabStore } from '../../stores/tab-store';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on } from '../../lib/ipc-client';
+import { shortcutLabel } from '../../lib/keybindings';
 import 'highlight.js/styles/tokyo-night-dark.css';
 
 interface FileEditorState {
@@ -298,7 +299,7 @@ export default function FileEditor() {
                 onClick={saveFile}
                 disabled={state.isSaving || !isDirty || state.hasConflict}
                 className="p-1.5 hover:bg-bg-base rounded transition-colors disabled:opacity-40"
-                title="Save (⌘S)"
+                title={`Save (${shortcutLabel('S')})`}
               >
                 <Save className={`w-4 h-4 ${isDirty ? 'text-accent' : 'text-text-secondary'}`} />
               </button>
@@ -308,7 +309,7 @@ export default function FileEditor() {
               <button
                 onClick={startEditing}
                 className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-base rounded transition-colors"
-                title="Edit file (⌘E)"
+                title={`Edit file (${shortcutLabel('E')})`}
               >
                 Edit
               </button>

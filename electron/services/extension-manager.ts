@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync, cpSync } from 'fs';
 import { join, basename } from 'path';
-import { execFileSync } from 'child_process';
+import AdmZip from 'adm-zip';
 import {
   PILOT_EXTENSIONS_DIR,
   PILOT_SKILLS_DIR,
@@ -179,7 +179,13 @@ export class ExtensionManager {
           for (const item of readdirSync(subDir)) {
             const src = join(subDir, item);
             const dest = join(extPath, item);
-            execFileSync('mv', [src, dest]);
+            try {
+              renameSync(src, dest);
+            } catch {
+              // Cross-device fallback: copy then delete
+              cpSync(src, dest, { recursive: true });
+              rmSync(src, { recursive: true, force: true });
+            }
           }
           rmSync(subDir, { recursive: true, force: true });
         } else {
@@ -311,7 +317,13 @@ export class ExtensionManager {
           for (const item of readdirSync(subDir)) {
             const src = join(subDir, item);
             const dest = join(skillPath, item);
-            execFileSync('mv', [src, dest]);
+            try {
+              renameSync(src, dest);
+            } catch {
+              // Cross-device fallback: copy then delete
+              cpSync(src, dest, { recursive: true });
+              rmSync(src, { recursive: true, force: true });
+            }
           }
           rmSync(subDir, { recursive: true, force: true });
         } else {
@@ -351,25 +363,13 @@ export class ExtensionManager {
   // --- ZIP Extraction ---
 
   private extractZip(zipPath: string, targetDir: string): void {
-    // Use system `unzip` (available on macOS and Linux)
-    // -o: overwrite without prompting, -q: quiet
     try {
-      execFileSync('unzip', ['-o', '-q', zipPath, '-d', targetDir], {
-        timeout: 30_000,
-        stdio: 'pipe',
-      });
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(targetDir, true); // overwrite = true
     } catch (err) {
-      // Fallback: try `tar` which handles ZIP on some systems
-      try {
-        execFileSync('tar', ['-xf', zipPath, '-C', targetDir], {
-          timeout: 30_000,
-          stdio: 'pipe',
-        });
-      } catch {
-        throw new Error(
-          `Failed to extract ZIP: ${err instanceof Error ? err.message : 'unzip and tar both failed'}`
-        );
-      }
+      throw new Error(
+        `Failed to extract ZIP: ${err instanceof Error ? err.message : 'Unknown error'}`
+      );
     }
   }
 

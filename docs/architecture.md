@@ -143,9 +143,11 @@ User rejects → discard (no filesystem touch)
 
 **Solution**: Two-tier Markdown memory system:
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+
 | Tier | Path | Scope | Git-Trackable |
 |---|---|---|---|
-| **Global** | `~/.config/.pilot/MEMORY.md` | User preferences across all projects | ❌ No |
+| **Global** | `<PILOT_DIR>/MEMORY.md` | User preferences across all projects | ❌ No |
 | **Project** | `<project>/.pilot/MEMORY.md` | Team knowledge, conventions | ✅ Yes |
 
 **Injection**: Both tiers are concatenated and injected into the agent's system prompt when a session starts.
@@ -177,7 +179,7 @@ The client auto-detects the environment and routes accordingly. Stores and hooks
 **Components**:
 - `useTabStore` (renderer) — Tab list, active tab, closed-tab stack
 - `PilotSessionManager` (main) — SDK `AgentSession` instances per tab
-- `WorkspaceStateService` (main) — Saves/restores tab layout to `~/.config/.pilot/workspace.json`
+- `WorkspaceStateService` (main) — Saves/restores tab layout to `<PILOT_DIR>/workspace.json`
 
 **Lifecycle**:
 1. User creates a tab → `TAB_CREATE` → Main creates session → Renderer adds tab to store
@@ -232,8 +234,8 @@ Services are instantiated in `electron/main/index.ts` and injected into IPC hand
 | **MemoryManager** | `memory-manager.ts` | Reads/writes two-tier Markdown memory files (global + project). Builds system prompt injection. |
 | **DevCommandsService** | `dev-commands.ts` | Spawns/kills child processes for dev commands. Streams stdout/stderr to renderer. |
 | **TerminalService** | `terminal-service.ts` | PTY management via `node-pty`. Handles terminal creation, resize, input, kill. |
-| **ExtensionManager** | `extension-manager.ts` | Lists/toggles/removes extensions and skills from `~/.config/.pilot/extensions/` and `~/.config/.pilot/skills/`. |
-| **WorkspaceStateService** | `workspace-state.ts` | Saves and restores tab layout + UI state to `~/.config/.pilot/workspace.json`. |
+| **ExtensionManager** | `extension-manager.ts` | Lists/toggles/removes extensions and skills from `<PILOT_DIR>/extensions/` and `<PILOT_DIR>/skills/`. |
+| **WorkspaceStateService** | `workspace-state.ts` | Saves and restores tab layout + UI state to `<PILOT_DIR>/workspace.json`. |
 | **CompanionServer** | `companion-server.ts` | HTTPS + WebSocket server for mobile companion access. |
 | **CompanionAuth** | `companion-auth.ts` | PIN/QR pairing, session token generation/validation. |
 | **CompanionDiscovery** | `companion-discovery.ts` | mDNS/Bonjour advertisement for local network discovery. |
@@ -451,7 +453,7 @@ PiLot/
 │       ├── terminal-service.ts     # node-pty wrapper
 │       ├── extension-manager.ts    # Extension/skill discovery
 │       ├── workspace-state.ts      # Tab layout persistence
-│       ├── pilot-paths.ts          # Path utilities (~/.config/.pilot/*)
+│       ├── pilot-paths.ts          # Path utilities (cross-platform)
 │       ├── app-settings.ts         # App settings persistence
 │       ├── companion-server.ts     # HTTPS + WebSocket server
 │       ├── companion-auth.ts       # PIN/QR pairing, tokens
@@ -521,10 +523,10 @@ npm run preview    # Preview production build
 ```
 
 **Config Files**:
-- `~/.config/.pilot/` — All app data (auth, settings, sessions, workspace, extensions, memory)
+- `<PILOT_DIR>/` — All app data (auth, settings, sessions, workspace, extensions, memory)
 - `<project>/.pilot/` — Project-specific settings (jail, commands, shared memory)
 
-**Resetting State**: `rm -rf ~/.config/.pilot/` — safe to do at any time (will require re-auth).
+**Resetting State**: Delete the `<PILOT_DIR>` directory to reset all settings (will require re-auth).
 
 ---
 

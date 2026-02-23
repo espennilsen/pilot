@@ -144,7 +144,7 @@ All companion connections use TLS encryption (HTTPS/WSS). Even on your local net
 - Pairing codes expire after 5 minutes
 - Session tokens are long-lived and stored securely
 - On iOS, tokens are stored in the Keychain
-- On the desktop, tokens are stored in `~/.config/.pilot/`
+- On the desktop, tokens are stored in `<PILOT_DIR>/`
 
 ### Certificate Pinning
 
@@ -200,9 +200,9 @@ Diff review works the same as desktop — tap **Accept** or **Reject** on each s
 
 ### Config File
 
-Companion settings are stored in `~/.config/.pilot/app-settings.json`.
+Companion settings are stored in `<PILOT_DIR>/app-settings.json`.
 
-Paired device tokens are stored separately in `~/.config/.pilot/companion-tokens.json`.
+Paired device tokens are stored separately in `<PILOT_DIR>/companion-tokens.json`.
 
 ---
 

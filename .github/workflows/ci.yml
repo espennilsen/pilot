@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build-cmd: npm run build:mac
+            artifact-pattern: |
+              release/*.dmg
+              release/*.zip
+          - os: windows-latest
+            build-cmd: npm run build:win
+            artifact-pattern: |
+              release/*-setup.exe
+              release/*-portable.exe
+              release/*.zip
+          - os: ubuntu-latest
+            build-cmd: npm run build:linux
+            artifact-pattern: |
+              release/*.AppImage
+              release/*.deb
+              release/*.tar.gz
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Linux: install native module build deps and electron runtime deps
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libx11-dev libxkbfile-dev
+
+      # Windows: ensure native module toolchain
+      - name: Install Windows build tools
+        if: runner.os == 'Windows'
+        run: npm install --global windows-build-tools@5.2.2 || true
+        continue-on-error: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Code signing: disabled by default. To enable:
+      #   macOS: set CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD
+      #   Windows: set WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD
+      - name: Build
+        run: ${{ matrix.build-cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: ${{ matrix.artifact-pattern }}
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: '**/*'
+          draft: true
+          generate_release_notes: true

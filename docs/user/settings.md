@@ -2,6 +2,8 @@
 
 Pilot's settings panel lets you configure authentication, models, project behavior, extensions, keybindings, and more. Access settings with `Cmd+,` or through the command palette.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+
 ---
 
 ## Opening Settings
@@ -134,7 +136,7 @@ Some providers use OAuth instead of API keys:
 - **Regenerate**: If a key is compromised, regenerate in the provider's console and update Pilot
 - **Remove**: Click the trash icon to delete a key
 
-**Security**: API keys are stored in `~/.config/.pilot/auth.json` with file permissions set to `600` (readable only by you).
+**Security**: API keys are stored in `<PILOT_DIR>/auth.json` with file permissions set to `600` (readable only by you).
 
 ---
 
@@ -231,7 +233,7 @@ Access Pilot from outside your local network:
 
 ### Extension Directory
 
-**Location**: `~/.config/.pilot/extensions/`
+**Location**: `<PILOT_DIR>/extensions/`
 
 **Purpose**: Add custom tools, themes, and UI components to Pilot.
 
@@ -253,7 +255,7 @@ View and manage installed extensions:
 1. **From Disk**:
    - Click **"Install from Folder"**
    - Select the extension directory
-   - Extension is copied to `~/.config/.pilot/extensions/`
+   - Extension is copied to `<PILOT_DIR>/extensions/`
 
 2. **From URL** (coming soon):
    - Click **"Install from URL"**
@@ -261,7 +263,7 @@ View and manage installed extensions:
    - Extension is downloaded and installed
 
 3. **Manual Installation**:
-   - Copy extension folder to `~/.config/.pilot/extensions/`
+   - Copy extension folder to `<PILOT_DIR>/extensions/`
    - Restart Pilot
    - Extension appears in the list
 
@@ -275,7 +277,7 @@ See [Pi SDK documentation](https://github.com/mariozechner/pi-coding-agent/blob/
 
 ### Skill Directory
 
-**Location**: `~/.config/.pilot/skills/`
+**Location**: `<PILOT_DIR>/skills/`
 
 **Purpose**: Skills are specialized instructions for specific tasks (e.g., "generate changelog", "code review").
 
@@ -384,7 +386,7 @@ Skills are Markdown files with structured instructions. See [Pi SDK skills docum
 
 #### Log Directory
 
-**Location**: `~/.config/.pilot/logs/`
+**Location**: `<PILOT_DIR>/logs/`
 
 **Files**:
 - `main.log` — Main process logs
@@ -469,7 +471,7 @@ To disable a shortcut without assigning a new one:
 
 #### Global Memory
 
-**Path**: `~/.config/.pilot/MEMORY.md`
+**Path**: `<PILOT_DIR>/MEMORY.md`
 
 **Editable**: Yes (click to open in editor)
 
@@ -549,7 +551,7 @@ Follow these conventions:
 
 **Purpose**: Where session `.jsonl` files are stored.
 
-**Default**: `~/.config/.pilot/sessions/`
+**Default**: `<PILOT_DIR>/sessions/`
 
 **Change**:
 1. Click **"Change Location"**
@@ -562,7 +564,7 @@ Follow these conventions:
 
 **Purpose**: Where temporary files and caches are stored.
 
-**Default**: `~/.config/.pilot/cache/`
+**Default**: `<PILOT_DIR>/cache/`
 
 **Clear Cache**:
 1. Click **"Clear Cache"**
@@ -600,10 +602,7 @@ Follow these conventions:
 
 **Complete Reset** (including data):
 1. Quit Pilot
-2. Delete `~/.config/.pilot/` directory:
-   ```bash
-   rm -rf ~/.config/.pilot/
-   ```
+2. Delete the `<PILOT_DIR>` directory (platform-specific location noted above)
 3. Relaunch Pilot
 4. Reconfigure from scratch
 
@@ -637,13 +636,13 @@ Follow these conventions:
 
 | Setting | File |
 |---------|------|
-| App settings | `~/.config/.pilot/app-settings.json` |
-| API keys | `~/.config/.pilot/auth.json` |
-| Workspace state | `~/.config/.pilot/workspace.json` |
-| Model registry | `~/.config/.pilot/models.json` |
-| Extension registry | `~/.config/.pilot/extension-registry.json` |
-| Companion tokens | `~/.config/.pilot/companion-tokens.json` |
-| Companion TLS cert | `~/.config/.pilot/companion-cert.pem` |
+| App settings | `<PILOT_DIR>/app-settings.json` |
+| API keys | `<PILOT_DIR>/auth.json` |
+| Workspace state | `<PILOT_DIR>/workspace.json` |
+| Model registry | `<PILOT_DIR>/models.json` |
+| Extension registry | `<PILOT_DIR>/extension-registry.json` |
+| Companion tokens | `<PILOT_DIR>/companion-tokens.json` |
+| Companion TLS cert | `<PILOT_DIR>/companion-cert.pem` |
 | Project settings | `<project>/.pilot/settings.json` |
 
 ### Manual Editing
@@ -664,14 +663,17 @@ Follow these conventions:
 ### Settings Not Saving
 
 **Check**:
-1. File permissions on `~/.config/.pilot/` (should be writable)
+1. File permissions on `<PILOT_DIR>/` (should be writable)
 2. Disk space (low disk space can prevent saves)
 3. Developer console for errors (`Cmd+Shift+I`)
 
-**Solution**:
+**Solution (macOS/Linux)**:
 ```bash
 chmod -R u+w ~/.config/.pilot/
 ```
+
+**Solution (Windows)**:
+Right-click the `%APPDATA%\.pilot` folder → Properties → Security → ensure your user has "Full control"
 
 ### Settings Corrupted
 
@@ -679,7 +681,7 @@ chmod -R u+w ~/.config/.pilot/
 
 **Solution**:
 1. Quit Pilot
-2. Rename the corrupted file:
+2. Rename the corrupted file (example for macOS/Linux):
    ```bash
    mv ~/.config/.pilot/app-settings.json ~/.config/.pilot/app-settings.json.backup
    ```

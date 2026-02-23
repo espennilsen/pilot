@@ -60,7 +60,7 @@ interface AppSettingsStore {
 ```
 
 **Actions:**
-- `load()` — Load settings from `~/.config/.pilot/app-settings.json`
+- `load()` — Load settings from `<PILOT_DIR>/app-settings.json`
 - `update(updates)` — Update settings on disk and in memory
 - `setPiAgentDir(dir)` — Change Pi agent directory
 - `setTerminalApp(app)` — Set default terminal app
@@ -76,7 +76,7 @@ interface AppSettingsStore {
 
 **Notes:**
 - Developer mode state is updated optimistically before IPC call
-- Default `piAgentDir` is `~/.config/.pilot`
+- Default `piAgentDir` is `<PILOT_DIR>` (platform-dependent)
 
 ---
 
@@ -306,7 +306,7 @@ interface ExtensionStore {
 - `IPC.SKILLS_IMPORT_ZIP` — Import skill
 
 **Notes:**
-- Extensions and skills can be global (`~/.config/.pilot/extensions|skills/`) or project-scoped (`<project>/.pilot/extensions|skills/`)
+- Extensions and skills can be global (`<PILOT_DIR>/extensions|skills/`) or project-scoped (`<project>/.pilot/extensions|skills/`)
 - State is reloaded after toggle/remove/import operations
 
 ---

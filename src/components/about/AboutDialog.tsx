@@ -136,7 +136,7 @@ export function AboutDialog() {
                 </>
               )}
               <span className="text-text-secondary">Platform</span>
-              <span className="text-text-primary font-mono">{navigator.platform}</span>
+              <span className="text-text-primary font-mono">{window.api?.platform || navigator.platform}</span>
             </div>
           </div>
 

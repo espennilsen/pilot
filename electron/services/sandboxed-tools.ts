@@ -10,10 +10,10 @@ import {
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { structuredPatch } from 'diff';
 import { readFileSync, existsSync } from 'fs';
-import { resolve, relative, isAbsolute, join } from 'path';
-import { homedir } from 'os';
+import { resolve, relative, isAbsolute } from 'path';
 import { randomUUID } from 'crypto';
 import type { StagedDiff } from '../../shared/types';
+import { expandHome } from '../utils/paths';
 
 /** Generate a unified diff string using the diff package (same engine as pi's edit tool). */
 function generateUnifiedDiff(oldContent: string, newContent: string, contextLines = 3): string {
@@ -49,22 +49,19 @@ export function resolveBashApproval(diffId: string, approved: boolean) {
   }
 }
 
-function expandHome(p: string): string {
-  const home = homedir();
-  if (p === '~') return home;
-  if (p.startsWith('~/') || p.startsWith('~\\')) return join(home, p.slice(2));
-  return p;
-}
-
 function isWithinProject(projectRoot: string, filePath: string, allowedPaths: string[]): boolean {
   const resolved = isAbsolute(filePath) ? resolve(filePath) : resolve(projectRoot, filePath);
-  const rel = relative(projectRoot, resolved);
+  // On Windows, normalize case for comparison (C:\Foo vs c:\foo are the same path)
+  const norm = (p: string) => process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p);
+  const normalRoot = norm(projectRoot);
+  const normalResolved = norm(resolved);
+  const rel = relative(normalRoot, normalResolved);
   // Path is within project if it doesn't start with '..'
   if (!rel.startsWith('..') && !isAbsolute(rel)) return true;
   // Check allowed paths
   for (const allowed of allowedPaths) {
-    const resolvedAllowed = resolve(expandHome(allowed));
-    const relToAllowed = relative(resolvedAllowed, resolved);
+    const normalAllowed = norm(expandHome(allowed));
+    const relToAllowed = relative(normalAllowed, normalResolved);
     if (!relToAllowed.startsWith('..') && !isAbsolute(relToAllowed)) return true;
   }
   return false;

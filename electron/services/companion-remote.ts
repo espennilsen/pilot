@@ -162,7 +162,7 @@ export async function setupTailscaleProxy(port: number): Promise<TailscaleResult
   try {
     // Check if tailscale CLI is installed
     try {
-      execSync('which tailscale', { stdio: 'ignore' });
+      execSync(process.platform === 'win32' ? 'where tailscale' : 'which tailscale', { stdio: 'ignore' });
     } catch {
       throw new Error('Tailscale CLI not found. Install Tailscale from https://tailscale.com/download');
     }
@@ -194,8 +194,8 @@ export async function setupTailscaleProxy(port: number): Promise<TailscaleResult
     let useTailscaleCerts = false;
     try {
       const certOutput = execSync(
-        `tailscale cert --cert-file="${certPath}" --key-file="${keyPath}" "${dnsName}" 2>&1`,
-        { encoding: 'utf-8' }
+        `tailscale cert --cert-file="${certPath}" --key-file="${keyPath}" "${dnsName}"`,
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
       console.log(`[CompanionRemote] Generated Tailscale TLS certs for ${dnsName}`);
       useTailscaleCerts = true;
@@ -256,7 +256,7 @@ export async function setupCloudflareTunnel(
   try {
     // Check if cloudflared is installed
     try {
-      execSync('which cloudflared', { stdio: 'ignore' });
+      execSync(process.platform === 'win32' ? 'where cloudflared' : 'which cloudflared', { stdio: 'ignore' });
     } catch {
       console.log('cloudflared not found in PATH');
       return null;

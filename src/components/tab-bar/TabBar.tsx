@@ -4,6 +4,7 @@ import { TabGroup } from './TabGroup';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
+import { shortcutLabel } from '../../lib/keybindings';
 
 export function TabBar() {
   const { addTab, closeTab, nextTab, prevTab, reopenClosedTab, switchToTabByIndex, activeTabId, moveTab, getGroupedTabs } = useTabStore();
@@ -173,7 +174,7 @@ export function TabBar() {
       )}
 
       {/* Add tab button */}
-      <Tooltip content="New tab (Cmd+T)" position="bottom">
+      <Tooltip content={`New tab (${shortcutLabel('T')})`} position="bottom">
         <button
           onClick={() => addTab()}
           className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors"

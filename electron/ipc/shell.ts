@@ -1,5 +1,5 @@
 import { ipcMain, shell } from 'electron';
-import { exec, execFile, execSync } from 'child_process';
+import { exec, execFile, execFileSync, execSync } from 'child_process';
 import { existsSync, statSync } from 'fs';
 import { dirname } from 'path';
 import { IPC } from '../../shared/ipc';
@@ -37,7 +37,10 @@ const EDITOR_DEFS = [
 
 function whichSync(cmd: string): string | null {
   try {
-    return execSync(`which ${cmd}`, { encoding: 'utf-8', timeout: 2000 }).trim() || null;
+    const bin = process.platform === 'win32' ? 'where' : 'which';
+    const result = execFileSync(bin, [cmd], { encoding: 'utf-8', timeout: 2000, stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    // `where` on Windows may return multiple lines — take the first
+    return result.split(/\r?\n/)[0] || null;
   } catch {
     return null;
   }
@@ -60,7 +63,7 @@ function detectEditors(): DetectedEditor[] {
     }
   }
 
-  // Fallback: on macOS, check for .app bundles without CLI installed
+  // Platform-specific fallback detection for editors without CLI in PATH
   if (process.platform === 'darwin') {
     const foundIds = new Set(found.map(e => e.id));
     for (const def of EDITOR_DEFS) {
@@ -76,6 +79,38 @@ function detectEditors(): DetectedEditor[] {
         }
       } catch {
         // skip
+      }
+    }
+  } else if (process.platform === 'win32') {
+    // Check common Windows install paths for editors not found via PATH
+    const foundIds = new Set(found.map(e => e.id));
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const localAppData = process.env['LOCALAPPDATA'] || '';
+    const winEditorPaths: { id: string; name: string; paths: string[] }[] = [
+      { id: 'vscode', name: 'VS Code', paths: [
+        `${programFiles}\\Microsoft VS Code\\Code.exe`,
+        `${localAppData}\\Programs\\Microsoft VS Code\\Code.exe`,
+      ]},
+      { id: 'vscode-insiders', name: 'VS Code Insiders', paths: [
+        `${programFiles}\\Microsoft VS Code Insiders\\Code - Insiders.exe`,
+        `${localAppData}\\Programs\\Microsoft VS Code Insiders\\Code - Insiders.exe`,
+      ]},
+      { id: 'cursor', name: 'Cursor', paths: [
+        `${localAppData}\\Programs\\cursor\\Cursor.exe`,
+      ]},
+      { id: 'sublime', name: 'Sublime Text', paths: [
+        `${programFiles}\\Sublime Text\\subl.exe`,
+        `${programFiles}\\Sublime Text 3\\subl.exe`,
+      ]},
+    ];
+    for (const def of winEditorPaths) {
+      if (foundIds.has(def.id)) continue;
+      for (const p of def.paths) {
+        if (existsSync(p)) {
+          found.push({ id: def.id, name: def.name, cli: p });
+          foundIds.add(def.id);
+          break;
+        }
       }
     }
   }
@@ -96,6 +131,22 @@ const TERMINAL_DEFS = [
   { id: 'rio',         name: 'Rio',              app: 'Rio',                bundleId: 'com.raphaelamorim.rio' },
   { id: 'wezterm',     name: 'WezTerm',          app: 'WezTerm',            bundleId: 'com.github.wez.wezterm' },
 ];
+
+// Map terminal IDs to their working-directory flags (Linux/Windows open-in-terminal)
+const TERMINAL_CWD_FLAGS: Record<string, (dir: string) => string[]> = {
+  'gnome-terminal': (dir) => ['--working-directory=' + dir],
+  'konsole':        (dir) => ['--workdir', dir],
+  'kitty':          (dir) => ['--directory', dir],
+  'alacritty':      (dir) => ['--working-directory', dir],
+  'wezterm':        (dir) => ['start', '--cwd', dir],
+  'ghostty':        (dir) => ['--working-directory=' + dir],
+  'xterm':          (dir) => ['-e', `cd "${dir}" && $SHELL`],
+  // Windows terminals
+  'wt':             (dir) => ['-d', dir],
+  'pwsh':           (dir) => ['-WorkingDirectory', dir],
+  'powershell':     (dir) => ['-NoExit', '-Command', `Set-Location '${dir}'`],
+  'cmd':            (dir) => ['/K', `cd /d "${dir}"`],
+};
 
 let cachedTerminals: DetectedTerminal[] | null = null;
 
@@ -122,8 +173,29 @@ function detectTerminals(): DetectedTerminal[] {
     if (!found.some(t => t.id === 'terminal')) {
       found.unshift({ id: 'terminal', name: 'Terminal', app: 'Terminal' });
     }
+  } else if (process.platform === 'win32') {
+    // Windows terminals
+    const winTerminals = [
+      { id: 'wt',         name: 'Windows Terminal', app: 'wt' },
+      { id: 'pwsh',       name: 'PowerShell 7',     app: 'pwsh' },
+      { id: 'powershell', name: 'PowerShell',       app: 'powershell' },
+      { id: 'cmd',        name: 'Command Prompt',   app: 'cmd' },
+      { id: 'alacritty',  name: 'Alacritty',        app: 'alacritty' },
+      { id: 'wezterm',    name: 'WezTerm',          app: 'wezterm' },
+      { id: 'kitty',      name: 'Kitty',            app: 'kitty' },
+      { id: 'hyper',      name: 'Hyper',            app: 'hyper' },
+    ];
+    for (const def of winTerminals) {
+      if (whichSync(def.app)) {
+        found.push(def);
+      }
+    }
+    // cmd.exe is always available on Windows
+    if (!found.some(t => t.id === 'cmd')) {
+      found.push({ id: 'cmd', name: 'Command Prompt', app: 'cmd' });
+    }
   } else {
-    // Linux/Windows: check for CLI commands
+    // Linux: check for CLI commands
     const linuxTerminals = [
       { id: 'gnome-terminal', name: 'GNOME Terminal', app: 'gnome-terminal' },
       { id: 'konsole',        name: 'Konsole',        app: 'konsole' },
@@ -159,16 +231,26 @@ export function registerShellIpc() {
     if (process.platform === 'darwin') {
       const app = terminalApp || 'Terminal';
       execFile('open', ['-a', app, dir]);
-    } else if (process.platform === 'win32') {
-      if (terminalApp) {
-        exec(`start "" "${terminalApp}" /d "${dir}"`);
-      } else {
-        exec(`start cmd /K "cd /d ${dir}"`);
-      }
     } else {
-      if (terminalApp) {
-        execFile(terminalApp, ['--working-directory=' + dir]);
+      // Linux and Windows: use per-terminal working-directory flags
+      const terminals = detectTerminals();
+      const terminal = terminalApp
+        ? terminals.find(t => t.app === terminalApp || t.name === terminalApp)
+        : terminals[0];
+
+      if (terminal) {
+        const flagFn = TERMINAL_CWD_FLAGS[terminal.id];
+        if (flagFn) {
+          execFile(terminal.app, flagFn(dir));
+        } else {
+          // Unknown terminal — try generic --working-directory
+          execFile(terminal.app, ['--working-directory=' + dir]);
+        }
+      } else if (process.platform === 'win32') {
+        // Fallback: cmd.exe
+        execFile('cmd', ['/K', `cd /d "${dir}"`]);
       } else {
+        // Fallback: xdg-open
         execFile('xdg-open', [dir]);
       }
     }

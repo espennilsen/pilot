@@ -53,12 +53,24 @@ function getSessionDir(piAgentDir: string, cwd: string): string {
 /**
  * Decode a session directory name back to a cwd.
  * Handles both new `+` encoding and legacy `-` encoding.
+ * On Windows, reconstructs drive letters properly (e.g., "C/Users/foo" → "C:\Users\foo").
  */
 function decodeDirName(dirName: string): string {
   const inner = dirName.replace(/^--/, '').replace(/--$/, '');
   // New format uses `+` as separator (round-trips safely with hyphens in names)
   // Legacy format uses `-` (lossy for hyphenated names, but best-effort)
   const decoded = inner.includes('+') ? inner.replace(/\+/g, '/') : inner.replace(/-/g, '/');
+  
+  // On Windows, detect drive letter pattern (e.g., "C/Users/foo") and reconstruct as "C:\Users\foo"
+  if (process.platform === 'win32' && /^[a-zA-Z]\//.test(decoded)) {
+    const driveLetter = decoded[0];
+    const restOfPath = decoded.slice(2); // Everything after "C/"
+    if (restOfPath) {
+      return `${driveLetter}:\\${restOfPath.replace(/\//g, '\\')}`;
+    }
+    return `${driveLetter}:\\`;
+  }
+  
   return '/' + decoded;
 }
 

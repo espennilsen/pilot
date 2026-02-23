@@ -2,6 +2,8 @@
 
 Complete reference documentation for all services in `electron/services/`. Each service runs in the Electron main process and provides core functionality to the application.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+
 ---
 
 ## Service Overview
@@ -307,7 +309,7 @@ No parameters. Uses hardcoded Pilot app directory paths.
 | `getMemoryPaths` | `(projectPath: string) => {global, project}` | Get file paths for both memory tiers |
 
 **Memory File Paths:**
-- **Global:** `~/.config/.pilot/MEMORY.md`
+- **Global:** `<PILOT_DIR>/MEMORY.md`
 - **Project:** `<project>/.pilot/MEMORY.md` (can be git-tracked)
 
 **Key Implementation Notes:**
@@ -422,7 +424,7 @@ Requires main window reference to send IPC events.
 **File:** `electron/services/extension-manager.ts`
 
 **Responsibility:**  
-Lists, enables/disables, imports, and removes extensions and skills. Scans both global (`~/.config/.pilot/extensions/`, `~/.config/.pilot/skills/`) and project-local (`<project>/.pilot/extensions/`, `<project>/.pilot/skills/`) directories. Manages enable/disable registry.
+Lists, enables/disables, imports, and removes extensions and skills. Scans both global (`<PILOT_DIR>/extensions/`, `<PILOT_DIR>/skills/`) and project-local (`<project>/.pilot/extensions/`, `<project>/.pilot/skills/`) directories. Manages enable/disable registry.
 
 **Constructor:**
 ```typescript
@@ -445,7 +447,7 @@ No parameters. Initializes registry if missing.
 
 **Extension Structure:**
 - Must contain `package.json` at root
-- Enabled/disabled state is persisted in `~/.config/.pilot/extension-registry.json`
+- Enabled/disabled state is persisted in `<PILOT_DIR>/extension-registry.json`
 
 **Skill Structure:**
 - Must contain `SKILL.md` at root
@@ -469,7 +471,7 @@ No parameters. Initializes registry if missing.
 **File:** `electron/services/workspace-state.ts`
 
 **Responsibility:**  
-Saves and restores tab layout + UI state to `~/.config/.pilot/workspace.json`. Includes tabs, active tab, sidebar/panel visibility, window bounds, and project paths.
+Saves and restores tab layout + UI state to `<PILOT_DIR>/workspace.json`. Includes tabs, active tab, sidebar/panel visibility, window bounds, and project paths.
 
 **Constructor:**
 ```typescript
@@ -522,7 +524,7 @@ interface SavedUIState {
 **File:** `electron/services/app-settings.ts`
 
 **Responsibility:**  
-Reads and writes app-level settings to `~/.config/.pilot/app-settings.json`. Includes Pi agent directory, terminal app, editor CLI, onboarding state, developer mode, keybind overrides, and companion server config.
+Reads and writes app-level settings to `<PILOT_DIR>/app-settings.json`. Includes Pi agent directory, terminal app, editor CLI, onboarding state, developer mode, keybind overrides, and companion server config.
 
 **Key Functions:**
 
@@ -536,7 +538,7 @@ Reads and writes app-level settings to `~/.config/.pilot/app-settings.json`. Inc
 **PilotAppSettings Type:**
 ```typescript
 interface PilotAppSettings {
-  piAgentDir: string;               // Default: ~/.config/.pilot
+  piAgentDir: string;               // Default: <PILOT_DIR>
   terminalApp: string | null;       // e.g., "iTerm.app"
   editorCli: string | null;         // e.g., "code"
   onboardingComplete: boolean;
@@ -567,16 +569,16 @@ Centralized path resolution for all Pilot config files. No class — just export
 
 | Export | Type | Value |
 |--------|------|-------|
-| `PILOT_APP_DIR` | `string` | `~/.config/.pilot` |
-| `PILOT_APP_SETTINGS_FILE` | `string` | `~/.config/.pilot/app-settings.json` |
-| `PILOT_WORKSPACE_FILE` | `string` | `~/.config/.pilot/workspace.json` |
-| `PILOT_AUTH_FILE` | `string` | `~/.config/.pilot/auth.json` |
-| `PILOT_MODELS_FILE` | `string` | `~/.config/.pilot/models.json` |
-| `PILOT_EXTENSIONS_DIR` | `string` | `~/.config/.pilot/extensions` |
-| `PILOT_SKILLS_DIR` | `string` | `~/.config/.pilot/skills` |
-| `PILOT_EXTENSION_REGISTRY_FILE` | `string` | `~/.config/.pilot/extension-registry.json` |
-| `PILOT_PROMPTS_DIR` | `string` | `~/.config/.pilot/prompts` |
-| `DEFAULT_PI_AGENT_DIR` | `string` | `~/.config/.pilot` |
+| `PILOT_APP_DIR` | `string` | `<PILOT_DIR>` (platform-dependent) |
+| `PILOT_APP_SETTINGS_FILE` | `string` | `<PILOT_DIR>/app-settings.json` |
+| `PILOT_WORKSPACE_FILE` | `string` | `<PILOT_DIR>/workspace.json` |
+| `PILOT_AUTH_FILE` | `string` | `<PILOT_DIR>/auth.json` |
+| `PILOT_MODELS_FILE` | `string` | `<PILOT_DIR>/models.json` |
+| `PILOT_EXTENSIONS_DIR` | `string` | `<PILOT_DIR>/extensions` |
+| `PILOT_SKILLS_DIR` | `string` | `<PILOT_DIR>/skills` |
+| `PILOT_EXTENSION_REGISTRY_FILE` | `string` | `<PILOT_DIR>/extension-registry.json` |
+| `PILOT_PROMPTS_DIR` | `string` | `<PILOT_DIR>/prompts` |
+| `DEFAULT_PI_AGENT_DIR` | `string` | `<PILOT_DIR>` (platform-dependent) |
 | `ensurePilotAppDirs` | `() => void` | Create all Pilot directories if missing |
 
 **Key Implementation Notes:**
@@ -1186,7 +1188,7 @@ const pin = auth.generatePIN(); // Show in UI
 
 ### Enable Developer Mode
 
-Set `developerMode: true` in `~/.config/.pilot/app-settings.json` to:
+Set `developerMode: true` in `<PILOT_DIR>/app-settings.json` to:
 - Show IPC traffic in DevTools console
 - Enable subagent debugging panel
 - Show memory extraction logs
@@ -1196,17 +1198,17 @@ Set `developerMode: true` in `~/.config/.pilot/app-settings.json` to:
 
 ```bash
 # List all sessions for a project
-ls -1 ~/.config/.pilot/sessions/--Users+espen+Dev+PiLot--/
+ls -1 <PILOT_DIR>/sessions/--Users+espen+Dev+PiLot--/
 
 # View a session file (JSONL)
-cat ~/.config/.pilot/sessions/--Users+espen+Dev+PiLot--/2025-02-23T16-30-45-789Z.jsonl | jq
+cat <PILOT_DIR>/sessions/--Users+espen+Dev+PiLot--/2025-02-23T16-30-45-789Z.jsonl | jq
 ```
 
 ### Inspect Memory Files
 
 ```bash
 # Global memory
-cat ~/.config/.pilot/MEMORY.md
+cat <PILOT_DIR>/MEMORY.md
 
 # Project-shared memory
 cat ~/Dev/project/.pilot/MEMORY.md

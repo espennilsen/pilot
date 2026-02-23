@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGitStore } from '../../stores/git-store';
+import { modKey } from '../../lib/keybindings';
 import { Button } from '../shared/Button';
 
 const CONVENTIONAL_PREFIXES = [
@@ -97,7 +98,7 @@ export default function GitCommitInput() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Commit message... (⌘+Enter to commit)"
+          placeholder={`Commit message... (${modKey()}Enter to commit)`}
           className="w-full bg-bg-elevated border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent resize-none"
           style={{ minHeight: '60px' }}
           disabled={!hasStagedFiles || isCommitting || isPushing}

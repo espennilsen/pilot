@@ -107,9 +107,7 @@ export function PromptFillDialog({
   }, [onCancel]);
 
   // Detect macOS for keyboard hint
-  const isMac = useMemo(() => {
-    return typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
-  }, []);
+  const isMac = window.api?.platform === 'darwin';
 
   return (
     <div

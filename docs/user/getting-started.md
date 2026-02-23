@@ -2,6 +2,8 @@
 
 Welcome to Pilot! This guide will walk you through your first launch, opening a project, and creating your first AI-assisted coding session.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+
 ---
 
 ## First Launch
@@ -9,12 +11,12 @@ Welcome to Pilot! This guide will walk you through your first launch, opening a 
 When you launch Pilot for the first time:
 
 1. **Initial Setup Window**  
-   Pilot will create its configuration directory at `~/.config/.pilot/`
+   Pilot will create its configuration directory at `<PILOT_DIR>/`
 
 2. **Authentication**  
    Configure your AI provider credentials in [Settings](./settings.md#auth) (`Cmd+,` → Auth tab)
    - Add API keys for OpenAI, Anthropic, Google, or other providers
-   - OAuth tokens are stored securely in `~/.config/.pilot/auth.json`
+   - OAuth tokens are stored securely in `<PILOT_DIR>/auth.json`
 
 3. **Model Selection**  
    Choose your preferred AI model from the settings panel or use the model switcher in any session

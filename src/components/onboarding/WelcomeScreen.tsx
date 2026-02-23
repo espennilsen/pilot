@@ -9,6 +9,7 @@ import {
   Terminal, Code, FolderOpen, ChevronRight, ChevronLeft, Sparkles,
 } from 'lucide-react';
 import appIcon from '../../assets/icon.png';
+import { shortcutLabel } from '../../lib/keybindings';
 
 // ─── Step definitions ────────────────────────────────────────────────────
 
@@ -543,7 +544,7 @@ function ProjectStep() {
               Open Project
             </button>
             <p className="text-[10px] text-text-secondary/40">
-              You can also use ⌘⇧N to open a project anytime
+              You can also use {shortcutLabel('N', true)} to open a project anytime
             </p>
           </>
         )}

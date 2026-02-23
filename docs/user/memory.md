@@ -2,6 +2,8 @@
 
 Pilot's **memory system** preserves context across sessions, ensuring the AI agent remembers important project details, conventions, decisions, and history. Memory is organized into two tiers: global and project.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+
 ---
 
 ## What is Memory?
@@ -27,7 +29,7 @@ Pilot uses a **two-tier memory architecture** to organize context:
 ```
 ┌─────────────────────────────────────────────┐
 │ 1. Global Memory                            │
-│    ~/.config/.pilot/MEMORY.md              │
+│    <PILOT_DIR>/MEMORY.md              │
 │    • Shared across ALL projects             │
 │    • Personal preferences and conventions   │
 └─────────────────────────────────────────────┘
@@ -47,7 +49,7 @@ Both tiers are injected into the agent's system prompt when working on a project
 
 ### Location
 ```
-~/.config/.pilot/MEMORY.md
+<PILOT_DIR>/MEMORY.md
 ```
 
 ### Purpose
@@ -224,7 +226,7 @@ When you start a session:
    The following are memories from past interactions.
 
    ## Global Memory
-   [contents of ~/.config/.pilot/MEMORY.md]
+   [contents of <PILOT_DIR>/MEMORY.md]
 
    ## Project Memory
    [contents of .pilot/MEMORY.md]
@@ -338,7 +340,7 @@ Regularly review and update memory:
 
 ### What's Shared
 
-- **Global memory**: Stored locally in `~/.config/.pilot/`, never committed to git
+- **Global memory**: Stored locally in `<PILOT_DIR>/`, never committed to git
 - **Project memory**: Lives in `<project>/.pilot/MEMORY.md`, can be committed to git
 
 ### What's Sent to AI Providers
@@ -375,7 +377,7 @@ If you need to reference sensitive information:
 
 **Check**:
 1. Memory files are valid Markdown (no syntax errors)
-2. File permissions allow reading `~/.config/.pilot/` and `.pilot/`
+2. File permissions allow reading `<PILOT_DIR>/` and `.pilot/`
 3. Check the developer console (`Cmd+Shift+I`) for errors
 
 ---

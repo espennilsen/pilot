@@ -82,7 +82,7 @@ export class CompanionDiscovery {
     }
 
     console.warn(
-      '[CompanionDiscovery] mDNS advertisement unavailable - install @homebridge/ciao or use macOS'
+      '[CompanionDiscovery] mDNS advertisement unavailable - @homebridge/ciao required (see https://github.com/nicnacnic/ciao for setup)'
     );
   }
 

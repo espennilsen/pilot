@@ -1,7 +1,7 @@
 import * as pty from 'node-pty';
 import { BrowserWindow } from 'electron';
-import { homedir } from 'os';
 import { IPC } from '../../shared/ipc';
+import { expandHome } from '../utils/paths';
 
 export class TerminalService {
   private terminals: Map<string, pty.IPty> = new Map();
@@ -16,17 +16,13 @@ export class TerminalService {
     this.close(id);
 
     // Resolve ~ to home directory
-    if (cwd === '~') {
-      cwd = homedir();
-    } else if (cwd.startsWith('~/')) {
-      cwd = homedir() + cwd.slice(1);
-    }
+    cwd = expandHome(cwd);
 
     // Determine the default shell based on platform
     const defaultShell = shell ||
       (process.platform === 'win32'
         ? 'powershell.exe'
-        : process.env.SHELL || '/bin/zsh');
+        : process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash'));
 
     // Spawn PTY
     const term = pty.spawn(defaultShell, [], {

@@ -435,7 +435,7 @@ export function createSandboxedTools(
   "jail": {
     "enabled": true,
     "allowedPaths": [
-      "~/.config/.pilot/"
+      "<PILOT_DIR>/"
     ]
   }
 }
@@ -487,7 +487,7 @@ Users can install extensions and skills by importing `.zip` files through the Pi
   - **Extension zip**: Must contain at least one `.ts` or `.js` file at the root or in an `extension/` directory.
   - **Skill zip**: Must contain a `SKILL.md` file at the root or in a `skill/` directory.
 - User chooses install scope:
-  - **Global** — extracted to `~/.config/.pilot/extensions/` or `~/.config/.pilot/skills/`. Available to all projects.
+  - **Global** — extracted to `<PILOT_DIR>/extensions/` or `<PILOT_DIR>/skills/`. Available to all projects.
   - **Project** — extracted to `<cwd>/.pilot/extensions/` or `<cwd>/.pilot/skills/`. Available only in that project.
 - After extraction, Pilot calls `loader.reload()` to pick up the new extension/skill without restarting.
 
@@ -524,7 +524,7 @@ my-skill.zip
 #### Storage
 
 ```
-~/.config/.pilot/
+<PILOT_DIR>/
 ├── extensions/              # Global extensions
 │   ├── my-extension/
 │   │   ├── extension.ts
@@ -672,8 +672,8 @@ The SDK (`@mariozechner/pi-coding-agent`) replaces the need for a custom agent c
 | `createAgentSession()` | Custom agent client | Creates and manages agent lifecycle |
 | `session.subscribe()` | WebSocket/SSE streaming | Real-time event streaming to renderer via IPC |
 | `session.prompt()` / `steer()` / `followUp()` | Custom message sending | Message handling with streaming-aware queueing |
-| `SessionManager` | SQLite conversation store | Session persistence via `.jsonl` files with tree branching. Stored in `~/.config/.pilot/sessions/`. |
-| `AuthStorage` | Custom keychain integration | API key, OAuth, and env var credential management. Stored in `~/.config/.pilot/auth.json`. |
+| `SessionManager` | SQLite conversation store | Session persistence via `.jsonl` files with tree branching. Stored in `<PILOT_DIR>/sessions/`. |
+| `AuthStorage` | Custom keychain integration | API key, OAuth, and env var credential management. Stored in `<PILOT_DIR>/auth.json`. |
 | `ModelRegistry` | Hardcoded model list | Model discovery, cycling, and availability checking |
 | `SettingsManager` | Custom settings file | Global + per-project settings with merge |
 | `DefaultResourceLoader` | Manual config loading | Extensions, skills, prompts, themes, context files |
@@ -720,7 +720,7 @@ export class PilotSessionManager {
       cwd: projectPath,
       settingsManager,
       eventBus: this.eventBus,
-      // Include ~/.config/.pilot/extensions/ and ~/.config/.pilot/skills/
+      // Include <PILOT_DIR>/extensions/ and <PILOT_DIR>/skills/
       additionalExtensionPaths: getGlobalExtensionPaths(),
     });
     await loader.reload();
@@ -841,8 +841,8 @@ export class PilotSessionManager {
 | Diff Rendering | `react-diff-viewer-continued` | Battle-tested, supports side-by-side and unified views. |
 | Syntax Highlighting | Shiki | VS Code's highlighter. Accurate, themeable, fast. |
 | Terminal | xterm.js | Industry standard for web-based terminal emulation. |
-| Session Persistence | SDK `SessionManager` (`.jsonl` files) | Handled by SDK. Stored in `~/.config/.pilot/sessions/`. Tree-structured with branching. |
-| Auth & Credentials | SDK `AuthStorage` | API keys, OAuth, env vars. Stored in `~/.config/.pilot/auth.json`. Priority-based resolution. |
+| Session Persistence | SDK `SessionManager` (`.jsonl` files) | Handled by SDK. Stored in `<PILOT_DIR>/sessions/`. Tree-structured with branching. |
+| Auth & Credentials | SDK `AuthStorage` | API keys, OAuth, env vars. Stored in `<PILOT_DIR>/auth.json`. Priority-based resolution. |
 | Model Management | SDK `ModelRegistry` | Discovery, availability checking, model cycling. |
 | Settings | SDK `SettingsManager` | Global + per-project merge with async persistence. |
 | Code Editor (Scratch Pad) | CodeMirror 6 | Lightweight, extensible, modern architecture. |
@@ -1361,7 +1361,7 @@ interface ImportResult {
 - [x] Extension & skill zip import (drag-and-drop + settings UI). (Done)
 - [x] Extension Manager panel (list, toggle, remove installed extensions). (Done)
 - [x] Skill Manager panel (list, remove installed skills). (Done)
-- [x] `~/.config/.pilot/` directory initialization and migration. (Done)
+- [x] Config directory initialization and cross-platform path handling. (Done)
 
 ---
 
@@ -1533,10 +1533,15 @@ pilot/
 └── README.md
 ```
 
-### Pilot Home Directory (`~/.config/.pilot/`)
+### Pilot Home Directory
+
+> **Platform-specific locations:**
+> - **macOS:** `~/.config/.pilot/`
+> - **Windows:** `%APPDATA%\.pilot\`
+> - **Linux:** `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`)
 
 ```
-~/.config/.pilot/
+<PILOT_DIR>/
 ├── config.json                  # App-level settings (window size, theme, developer mode toggle)
 ├── auth.json                    # API keys and OAuth tokens (via SDK AuthStorage)
 ├── models.json                  # Custom model definitions (via SDK ModelRegistry)

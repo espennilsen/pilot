@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { homedir } from 'os';
 import {
   PILOT_APP_SETTINGS_FILE,
   DEFAULT_PI_AGENT_DIR,
   ensurePilotAppDirs,
 } from './pilot-paths';
 import type { PilotAppSettings } from '../../shared/types';
+import { expandHome } from '../utils/paths';
 
 const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   piAgentDir: DEFAULT_PI_AGENT_DIR,
@@ -67,16 +67,9 @@ export function getAppSettings(): PilotAppSettings {
   return loadAppSettings();
 }
 
-/** Expand ~ to home directory */
-function expandTilde(path: string): string {
-  if (path === '~') return homedir();
-  if (path.startsWith('~/')) return homedir() + path.slice(1);
-  return path;
-}
-
 /** Resolve the effective pi agent directory (from app settings), with ~ expansion */
 export function getPiAgentDir(): string {
   const settings = loadAppSettings();
   const dir = settings.piAgentDir || DEFAULT_PI_AGENT_DIR;
-  return expandTilde(dir);
+  return expandHome(dir);
 }

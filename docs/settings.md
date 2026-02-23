@@ -2,10 +2,12 @@
 
 Pilot has three layers of settings, each stored in a different location.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+
 ## Storage Locations
 
 ```
-~/.config/.pilot/
+<PILOT_DIR>/
 ├── app-settings.json          # Global app settings
 ├── workspace.json             # UI layout, tabs, window state
 ├── auth.json                  # Auth credentials
@@ -25,14 +27,14 @@ Pilot has three layers of settings, each stored in a different location.
 
 ## App Settings
 
-**File:** `~/.config/.pilot/app-settings.json`
+**File:** `<PILOT_DIR>/app-settings.json`
 **Interface:** `PilotAppSettings` (`shared/types.ts`)
 
 These are global, user-level preferences that persist across restarts.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `piAgentDir` | `string` | `~/.config/.pilot` | Pi agent config directory |
+| `piAgentDir` | `string` | `<PILOT_DIR>` | Pi agent config directory |
 | `terminalApp` | `string \| null` | `null` | Preferred terminal app (null = system default) |
 | `editorCli` | `string \| null` | `null` | Preferred code editor CLI (null = auto-detect) |
 | `onboardingComplete` | `boolean` | `false` | Whether the onboarding wizard has been completed |
@@ -46,7 +48,7 @@ Renderer Store (useAppSettingsStore)
     ↕ IPC: APP_SETTINGS_GET / APP_SETTINGS_UPDATE
 Main Process (loadAppSettings / saveAppSettings)
     ↕ fs read/write
-~/.config/.pilot/app-settings.json
+<PILOT_DIR>/app-settings.json
 ```
 
 **Main process** (`electron/services/app-settings.ts`):
@@ -97,7 +99,7 @@ Main Process (loadProjectSettings)
 
 ## Workspace State
 
-**File:** `~/.config/.pilot/workspace.json`
+**File:** `<PILOT_DIR>/workspace.json`
 
 Not a user-facing setting, but persisted automatically. Captures the full UI layout so Pilot restores exactly where you left off.
 
@@ -145,7 +147,7 @@ Loaded via `IPC.DEV_LOAD_CONFIG` when developer mode is enabled and a project is
 
 ## Auth Credentials
 
-**File:** `~/.config/.pilot/auth.json`
+**File:** `<PILOT_DIR>/auth.json`
 **Managed by:** pi SDK `AuthStorage` class
 **Permissions:** `0o600` (read/write owner only), file-locked for concurrent access
 
@@ -189,7 +191,7 @@ When resolving credentials for a provider, Pilot checks (in order):
 
 ## Model Registry
 
-**File:** `~/.config/.pilot/models.json`
+**File:** `<PILOT_DIR>/models.json`
 **Managed by:** pi SDK `ModelRegistry` class
 
 Defines custom model providers, custom models, and per-model overrides for built-in models. This file is optional — if absent, only built-in models are available.
@@ -271,7 +273,7 @@ Overrides are the same as model definitions but all fields are optional. Applied
 
 ## Extension Registry
 
-**File:** `~/.config/.pilot/extension-registry.json`
+**File:** `<PILOT_DIR>/extension-registry.json`
 **Managed by:** `ExtensionManager` (`electron/services/extension-manager.ts`)
 
 Tracks enabled/disabled state for installed extensions. Extensions not in the registry default to enabled.
@@ -310,7 +312,7 @@ Extensions are scanned from two locations:
 
 | Scope | Directory |
 |-------|-----------|
-| **Global** | `~/.config/.pilot/extensions/` |
+| **Global** | `<PILOT_DIR>/extensions/` |
 | **Project** | `<project>/.pilot/extensions/` |
 
 Each extension directory must contain a `package.json`. The registry only stores enabled/disabled state — the extension list is rebuilt by scanning directories on each load.
@@ -323,7 +325,7 @@ Skills are scanned from two locations (no registry file — all discovered skill
 
 | Scope | Directory |
 |-------|-----------|
-| **Global** | `~/.config/.pilot/skills/` |
+| **Global** | `<PILOT_DIR>/skills/` |
 | **Project** | `<project>/.pilot/skills/` |
 
 Each skill directory must contain a `SKILL.md` file.
@@ -343,7 +345,7 @@ Each skill directory must contain a `SKILL.md` file.
 Opened via ⌘, (or the gear icon). Has six tabs:
 
 ### General
-- **Pi Config Directory** — path to pi agent config (default `~/.config/.pilot`)
+- **Pi Config Directory** — path to pi agent config (default `<PILOT_DIR>`)
 
 ### Project
 - **Project Jail** — toggle to restrict agent to project directory

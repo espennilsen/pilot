@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { X, ArrowLeft, Pencil, Save, Undo2 } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useHighlight } from '../../hooks/useHighlight';
+import { shortcutLabel } from '../../lib/keybindings';
 import 'highlight.js/styles/tokyo-night-dark.css';
 
 export default function FilePreview() {
@@ -116,7 +117,7 @@ export default function FilePreview() {
                 onClick={saveFile}
                 disabled={isSaving || !isDirty}
                 className="p-1 hover:bg-bg-base rounded transition-colors disabled:opacity-40"
-                title="Save (⌘S)"
+                title={`Save (${shortcutLabel('S')})`}
               >
                 <Save className={`w-4 h-4 ${isDirty ? 'text-accent' : 'text-text-secondary'}`} />
               </button>

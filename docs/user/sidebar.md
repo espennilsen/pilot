@@ -204,7 +204,7 @@ The Memory pane shows:
 ### Tier Tabs
 
 Switch between memory tiers:
-- **Global** — `~/.config/.pilot/MEMORY.md`
+- **Global** — `<PILOT_DIR>/MEMORY.md`
 - **Project** — `<project>/.pilot/MEMORY.md` (shared with team)
 
 Click a tab to show entries from that tier.

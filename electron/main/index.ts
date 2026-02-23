@@ -48,6 +48,7 @@ let companionRemote: CompanionRemote | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
+const isWin = process.platform === 'win32';
 
 function buildApplicationMenu() {
   const template: MenuItemConstructorOptions[] = [
@@ -157,7 +158,14 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     frame: false,
-    ...(isMac ? { titleBarStyle: 'hiddenInset' } : {}),
+    ...(isMac ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    ...(isWin ? {
+      titleBarOverlay: {
+        color: '#1a1b1e',
+        symbolColor: '#ffffff',
+        height: 36,
+      },
+    } : {}),
     icon: join(__dirname, '../../resources/icon.png'),
     backgroundColor: '#1a1b1e',
     show: false,
@@ -204,6 +212,11 @@ function createWindow() {
 
   // Build application menu
   buildApplicationMenu();
+}
+
+// Enable native Wayland support on Linux when available
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 }
 
 // This method will be called when Electron has finished initialization

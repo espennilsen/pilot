@@ -2,6 +2,8 @@
 
 Complete reference for all inter-process communication channels in PiLot.
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+
 ---
 
 ## Architecture Overview
@@ -380,7 +382,7 @@ type MemoryScope = 'global' | 'project';
 
 **File Locations:**
 
-- **Global:** `~/.config/.pilot/MEMORY.md`
+- **Global:** `<PILOT_DIR>/MEMORY.md`
 - **Project:** `<project>/.pilot/MEMORY.md` (can be git-tracked)
 
 ---
@@ -476,7 +478,7 @@ Provider authentication, OAuth flows, API keys.
 
 ### Settings
 
-App-level settings (in `~/.config/.pilot/`) and project-level settings (in `<project>/.pilot/`).
+App-level settings (in `<PILOT_DIR>/`) and project-level settings (in `<project>/.pilot/`).
 
 | Channel | Direction | Args | Returns |
 |---|---|---|---|
@@ -491,7 +493,7 @@ App-level settings (in `~/.config/.pilot/`) and project-level settings (in `<pro
 
 ```typescript
 {
-  piAgentDir: string; // Default: ~/.config/.pilot
+  piAgentDir: string; // Default: <PILOT_DIR>
   terminalApp: string | null;
   editorCli: string | null;
   onboardingComplete: boolean;
@@ -504,8 +506,8 @@ App-level settings (in `~/.config/.pilot/`) and project-level settings (in `<pro
 
 **File Locations:**
 
-- **App Settings:** `~/.config/.pilot/app-settings.json`
-- **Pi Settings:** `~/.config/.pilot/config.json`
+- **App Settings:** `<PILOT_DIR>/app-settings.json`
+- **Pi Settings:** `<PILOT_DIR>/config.json`
 - **Project Settings:** `<project>/.pilot/settings.json`
 
 ---
@@ -533,7 +535,7 @@ Tab layout persistence and restoration.
 }
 ```
 
-**File Location:** `~/.config/.pilot/workspace.json`
+**File Location:** `<PILOT_DIR>/workspace.json`
 
 ---
 
@@ -598,9 +600,9 @@ Extension and skill management (list, toggle, remove, import).
 
 **File Locations:**
 
-- **Global Extensions:** `~/.config/.pilot/extensions/`
-- **Global Skills:** `~/.config/.pilot/skills/`
-- **Extension Registry:** `~/.config/.pilot/extension-registry.json`
+- **Global Extensions:** `<PILOT_DIR>/extensions/`
+- **Global Skills:** `<PILOT_DIR>/skills/`
+- **Extension Registry:** `<PILOT_DIR>/extension-registry.json`
 
 ---
 
@@ -640,7 +642,7 @@ Slash command prompt templates (create, update, delete, fill).
 
 **File Locations:**
 
-- **Global Prompts:** `~/.config/.pilot/prompts/`
+- **Global Prompts:** `<PILOT_DIR>/prompts/`
 - **Project Prompts:** `<project>/.pilot/prompts/`
 
 ---
@@ -826,7 +828,7 @@ exec(`git commit -m "${userMessage}"`);
 
 ### API Key Storage
 
-API keys and OAuth tokens are stored in `~/.config/.pilot/auth.json` with file permissions `0600`. Never log or expose these in error messages.
+API keys and OAuth tokens are stored in `<PILOT_DIR>/auth.json` with file permissions `0600`. Never log or expose these in error messages.
 
 ---
 

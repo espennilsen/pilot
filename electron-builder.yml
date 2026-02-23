@@ -45,6 +45,57 @@ dmg:
       type: link
       path: /Applications
 
+win:
+  icon: resources/icon.ico
+  # Code signing: set CSC_LINK and CSC_KEY_PASSWORD env vars in CI
+  # signingHashAlgorithms:
+  #   - sha256
+  target:
+    - target: nsis
+    - target: portable
+    - target: zip
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  artifactName: "${productName}-${version}-setup.${ext}"
+
+portable:
+  artifactName: "${productName}-${version}-portable.${ext}"
+
+linux:
+  icon: resources/icon.png
+  category: Development
+  executableName: pilot
+  desktop:
+    Name: Pilot
+    Comment: AI-powered coding agent
+    Terminal: false
+    Categories: Development;IDE;
+    Keywords: coding;ai;agent;
+    MimeType: x-scheme-handler/pilot;
+    StartupWMClass: Pilot
+  target:
+    - target: AppImage
+    - target: deb
+    - target: tar.gz
+
+appImage:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+deb:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libasound2
+
 npmRebuild: true
 
 extraMetadata:

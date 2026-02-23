@@ -58,7 +58,7 @@ export default function Terminal() {
     const xterm = new XTerm({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: 'Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Liberation Mono", "Courier New", monospace',
       theme: XTERM_THEME,
       scrollback: 5000,
       allowProposedApi: true,

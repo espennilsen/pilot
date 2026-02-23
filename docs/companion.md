@@ -119,7 +119,7 @@ The companion server uses self-signed TLS certificates. Clients must trust the c
 | Validity | 3650 days (10 years) |
 | SAN (DNS) | `localhost` |
 | SAN (IP) | `127.0.0.1`, `0.0.0.0` |
-| Files | `~/.config/.pilot/companion-cert.pem`, `companion-key.pem` |
+| Files | `<PILOT_DIR>/companion-cert.pem`, `companion-key.pem` |
 
 ### Certificate Pinning
 
@@ -222,7 +222,7 @@ Content-Type: application/json
 | Format | 96 hex characters (48 random bytes) |
 | Lifetime | Permanent until revoked |
 | Storage (iOS) | Keychain |
-| Storage (Desktop) | `~/.config/.pilot/companion-tokens.json` |
+| Storage (Desktop) | `<PILOT_DIR>/companion-tokens.json` |
 
 The session token is used for all subsequent WebSocket connections. Store it securely — it grants full access to the Pilot instance.
 
@@ -820,6 +820,6 @@ Common errors:
 | `shared/ipc.ts` | IPC channel name constants (includes `COMPANION_*`) |
 | `src/lib/ipc-client.ts` | Universal IPC client with WebSocket polyfill |
 | `src/hooks/useCompanionMode.ts` | `useLayoutMode()` responsive hook |
-| `~/.config/.pilot/companion-tokens.json` | Persisted device tokens |
-| `~/.config/.pilot/companion-cert.pem` | Self-signed TLS certificate |
-| `~/.config/.pilot/companion-key.pem` | TLS private key |
+| `<PILOT_DIR>/companion-tokens.json` | Persisted device tokens |
+| `<PILOT_DIR>/companion-cert.pem` | Self-signed TLS certificate |
+| `<PILOT_DIR>/companion-key.pem` | TLS private key |

@@ -8,9 +8,11 @@ Pilot's memory system gives the agent persistent context that survives across se
 
 Memory is stored as Markdown files at two scopes:
 
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+
 | Scope | Location | Git-tracked | Purpose |
 |-------|----------|-------------|---------|
-| **Global** | `~/.config/.pilot/MEMORY.md` | No | Preferences that apply everywhere (style, tools, conventions) |
+| **Global** | `<PILOT_DIR>/MEMORY.md` | No | Preferences that apply everywhere (style, tools, conventions) |
 | **Project** | `<project>/.pilot/MEMORY.md` | Yes | Project-specific context to share with the team |
 
 ### Memory File Format
@@ -146,7 +148,7 @@ Accessible via the Memory pane in the sidebar, the `/memory` slash command, or c
 
 | Tab | Description |
 |-----|-------------|
-| Global | Applies to all projects and sessions (`~/.config/.pilot/MEMORY.md`) |
+| Global | Applies to all projects and sessions (`<PILOT_DIR>/MEMORY.md`) |
 | Project | Shared project memory, can be checked into git (`.pilot/MEMORY.md`) |
 
 ---

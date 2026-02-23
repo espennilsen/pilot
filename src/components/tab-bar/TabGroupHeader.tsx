@@ -38,7 +38,7 @@ export function TabGroupHeader({
     },
     'separator',
     {
-      label: window.api.platform === 'darwin' ? 'Reveal in Finder' : 'Reveal in Explorer',
+      label: window.api.platform === 'darwin' ? 'Reveal in Finder' : window.api.platform === 'win32' ? 'Reveal in Explorer' : 'Reveal in File Manager',
       icon: <Icon name="FolderSearch" size={14} />,
       action: () => {
         if (projectPath) {

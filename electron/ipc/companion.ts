@@ -1,4 +1,5 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, shell } from 'electron';
+import { execSync } from 'child_process';
 import { IPC } from '../../shared/ipc';
 import type { CompanionAuth } from '../services/companion-auth';
 import type { CompanionServer } from '../services/companion-server';
@@ -272,16 +273,15 @@ export function registerCompanionIpc(deps: CompanionDeps) {
    * Check which remote providers are available
    */
   ipcMain.handle(IPC.COMPANION_CHECK_REMOTE, async () => {
-    const { execSync } = require('child_process');
+    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
     let tailscale = false;
     let tailscaleOnline = false;
     let cloudflared = false;
-    try { execSync('which tailscale', { stdio: 'ignore' }); tailscale = true; } catch {}
-    try { execSync('which cloudflared', { stdio: 'ignore' }); cloudflared = true; } catch {}
+    try { execSync(`${whichCmd} tailscale`, { stdio: 'ignore' }); tailscale = true; } catch {}
+    try { execSync(`${whichCmd} cloudflared`, { stdio: 'ignore' }); cloudflared = true; } catch {}
     if (tailscale) {
       try {
-        const { execSync: es } = require('child_process');
-        const out = es('tailscale status --json', { encoding: 'utf-8' });
+        const out = execSync('tailscale status --json', { encoding: 'utf-8' });
         const status = JSON.parse(out);
         tailscaleOnline = !!status.Self?.Online;
       } catch {}
@@ -293,7 +293,6 @@ export function registerCompanionIpc(deps: CompanionDeps) {
    * Open a tunnel URL in the default browser (or specified browser)
    */
   ipcMain.handle(IPC.COMPANION_OPEN_TUNNEL, async (_event, url: string) => {
-    const { shell } = require('electron');
     await shell.openExternal(url);
     return { opened: true };
   });

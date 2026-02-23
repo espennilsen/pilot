@@ -18,7 +18,7 @@
 </p>
 
 > [!WARNING]
-> **Pilot is in early development.** Pre-built binaries are not yet available — you'll need to build from source. The app is currently developed on and for **macOS**; Windows and Linux support will come later.
+> **Pilot is in early development.** Pre-built binaries are not yet available — you'll need to build from source. The app runs on **macOS**, **Windows**, and **Linux**.
 
 ---
 
@@ -67,7 +67,10 @@ The design philosophy is **keyboard-first, zero-friction**: every core action is
 
 ### Onboarding
 A guided 3-step welcome screen greets first-time users:
-1. **Connect Provider** — Add API keys or log in via OAuth for Anthropic (Claude), OpenAI (GPT), or Google (Gemini). Keys are stored locally in `~/.config/.pilot/auth.json`.
+
+> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+
+1. **Connect Provider** — Add API keys or log in via OAuth for Anthropic (Claude), OpenAI (GPT), or Google (Gemini). Keys are stored locally in `<PILOT_DIR>/auth.json`.
 2. **Tools** — Pick your preferred terminal and code editor from auto-detected options. Used when Pilot opens files or directories in external apps.
 3. **Open Project** — Choose a working directory to give the agent file access.
 
@@ -191,7 +194,7 @@ Two-tier persistent memory automatically builds context across all your sessions
 
 | Tier | Location | Purpose |
 |---|---|---|
-| **Global** | `~/.config/.pilot/MEMORY.md` | Follows you across every project — preferences, coding style, personal notes |
+| **Global** | `<PILOT_DIR>/MEMORY.md` | Follows you across every project — preferences, coding style, personal notes |
 | **Project** | `<project>/.pilot/MEMORY.md` | Git-trackable; the whole team shares the same project context |
 
 **Auto-extraction** — after each agent turn the cheapest available model (Haiku / GPT-4o mini / Flash) distils new memories in the background. A 30-second debounce prevents redundant runs; each extraction times out after 10 seconds so it never blocks anything. Toggle auto-extraction on or off in Settings → Memory.
@@ -324,7 +327,7 @@ Reusable message templates with variable substitution:
 - Select a template → variable fill dialog appears → insert into chat input
 
 #### Scopes & override
-- **Global** templates live in `~/.config/.pilot/prompts/`
+- **Global** templates live in `<PILOT_DIR>/prompts/`
 - **Project** templates live in `<project>/.pilot/prompts/`
 - Project templates override global ones when slugs collide
 
@@ -373,7 +376,7 @@ When a dev command's output contains a `localhost:…` URL, Pilot can automatica
 Settings → Companion lists all paired devices with last-seen timestamps. Revoke any device individually or revoke all at once.
 
 #### TLS
-A self-signed certificate is auto-generated on first enable and stored as `~/.config/.pilot/companion-cert.pem` / `companion-key.pem`. Tailscale-issued certs are hot-swapped without restarting the companion server. Paired device session tokens are stored in `~/.config/.pilot/companion-tokens.json`.
+A self-signed certificate is auto-generated on first enable and stored as `<PILOT_DIR>/companion-cert.pem` / `companion-key.pem`. Tailscale-issued certs are hot-swapped without restarting the companion server. Paired device session tokens are stored in `<PILOT_DIR>/companion-tokens.json`.
 
 ---
 
@@ -460,7 +463,7 @@ A modal settings panel (`⌘,`) with ten sections:
 | **Skills** | Install or remove skills (global & project-scoped) |
 | **Developer** | Toggle Developer Mode, configure dev commands |
 
-Extensions and skills are installed by importing `.zip` files via the UI or drag-and-drop. Global packages go to `~/.config/.pilot/extensions/` or `~/.config/.pilot/skills/`; project-scoped packages go to `<project>/.pilot/`.
+Extensions and skills are installed by importing `.zip` files via the UI or drag-and-drop. Global packages go to `<PILOT_DIR>/extensions/` or `<PILOT_DIR>/skills/`; project-scoped packages go to `<project>/.pilot/`.
 
 ---
 
@@ -575,6 +578,7 @@ src/
 - **Node.js** 20+ (dev tooling; Electron bundles its own Node runtime)
 - **Git** on PATH (required for git panel features)
 - API key or OAuth credentials for at least one supported AI provider
+- **Linux only:** `build-essential`, `libx11-dev`, `libxkbfile-dev` (for native module compilation)
 
 ### Install
 
@@ -595,10 +599,13 @@ Launches Electron with Vite HMR. DevTools open automatically in a detached windo
 ### Build for production
 
 ```bash
-npm run build
+# Build for your current platform
+npm run build:mac      # macOS — .dmg + .zip (arm64 & x64)
+npm run build:win      # Windows — NSIS installer + portable + .zip
+npm run build:linux    # Linux — AppImage + .deb + .tar.gz
 ```
 
-Output lands in `out/`.
+Output lands in `release/`.
 
 ### Preview production build
 
@@ -610,7 +617,15 @@ npm run preview
 
 ## Configuration
 
-### Global config — `~/.config/.pilot/`
+### Global config directory
+
+| Platform | Default location |
+|---|---|
+| macOS | `~/.config/.pilot/` |
+| Windows | `%APPDATA%\.pilot\` |
+| Linux | `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`) |
+
+*Documentation uses `<PILOT_DIR>` as shorthand for this platform-specific path.*
 
 | Path | Contents |
 |---|---|
@@ -682,9 +697,9 @@ npm run preview
 
 `persistent: true` keeps the process running (e.g. a dev server); `persistent: false` runs to completion (e.g. tests, linters).
 
-### Custom providers — `~/.config/.pilot/app-settings.json`
+### Custom providers — `<PILOT_DIR>/app-settings.json`
 
-Add any OpenAI-compatible API endpoint as a custom provider:
+Add any OpenAI-compatible API endpoint as a custom provider (file location is platform-specific as noted above):
 
 ```json
 {
@@ -765,6 +780,8 @@ Add any OpenAI-compatible API endpoint as a custom provider:
 | PTY | `node-pty` |
 | Terminal emulator | `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-web-links` |
 | Companion server | `express` + `ws` |
+| TLS cert generation | `node-forge` (pure JS — no OpenSSL CLI required) |
+| ZIP extraction | `adm-zip` |
 | mDNS / Bonjour | `@homebridge/ciao` |
 | QR pairing | `qrcode` |
 | File watching | `chokidar` |

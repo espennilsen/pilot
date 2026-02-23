@@ -255,7 +255,7 @@ function buildMenuItems(
 
   // OS integration
   items.push({
-    label: window.api.platform === 'darwin' ? 'Reveal in Finder' : 'Reveal in Explorer',
+    label: window.api.platform === 'darwin' ? 'Reveal in Finder' : window.api.platform === 'win32' ? 'Reveal in Explorer' : 'Reveal in File Manager',
     icon: <FolderSearch className="w-3.5 h-3.5" />,
     action: callbacks.onReveal,
   });

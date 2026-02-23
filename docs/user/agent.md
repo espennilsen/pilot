@@ -469,7 +469,7 @@ Pilot's sandboxing protects you from:
 
 ### API Key Security
 
-- API keys are stored in `~/.config/.pilot/auth.json`
+- API keys are stored in `<PILOT_DIR>/auth.json`
 - File permissions are set to `600` (readable only by you)
 - Keys are never included in memory or sent to the agent
 - OAuth tokens are refreshed automatically

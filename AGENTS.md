@@ -20,7 +20,7 @@ electron/
   preload/index.ts       # contextBridge — exposes window.api to renderer
   ipc/                   # One file per domain: agent, auth, git, model, sandbox, session, …
   services/              # Business logic: PilotSessionManager, GitService, MemoryManager, …
-  utils/                 # (empty — reserved)
+  utils/paths.ts         # Cross-platform path utilities (expandHome, normalizePath, isWithinDir)
 shared/
   ipc.ts                 # All IPC channel name constants (the IPC contract)
   types.ts               # All serialisable types used across the process boundary
@@ -105,7 +105,7 @@ window.api.on(IPC.MY_PUSH_CHANNEL, (payload) => { ... });
 | `DevCommandsService` | `services/dev-commands.ts` | Spawns/kills child processes for dev commands. Streams output to renderer. |
 | `TerminalService` | `services/terminal-service.ts` | PTY management via `node-pty`. |
 | `ExtensionManager` | `services/extension-manager.ts` | Lists/toggles/removes extensions and skills from disk. |
-| `WorkspaceStateService` | `services/workspace-state.ts` | Saves and restores tab layout + UI state to `~/.config/.pilot/workspace.json`. |
+| `WorkspaceStateService` | `services/workspace-state.ts` | Saves and restores tab layout + UI state to `<PILOT_DIR>/workspace.json`. |
 
 ---
 
@@ -163,7 +163,7 @@ window.api.on(IPC.MY_PUSH_CHANNEL, (payload) => { ... });
 ### File Operations
 - All agent-initiated file writes go through `SandboxedTools` → `StagedDiffManager`. Do not write files directly from IPC handlers on behalf of the agent.
 - Project settings live in `<project>/.pilot/` — create the directory if missing before writing.
-- App-level settings live in `~/.config/.pilot/` — use helpers from `services/pilot-paths.ts` and `services/app-settings.ts`.
+- App-level settings live in the platform config directory (see below) — use helpers from `services/pilot-paths.ts` and `services/app-settings.ts`.
 
 ### Error Handling
 - IPC handlers that can fail should `throw` — Electron serialises the error and the renderer receives it as a rejected promise. Catch at the call site.
@@ -174,17 +174,24 @@ window.api.on(IPC.MY_PUSH_CHANNEL, (payload) => { ... });
 
 ## Important File Paths (Runtime)
 
+The app config directory (`<PILOT_DIR>`) is platform-dependent:
+- **macOS:** `~/.config/.pilot/`
+- **Windows:** `%APPDATA%\.pilot\`
+- **Linux:** `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`)
+
+All paths are resolved via `PILOT_APP_DIR` in `services/pilot-paths.ts`.
+
 | Path | Contents |
 |---|---|
-| `~/.config/.pilot/auth.json` | API keys and OAuth tokens |
-| `~/.config/.pilot/models.json` | Model registry cache |
-| `~/.config/.pilot/app-settings.json` | Terminal, editor, developer mode, keybind overrides |
-| `~/.config/.pilot/workspace.json` | Saved tab layout and UI state |
-| `~/.config/.pilot/sessions/` | Session `.jsonl` files (managed by Pi SDK) |
-| `~/.config/.pilot/extensions/` | Global extensions |
-| `~/.config/.pilot/skills/` | Global skills |
-| `~/.config/.pilot/extension-registry.json` | Extension enabled/disabled state |
-| `~/.config/.pilot/MEMORY.md` | Global memory |
+| `<PILOT_DIR>/auth.json` | API keys and OAuth tokens |
+| `<PILOT_DIR>/models.json` | Model registry cache |
+| `<PILOT_DIR>/app-settings.json` | Terminal, editor, developer mode, keybind overrides |
+| `<PILOT_DIR>/workspace.json` | Saved tab layout and UI state |
+| `<PILOT_DIR>/sessions/` | Session `.jsonl` files (managed by Pi SDK) |
+| `<PILOT_DIR>/extensions/` | Global extensions |
+| `<PILOT_DIR>/skills/` | Global skills |
+| `<PILOT_DIR>/extension-registry.json` | Extension enabled/disabled state |
+| `<PILOT_DIR>/MEMORY.md` | Global memory |
 | `<project>/.pilot/settings.json` | Jail, yolo mode, allowed paths |
 | `<project>/.pilot/commands.json` | Dev command buttons |
 | `<project>/.pilot/MEMORY.md` | Project memory (can be git-tracked) |
@@ -242,7 +249,7 @@ npm run build      # Production build → out/
 npm run preview    # Preview production build
 ```
 
-The app writes all config to `~/.config/.pilot/` — safe to `rm -rf` that directory to reset to factory defaults.
+The app writes all config to `<PILOT_DIR>` (see [Important File Paths](#important-file-paths-runtime)) — safe to delete that directory to reset to factory defaults.
 
 ---
 

@@ -10,7 +10,8 @@ function isEslintAvailable(projectPath: string): boolean {
   if (existsSync(join(projectPath, 'node_modules', '.bin', 'eslint'))) return true;
   // Check if globally available
   try {
-    execSync('which eslint', { stdio: 'ignore' });
+    const bin = process.platform === 'win32' ? 'where' : 'which';
+    execSync(`${bin} eslint`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -28,6 +29,18 @@ const DEFAULT_COMMANDS: DevCommand[] = [
  * Matches common dev server output from Vite, Next.js, CRA, Angular, Nuxt, Express, etc.
  */
 const LOCALHOST_URL_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d{2,5})\/?/;
+
+/** Kill a process and all its children. On Windows uses taskkill for tree-kill. */
+function killProcessTree(proc: ChildProcess): void {
+  if (!proc.pid) return;
+  if (process.platform === 'win32') {
+    try {
+      execSync(`taskkill /pid ${proc.pid} /T /F`, { stdio: 'ignore' });
+    } catch { /* process may have already exited */ }
+  } else {
+    proc.kill('SIGTERM');
+  }
+}
 
 export class DevCommandsService {
   private processes = new Map<string, ChildProcess>();
@@ -173,7 +186,7 @@ export class DevCommandsService {
   stopCommand(commandId: string): void {
     const proc = this.processes.get(commandId);
     if (proc) {
-      proc.kill('SIGTERM');
+      killProcessTree(proc);
       this.processes.delete(commandId);
       const state = this.states.get(commandId);
       if (state) {
@@ -206,7 +219,7 @@ export class DevCommandsService {
       this.fileWatcherCallback = null;
     }
     for (const proc of this.processes.values()) {
-      proc.kill('SIGTERM');
+      killProcessTree(proc);
     }
     this.processes.clear();
   }

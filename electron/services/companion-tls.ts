@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
-import { tmpdir, networkInterfaces } from 'os';
+import { networkInterfaces } from 'os';
+import forge from 'node-forge';
 
 /** Collect all non-internal IPv4 addresses from the system. */
 function getAllIPv4Addresses(): string[] {
@@ -19,76 +19,64 @@ function getAllIPv4Addresses(): string[] {
   return addresses;
 }
 
-/** Build an OpenSSL config with SAN entries for localhost + all LAN IPs. */
-function buildOpensslConfig(extraIPs: string[]): string {
-  const ipEntries = [
-    'IP.1 = 127.0.0.1',
-    'IP.2 = 0.0.0.0',
-    ...extraIPs.map((ip, i) => `IP.${i + 3} = ${ip}`),
-  ].join('\n');
-
-  return `
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-
-[req_distinguished_name]
-CN = Pilot Companion
-
-[v3_req]
-keyUsage = critical, digitalSignature, keyEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = localhost
-${ipEntries}
-`.trim();
-}
-
-/** Generate a cert+key pair and write them to disk. */
+/** Generate a self-signed cert+key pair with SAN entries for localhost + all LAN IPs. */
 function generateCert(configDir: string): { cert: Buffer; key: Buffer } {
   const certPath = join(configDir, 'companion-cert.pem');
   const keyPath = join(configDir, 'companion-key.pem');
-  const tempConfigPath = join(tmpdir(), `pilot-openssl-${Date.now()}.cnf`);
 
   const lanIPs = getAllIPv4Addresses();
-  const opensslConfig = buildOpensslConfig(lanIPs);
 
   if (lanIPs.length > 0) {
     console.log(`[CompanionTLS] Generating cert with SAN IPs: 127.0.0.1, ${lanIPs.join(', ')}`);
   }
 
-  try {
-    writeFileSync(tempConfigPath, opensslConfig);
+  // Generate 2048-bit RSA key pair
+  const keys = forge.pki.rsa.generateKeyPair(2048);
 
-    const keyData = execSync('openssl genrsa 2048', { encoding: 'buffer' });
-    const certData = execSync(
-      `openssl req -new -x509 -key /dev/stdin -out /dev/stdout -days 3650 -config "${tempConfigPath}"`,
-      { input: keyData, encoding: 'buffer' }
-    );
+  // Create a self-signed certificate
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = Date.now().toString(16);
+  cert.validity.notBefore = new Date();
+  cert.validity.notAfter = new Date();
+  cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 10); // 10 years
 
-    if (!existsSync(configDir)) {
-      mkdirSync(configDir, { recursive: true });
-    }
+  const attrs = [{ name: 'commonName', value: 'Pilot Companion' }];
+  cert.setSubject(attrs);
+  cert.setIssuer(attrs);
 
-    writeFileSync(certPath, certData);
-    writeFileSync(keyPath, keyData);
+  // Build Subject Alternative Names
+  const altNames: forge.pki.CertificateField[] = [
+    { type: 2, value: 'localhost' }, // DNS
+    { type: 7, ip: '127.0.0.1' },   // IP
+    { type: 7, ip: '0.0.0.0' },     // IP
+    ...lanIPs.map(ip => ({ type: 7 as const, ip })),
+  ];
 
-    return { cert: certData, key: keyData };
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('openssl')) {
-      throw new Error(
-        'OpenSSL not found. Please install OpenSSL to generate TLS certificates for Pilot Companion.'
-      );
-    }
-    throw error;
-  } finally {
-    if (existsSync(tempConfigPath)) {
-      unlinkSync(tempConfigPath);
-    }
+  cert.setExtensions([
+    { name: 'keyUsage', critical: true, digitalSignature: true, keyEncipherment: true },
+    { name: 'extKeyUsage', serverAuth: true },
+    { name: 'subjectAltName', altNames },
+  ]);
+
+  // Self-sign
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+
+  // Convert to PEM
+  const certPem = forge.pki.certificateToPem(cert);
+  const keyPem = forge.pki.privateKeyToPem(keys.privateKey);
+
+  const certData = Buffer.from(certPem, 'utf-8');
+  const keyData = Buffer.from(keyPem, 'utf-8');
+
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true });
   }
+
+  writeFileSync(certPath, certData);
+  writeFileSync(keyPath, keyData);
+
+  return { cert: certData, key: keyData };
 }
 
 /**
@@ -97,13 +85,23 @@ function generateCert(configDir: string): { cert: Buffer; key: Buffer } {
  */
 function certCoversCurrentIPs(certPath: string): boolean {
   try {
-    const sanText = execSync(
-      `openssl x509 -in "${certPath}" -noout -ext subjectAltName 2>/dev/null`,
-      { encoding: 'utf-8' }
-    );
+    const certPem = readFileSync(certPath, 'utf-8');
+    const cert = forge.pki.certificateFromPem(certPem);
+
+    // Extract SAN IPs from the certificate
+    const sanExt = cert.getExtension('subjectAltName') as any;
+    if (!sanExt?.altNames) return false;
+
+    const certIPs = new Set<string>();
+    for (const alt of sanExt.altNames) {
+      if (alt.type === 7 && alt.ip) {
+        certIPs.add(alt.ip);
+      }
+    }
+
     const currentIPs = getAllIPv4Addresses();
     for (const ip of currentIPs) {
-      if (!sanText.includes(ip)) {
+      if (!certIPs.has(ip)) {
         console.log(`[CompanionTLS] Current IP ${ip} not in cert SAN — will regenerate`);
         return false;
       }
@@ -118,6 +116,8 @@ function certCoversCurrentIPs(certPath: string): boolean {
  * Ensures TLS certificate and private key exist for Pilot Companion.
  * Generates a self-signed certificate that includes all current LAN IPs
  * in its Subject Alternative Names. Regenerates if IPs have changed.
+ *
+ * Uses node-forge for pure-JS cert generation (no OpenSSL CLI dependency).
  *
  * @param configDir - Directory to store/read cert and key files
  * @returns Promise resolving to cert and key as Buffers

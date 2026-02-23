@@ -153,7 +153,7 @@ Pairing prevents unauthorized access. Two methods: 6-digit PIN (simple) and QR c
 
 ### Persistence
 
-Tokens stored in `~/.config/.pilot/companion-tokens.json`, encrypted at rest using the same mechanism as `auth.json`.
+Tokens stored in `<PILOT_DIR>/companion-tokens.json`, encrypted at rest using the same mechanism as `auth.json`.
 
 ---
 
@@ -171,7 +171,7 @@ Bonjour/mDNS advertisement so the iOS app auto-finds Pilot on the local network.
 
 Self-signed cert generated on first run. See [companion-api.md](companion-api.md#connection--tls) for certificate details and pinning protocol.
 
-**`ensureTLSCert(configDir)`** — Checks for `companion-cert.pem` and `companion-key.pem` in `~/.config/.pilot/`. If missing, generates a self-signed RSA 2048-bit cert (CN=`Pilot Companion`, 10-year validity, SAN: `DNS:localhost` + `IP:0.0.0.0`). Returns `{ cert, key }` as Buffers.
+**`ensureTLSCert(configDir)`** — Checks for `companion-cert.pem` and `companion-key.pem` in `<PILOT_DIR>/`. If missing, generates a self-signed RSA 2048-bit cert (CN=`Pilot Companion`, 10-year validity, SAN: `DNS:localhost` + `IP:0.0.0.0`). Returns `{ cert, key }` as Buffers.
 
 ---
 
@@ -301,7 +301,7 @@ Settings → Companion
 
 ## Config Storage
 
-Add companion config to `~/.config/.pilot/config.json`:
+Add companion config to `<PILOT_DIR>/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -310,7 +310,7 @@ Add companion config to `~/.config/.pilot/config.json`:
 | `companion.remoteTunnel.enabled` | boolean | `false` | Whether remote tunnel is active |
 | `companion.remoteTunnel.provider` | `'tailscale'` \| `'cloudflare'` | `'tailscale'` | Tunnel provider |
 
-Paired device tokens stored in `~/.config/.pilot/companion-tokens.json` (encrypted at rest using the same mechanism as `auth.json`).
+Paired device tokens stored in `<PILOT_DIR>/companion-tokens.json` (encrypted at rest using the same mechanism as `auth.json`).
 
 ---
 

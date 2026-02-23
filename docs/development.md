@@ -4,7 +4,8 @@
 - Node.js 20+ (recommended: use mise or nvm)
 - npm 10+
 - Git
-- macOS (primary platform), Linux, or Windows
+- macOS, Windows, or Linux
+- **Linux only:** `sudo apt install build-essential libx11-dev libxkbfile-dev` (for node-pty native compilation)
 
 ## Getting Started
 
@@ -23,6 +24,9 @@ npm run dev
 |---|---|
 | `npm run dev` | Development mode with HMR and DevTools |
 | `npm run build` | Production build to `out/` |
+| `npm run build:mac` | Package for macOS (.dmg + .zip, arm64 & x64) |
+| `npm run build:win` | Package for Windows (NSIS installer + portable + .zip) |
+| `npm run build:linux` | Package for Linux (AppImage + .deb + .tar.gz) |
 | `npm run preview` | Preview production build |
 
 ## Project Structure
@@ -158,24 +162,31 @@ useEffect(() => {
 
 ## Config & Data Paths
 
+The app config directory (`<PILOT_DIR>`) is platform-dependent:
+
+| Platform | Default location |
+|---|---|
+| macOS | `~/.config/.pilot/` |
+| Windows | `%APPDATA%\.pilot\` |
+| Linux | `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`) |
+
 | Path | Contents |
 |---|---|
-| `~/.config/.pilot/` | All app-level config and data |
-| `~/.config/.pilot/auth.json` | API keys and OAuth tokens |
-| `~/.config/.pilot/models.json` | Model registry cache |
-| `~/.config/.pilot/app-settings.json` | App settings |
-| `~/.config/.pilot/workspace.json` | Saved tab layout and UI state |
-| `~/.config/.pilot/sessions/` | Session .jsonl files |
-| `~/.config/.pilot/extensions/` | Global extensions |
-| `~/.config/.pilot/skills/` | Global skills |
-| `~/.config/.pilot/MEMORY.md` | Global memory |
+| `<PILOT_DIR>/auth.json` | API keys and OAuth tokens |
+| `<PILOT_DIR>/models.json` | Model registry cache |
+| `<PILOT_DIR>/app-settings.json` | App settings |
+| `<PILOT_DIR>/workspace.json` | Saved tab layout and UI state |
+| `<PILOT_DIR>/sessions/` | Session .jsonl files |
+| `<PILOT_DIR>/extensions/` | Global extensions |
+| `<PILOT_DIR>/skills/` | Global skills |
+| `<PILOT_DIR>/MEMORY.md` | Global memory |
 | `<project>/.pilot/` | Project-level config |
 | `<project>/.pilot/settings.json` | Jail, yolo mode |
 | `<project>/.pilot/commands.json` | Dev command buttons |
 | `<project>/.pilot/MEMORY.md` | Project memory |
 | `<project>/.pilot/tasks.jsonl` | Project tasks |
 
-To reset all config: `rm -rf ~/.config/.pilot/`
+To reset all config, delete the `<PILOT_DIR>` directory.
 
 ## Debugging
 
