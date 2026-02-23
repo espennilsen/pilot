@@ -149,9 +149,9 @@ export function registerCompanionIpc(deps: CompanionDeps) {
 
     // Auto-detect LAN IP if host not provided
     const resolvedHost = host || getLanAddress() || 'localhost';
-    // Use provided port, or server port for LAN IPs.
-    // For tunnel hostnames, caller should pass the correct port (443 for cloudflare).
-    const resolvedPort = port ?? server.port;
+    // Use provided port for explicit overrides, server port for LAN IPs.
+    // When port is undefined (e.g. Tailscale funnel on 443), omit it from the payload.
+    const resolvedPort = port !== undefined ? port : (host ? undefined : server.port);
 
     const qrPayload = auth.generateQRPayload(resolvedHost, resolvedPort);
 
