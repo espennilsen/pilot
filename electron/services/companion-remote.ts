@@ -2,7 +2,7 @@ import { exec, execSync, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { PILOT_APP_DIR } from './pilot-paths';
 
 const execAsync = promisify(exec);
 
@@ -183,7 +183,7 @@ export async function setupTailscaleProxy(port: number): Promise<TailscaleResult
     const dnsName = status.Self.DNSName.replace(/\.$/, '');
     
     // Generate TLS certificates for the Tailscale domain
-    const certDir = join(homedir(), '.config', '.pilot', 'tailscale-certs');
+    const certDir = join(PILOT_APP_DIR, 'tailscale-certs');
     if (!existsSync(certDir)) {
       mkdirSync(certDir, { recursive: true });
     }
