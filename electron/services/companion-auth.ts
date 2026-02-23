@@ -29,7 +29,7 @@ export interface QRPayload {
   type: 'pilot-companion';
   version: 1;
   host: string;
-  port: number;
+  port?: number;
   token: string;
 }
 
@@ -98,7 +98,7 @@ export class CompanionAuth {
    * @param serverPort - WebSocket server port
    * @returns QR payload object (serialize to JSON for QR encoding)
    */
-  generateQRPayload(serverHost: string, serverPort: number): QRPayload {
+  generateQRPayload(serverHost: string, serverPort?: number): QRPayload {
     const token = randomBytes(32).toString('hex'); // 32 bytes = 64 hex chars
     const now = Date.now();
     this.activePairing = {
@@ -106,13 +106,16 @@ export class CompanionAuth {
       createdAt: now,
       expiresAt: now + 5 * 60 * 1000, // 5 minutes
     };
-    return {
+    const payload: QRPayload = {
       type: 'pilot-companion',
       version: 1,
       host: serverHost,
-      port: serverPort,
       token,
     };
+    if (serverPort != null) {
+      payload.port = serverPort;
+    }
+    return payload;
   }
 
   /**

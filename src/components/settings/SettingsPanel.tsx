@@ -939,14 +939,16 @@ function CompanionSettings() {
 
   const generateQRForHost = async (host?: string) => {
     try {
-      // Determine port: for tunnel hostnames use the port from the URL, for LAN IPs use server port
+      // Determine port: for tunnel hostnames use the port from the URL, for LAN IPs use server port.
+      // Omit port for standard HTTPS (443) — companion defaults to 443 when no port is specified.
       let port: number | undefined;
       if (host && status?.remoteUrl) {
         try {
           const tunnelUrl = new URL(status.remoteUrl);
           if (host === tunnelUrl.hostname) {
-            // Tunnel host — use tunnel port (443 for cloudflare, explicit for tailscale)
-            port = tunnelUrl.port ? parseInt(tunnelUrl.port, 10) : 443;
+            // Tunnel host — use explicit port if non-standard, omit for 443 (HTTPS default)
+            const tunnelPort = tunnelUrl.port ? parseInt(tunnelUrl.port, 10) : 443;
+            port = tunnelPort !== 443 ? tunnelPort : undefined;
           }
         } catch { /* not a tunnel host, use default */ }
       }
