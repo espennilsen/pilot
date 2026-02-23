@@ -51,7 +51,7 @@ export function CompanionTitleBar() {
   const projectName = projectPath ? projectPath.split('/').pop() : null;
 
   return (
-    <div className="h-[38px] bg-bg-surface border-b border-border flex items-center px-2 select-none relative">
+    <div className="bg-bg-surface border-b border-border flex items-center px-2 select-none relative h-[38px] pt-[env(safe-area-inset-top)]" style={{ minHeight: 'calc(38px + env(safe-area-inset-top, 0px))' }}>
       {/* Hamburger menu button */}
       <button
         ref={buttonRef}
@@ -87,7 +87,8 @@ export function CompanionTitleBar() {
       {menuOpen && (
         <div
           ref={menuRef}
-          className="absolute top-[38px] left-1 z-50 w-56 bg-bg-elevated border border-border rounded-lg shadow-xl py-1 animate-in fade-in slide-in-from-top-1 duration-100"
+          className="absolute left-1 z-50 w-56 bg-bg-elevated border border-border rounded-lg shadow-xl py-1 animate-in fade-in slide-in-from-top-1 duration-100"
+          style={{ top: 'calc(38px + env(safe-area-inset-top, 0px))' }}
         >
           <MenuSection label="File">
             <MenuItem icon="Plus" label="New Conversation" onClick={() => act(() => addTab())} />
