@@ -58,7 +58,7 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
   const [slashMenuVisible, setSlashMenuVisible] = useState(false);
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
-  const slashCommandsLoadedRef = useRef(false);
+  const slashCommandsLoadingRef = useRef(false);
 
   // File mention (@) state
   const [mentionFiles, setMentionFiles] = useState<FileMention[]>([]);
@@ -75,15 +75,20 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
   const slashFilter = slashMatch ? slashMatch[1] : '';
   const isSlashMode = slashMatch !== null && !isStreaming;
 
-  // Load slash commands on first '/' keystroke
+  // Load slash commands every time the slash menu opens.
+  // The IPC call reads from in-memory data so it's fast.
+  // Re-fetch on every open ensures prompt library changes, newly
+  // loaded sessions, and extension commands are always up-to-date.
   useEffect(() => {
-    if (isSlashMode && !slashCommandsLoadedRef.current && activeTabId) {
-      slashCommandsLoadedRef.current = true;
+    if (isSlashMode && activeTabId && !slashCommandsLoadingRef.current) {
+      slashCommandsLoadingRef.current = true;
       invoke(IPC.AGENT_GET_SLASH_COMMANDS, activeTabId).then((cmds: any) => {
         if (Array.isArray(cmds)) {
           setSlashCommands(cmds);
         }
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => {
+        slashCommandsLoadingRef.current = false;
+      });
     }
     if (isSlashMode) {
       setSlashMenuVisible(true);
@@ -92,11 +97,6 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
       setSlashMenuVisible(false);
     }
   }, [isSlashMode, activeTabId]);
-
-  // Reload slash commands when tab changes
-  useEffect(() => {
-    slashCommandsLoadedRef.current = false;
-  }, [activeTabId]);
 
   /**
    * Detect @mention trigger: find the word starting with @ at or before the cursor.

@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
-import os from 'os';
 
-const PILOT_APP_DIR = path.join(os.homedir(), '.config', '.pilot');
+import { PILOT_APP_DIR } from './pilot-paths';
+
 const GLOBAL_MEMORY_PATH = path.join(PILOT_APP_DIR, 'MEMORY.md');
 
 export interface MemoryExtractionResult {

@@ -207,7 +207,7 @@ function createWindow() {
 }
 
 // This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Create window first (needed by terminal service)
   createWindow();
 
@@ -351,11 +351,13 @@ app.whenReady().then(() => {
     remote: companionRemote!,
   });
 
-  // Initialize prompt library
+  // Initialize prompt library (await so prompts are available before first slash command query)
   promptLibrary = new PromptLibrary();
-  promptLibrary.init().catch(err => {
+  try {
+    await promptLibrary.init();
+  } catch (err) {
     console.error('Failed to initialize prompt library:', err);
-  });
+  }
   registerPromptsIpc(promptLibrary);
   setPromptLibraryRef(promptLibrary);
 

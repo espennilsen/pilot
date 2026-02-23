@@ -2,9 +2,24 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { mkdirSync, existsSync } from 'fs';
 
-// ─── Pilot App Directory (~/.config/.pilot/) ─────────────────────────────
+// ─── Pilot App Directory ─────────────────────────────────────────────────
 // App-level config that is NOT per-project and NOT related to pi agent settings.
-export const PILOT_APP_DIR = join(homedir(), '.config', '.pilot');
+// Platform-aware:
+//   macOS:   ~/.config/.pilot/              (backward-compatible)
+//   Windows: %APPDATA%\.pilot\              (e.g. C:\Users\<user>\AppData\Roaming\.pilot)
+//   Linux:   $XDG_CONFIG_HOME/.pilot/       (default: ~/.config/.pilot/)
+function resolvePilotAppDir(): string {
+  switch (process.platform) {
+    case 'win32':
+      return join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), '.pilot');
+    case 'linux':
+      return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), '.pilot');
+    default: // darwin and others
+      return join(homedir(), '.config', '.pilot');
+  }
+}
+
+export const PILOT_APP_DIR = resolvePilotAppDir();
 
 // App settings file (includes piAgentDir override)
 export const PILOT_APP_SETTINGS_FILE = join(PILOT_APP_DIR, 'app-settings.json');
