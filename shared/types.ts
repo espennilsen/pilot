@@ -56,6 +56,13 @@ export interface StagedDiff {
   proposedContent: string;
   /** Unified diff string from pi's edit tool (with @@ hunks, context lines) */
   unifiedDiff?: string;
+  /**
+   * For edit operations: the original oldText/newText params.
+   * Stored so that accept can re-apply against the current disk content
+   * instead of blindly writing proposedContent (which may be stale if
+   * another diff for the same file was accepted first).
+   */
+  editParams?: { oldText: string; newText: string };
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: number; // timestamp, not Date (must be serializable over IPC)
 }

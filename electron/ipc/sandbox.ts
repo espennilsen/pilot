@@ -6,7 +6,13 @@ import type { PilotSessionManager } from '../services/pi-session-manager';
 import { loadProjectSettings } from '../services/project-settings';
 import { resolveBashApproval } from '../services/sandboxed-tools';
 
-function applyDiff(diff: { filePath: string; operation: string; proposedContent: string; originalContent?: string | null }) {
+function applyDiff(diff: {
+  filePath: string;
+  operation: string;
+  proposedContent: string;
+  originalContent?: string | null;
+  editParams?: { oldText: string; newText: string };
+}) {
   if (diff.operation === 'bash') {
     // Bash diffs are handled via resolveBashApproval, not file writes
     return;
@@ -18,30 +24,51 @@ function applyDiff(diff: { filePath: string; operation: string; proposedContent:
 
   let content = diff.proposedContent;
 
-  // Handle legacy edit format where proposedContent is JSON.stringify(params)
   if (diff.operation === 'edit') {
-    try {
-      const parsed = JSON.parse(diff.proposedContent);
-      if (parsed && typeof parsed.oldText === 'string' && typeof parsed.newText === 'string') {
-        // Read current file content and apply the edit
-        const filePath = parsed.path || diff.filePath;
-        let current: string;
-        try {
-          current = readFileSync(filePath, 'utf-8');
-        } catch {
-          current = diff.originalContent ?? '';
-        }
-        if (current.includes(parsed.oldText)) {
-          content = current.replace(parsed.oldText, parsed.newText);
-        } else {
-          throw new Error(`Edit target text not found in file: ${filePath}`);
-        }
+    // If we have the original edit params, re-apply the oldText→newText
+    // transformation against the *current* disk content. This prevents
+    // a race where accepting edit A, then edit B (both targeting the same
+    // file) would cause B's pre-computed proposedContent to overwrite A's
+    // changes — because B's proposedContent was computed before A was accepted.
+    if (diff.editParams) {
+      let current: string;
+      try {
+        current = readFileSync(diff.filePath, 'utf-8');
+      } catch {
+        current = diff.originalContent ?? '';
       }
-    } catch (e) {
-      if (e instanceof SyntaxError) {
-        // Not JSON — proposedContent is the actual new file content (new format)
+      if (current.includes(diff.editParams.oldText)) {
+        content = current.replace(diff.editParams.oldText, diff.editParams.newText);
       } else {
-        throw e;
+        throw new Error(
+          `Edit target text not found in ${diff.filePath}. ` +
+          `The file may have been modified since the edit was staged.`
+        );
+      }
+    } else {
+      // Legacy format: proposedContent is JSON.stringify(params)
+      try {
+        const parsed = JSON.parse(diff.proposedContent);
+        if (parsed && typeof parsed.oldText === 'string' && typeof parsed.newText === 'string') {
+          const filePath = parsed.path || diff.filePath;
+          let current: string;
+          try {
+            current = readFileSync(filePath, 'utf-8');
+          } catch {
+            current = diff.originalContent ?? '';
+          }
+          if (current.includes(parsed.oldText)) {
+            content = current.replace(parsed.oldText, parsed.newText);
+          } else {
+            throw new Error(`Edit target text not found in file: ${filePath}`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          // Not JSON — proposedContent is the actual new file content
+        } else {
+          throw e;
+        }
       }
     }
   }

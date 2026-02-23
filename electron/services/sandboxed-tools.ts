@@ -145,6 +145,7 @@ export function createSandboxedTools(
         originalContent,
         proposedContent,
         unifiedDiff,
+        editParams: { oldText, newText },
         status: 'pending',
         createdAt: Date.now(),
       };
