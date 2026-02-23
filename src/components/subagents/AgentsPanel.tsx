@@ -60,9 +60,12 @@ function SubagentItem({ sub }: { sub: SubagentRecord }) {
 
   return (
     <div className="border-b border-border/50 last:border-b-0">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-bg-base/50 transition-colors text-left"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
+        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-bg-base/50 transition-colors text-left cursor-pointer"
       >
         {expanded ? (
           <ChevronDown className="w-3 h-3 text-text-secondary flex-shrink-0" />
@@ -85,7 +88,7 @@ function SubagentItem({ sub }: { sub: SubagentRecord }) {
             <StopCircle className="w-3 h-3 text-text-secondary hover:text-red-400" />
           </button>
         )}
-      </button>
+      </div>
 
       {expanded && (
         <div className="px-3 pb-2 pl-8 space-y-1">
