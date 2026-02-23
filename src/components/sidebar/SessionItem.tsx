@@ -36,11 +36,9 @@ export function SessionItem({
     session.isPinned
       ? { label: 'Unpin', icon: <Icon name="PinOff" size={14} />, action: onUnpin }
       : { label: 'Pin', icon: <Icon name="Pin" size={14} />, action: onPin },
-    {
-      label: 'Archive',
-      icon: <Icon name="Archive" size={14} />,
-      action: onArchive,
-    },
+    session.isArchived
+      ? { label: 'Unarchive', icon: <Icon name="ArchiveRestore" size={14} />, action: onArchive }
+      : { label: 'Archive', icon: <Icon name="Archive" size={14} />, action: onArchive },
     'separator',
     {
       label: 'Delete',
@@ -101,9 +99,9 @@ export function SessionItem({
                 e.stopPropagation();
                 onArchive();
               }}
-              title="Archive session"
+              title={session.isArchived ? 'Unarchive session' : 'Archive session'}
             >
-              <Icon name="Archive" className="w-3.5 h-3.5" />
+              <Icon name={session.isArchived ? 'ArchiveRestore' : 'Archive'} className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

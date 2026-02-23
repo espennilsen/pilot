@@ -31,7 +31,7 @@ import {
 } from './pilot-paths';
 import { IPC } from '../../shared/ipc';
 import type { StagedDiff, SessionMetadata, MemoryCommandResult } from '../../shared/types';
-import { getAllSessionMeta } from './session-metadata';
+import { getAllSessionMeta, removeSessionMeta } from './session-metadata';
 import { TaskManager } from './task-manager';
 import { createTaskTools } from './task-tools';
 import { companionBridge } from './companion-ipc-bridge';
@@ -711,6 +711,23 @@ export class PilotSessionManager {
       return (b.sessionPath || '').localeCompare(a.sessionPath || '');
     });
     return allSessions;
+  }
+
+  /** Delete a session file from disk and clean up its metadata. */
+  async deleteSession(sessionPath: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { unlinkSync } = await import('fs');
+      if (existsSync(sessionPath)) {
+        unlinkSync(sessionPath);
+      }
+      // Clean up persisted metadata (pin/archive flags)
+      removeSessionMeta(sessionPath);
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to delete session:', message);
+      return { success: false, error: message };
+    }
   }
 
   private forwardEventToRenderer(tabId: string, event: AgentSessionEvent): void {

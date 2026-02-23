@@ -10,12 +10,16 @@ export function SessionList() {
   const {
     searchQuery,
     isLoading,
+    showArchived,
     loadSessions,
     setSearchQuery,
+    setShowArchived,
     getFilteredSessions,
     pinSession,
     unpinSession,
     archiveSession,
+    unarchiveSession,
+    deleteSession,
   } = useSessionStore();
 
   const { activeTabId, tabs, switchTab } = useTabStore();
@@ -60,8 +64,8 @@ export function SessionList() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search input */}
-      <div className="px-3 py-2 border-b border-border">
+      {/* Search input + archive toggle */}
+      <div className="px-3 py-2 border-b border-border space-y-2">
         <div className="relative">
           <Icon
             name="Search"
@@ -75,6 +79,15 @@ export function SessionList() {
             className="w-full bg-bg-elevated border-none rounded-md pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent/50"
           />
         </div>
+        <button
+          onClick={() => setShowArchived(!showArchived)}
+          className={`flex items-center gap-1.5 text-xs transition-colors ${
+            showArchived ? 'text-accent' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Icon name="Archive" className="w-3 h-3" />
+          {showArchived ? 'Hide archived' : 'Show archived'}
+        </button>
       </div>
 
       {/* Session list */}
@@ -109,7 +122,15 @@ export function SessionList() {
                 })}
                 onPin={() => pinSession(session.path)}
                 onUnpin={() => unpinSession(session.path)}
-                onArchive={() => archiveSession(session.path)}
+                onArchive={() => session.isArchived
+                  ? unarchiveSession(session.path)
+                  : archiveSession(session.path)
+                }
+                onDelete={() => {
+                  if (confirm(`Delete session "${session.title}"? This cannot be undone.`)) {
+                    deleteSession(session.path);
+                  }
+                }}
               />
             ))}
           </div>

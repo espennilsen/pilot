@@ -17,13 +17,16 @@ interface SessionStore {
   sessions: SessionInfo[];
   searchQuery: string;
   isLoading: boolean;
+  showArchived: boolean;
 
   loadSessions: (projectPaths?: string[]) => Promise<void>;
   pinSession: (path: string) => void;
   unpinSession: (path: string) => void;
   archiveSession: (path: string) => void;
   unarchiveSession: (path: string) => void;
+  deleteSession: (path: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
+  setShowArchived: (show: boolean) => void;
   getFilteredSessions: () => SessionInfo[];
 }
 
@@ -31,6 +34,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   searchQuery: '',
   isLoading: false,
+  showArchived: false,
 
   loadSessions: async (projectPaths?: string[]) => {
     set({ isLoading: true });
@@ -91,15 +95,34 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     invoke(IPC.SESSION_UPDATE_META, path, { isArchived: false }).catch(console.error);
   },
 
+  deleteSession: async (path: string) => {
+    try {
+      const result = await invoke(IPC.SESSION_DELETE, path) as { success: boolean; error?: string };
+      if (result.success) {
+        set(state => ({
+          sessions: state.sessions.filter(s => s.path !== path),
+        }));
+      } else {
+        console.error('Failed to delete session:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  },
+
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
   },
 
+  setShowArchived: (show: boolean) => {
+    set({ showArchived: show });
+  },
+
   getFilteredSessions: () => {
-    const { sessions, searchQuery } = get();
+    const { sessions, searchQuery, showArchived } = get();
     
-    // Filter out archived sessions
-    let filtered = sessions.filter(s => !s.isArchived);
+    // Filter out archived sessions unless showArchived is on
+    let filtered = showArchived ? [...sessions] : sessions.filter(s => !s.isArchived);
     
     // Apply search filter
     if (searchQuery.trim()) {

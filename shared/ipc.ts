@@ -31,6 +31,7 @@ export const IPC = {
   SESSION_LIST: 'session:list',
   SESSION_LIST_ALL: 'session:list-all',
   SESSION_UPDATE_META: 'session:update-meta',
+  SESSION_DELETE: 'session:delete',
   SESSION_NEW: 'session:new',
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
