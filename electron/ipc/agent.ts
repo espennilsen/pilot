@@ -193,6 +193,25 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
         await sessionManager.createSession(tabId, projectPath);
       }
     }
+    // Broadcast user message to all renderers so companion ↔ desktop stay in sync.
+    // The sending client already adds it optimistically; handleEvent deduplicates.
+    if (!text.startsWith('/')) {
+      const userMessageEvent = {
+        tabId,
+        event: {
+          type: 'user_message',
+          content: text,
+          images,
+          timestamp: Date.now(),
+        },
+      };
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        win.webContents.send(IPC.AGENT_EVENT, userMessageEvent);
+      }
+      companionBridge.forwardEvent(IPC.AGENT_EVENT, userMessageEvent);
+    }
+
     await sessionManager.prompt(tabId, text, images);
   });
 

@@ -121,8 +121,24 @@ export function useAgentSession() {
     };
   }, []);
 
-  function handleEvent(tabId: string, event: AgentSessionEvent & { content?: string }) {
+  function handleEvent(tabId: string, event: AgentSessionEvent & { content?: string; images?: any[]; timestamp?: number }) {
     switch (event.type) {
+      case 'user_message': {
+        // User message broadcast from main process (companion ↔ desktop sync).
+        // Skip if we already have this message (the sending client adds it optimistically).
+        const msgs = useChatStore.getState().getMessages(tabId);
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg?.role === 'user' && lastMsg.content === event.content) {
+          break; // Already added optimistically by sendMessage()
+        }
+        addMessage(tabId, {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: event.content || '',
+          timestamp: event.timestamp || Date.now(),
+        });
+        break;
+      }
       case 'system_message':
         // Memory command result — show as a system message in chat
         addMessage(tabId, {

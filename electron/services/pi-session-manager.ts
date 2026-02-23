@@ -33,6 +33,7 @@ import { IPC } from '../../shared/ipc';
 import type { StagedDiff, SessionMetadata, MemoryCommandResult } from '../../shared/types';
 import { TaskManager } from './task-manager';
 import { createTaskTools } from './task-tools';
+import { companionBridge } from './companion-ipc-bridge';
 import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
 
@@ -715,11 +716,6 @@ export class PilotSessionManager {
       win.webContents.send(channel, data);
     }
     // Forward to companion clients
-    try {
-      const { companionBridge } = require('./companion-ipc-bridge');
-      companionBridge.forwardEvent(channel, data);
-    } catch {
-      // Companion bridge not initialized yet
-    }
+    companionBridge.forwardEvent(channel, data);
   }
 }
