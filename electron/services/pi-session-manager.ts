@@ -31,6 +31,7 @@ import {
 } from './pilot-paths';
 import { IPC } from '../../shared/ipc';
 import type { StagedDiff, SessionMetadata, MemoryCommandResult } from '../../shared/types';
+import { getAllSessionMeta } from './session-metadata';
 import { TaskManager } from './task-manager';
 import { createTaskTools } from './task-tools';
 import { companionBridge } from './companion-ipc-bridge';
@@ -637,16 +638,20 @@ export class PilotSessionManager {
       const piAgentDir = getPiAgentDir();
       const sessionDir = getSessionDir(piAgentDir, projectPath);
       const sessions = await SessionManager.list(projectPath, sessionDir);
-      return sessions.map(s => ({
-        sessionPath: s.path,
-        projectPath: s.cwd || projectPath,
-        isPinned: false,
-        isArchived: false,
-        customTitle: s.name || s.firstMessage || null,
-        messageCount: s.messageCount || 0,
-        created: s.created?.getTime() || 0,
-        modified: s.modified?.getTime() || 0,
-      }));
+      const metaMap = getAllSessionMeta();
+      return sessions.map(s => {
+        const meta = metaMap[s.path] || { isPinned: false, isArchived: false };
+        return {
+          sessionPath: s.path,
+          projectPath: s.cwd || projectPath,
+          isPinned: meta.isPinned,
+          isArchived: meta.isArchived,
+          customTitle: s.name || s.firstMessage || null,
+          messageCount: s.messageCount || 0,
+          created: s.created?.getTime() || 0,
+          modified: s.modified?.getTime() || 0,
+        };
+      });
     } catch {
       return [];
     }
@@ -656,6 +661,7 @@ export class PilotSessionManager {
   async listAllSessions(projectPaths: string[]): Promise<SessionMetadata[]> {
     const piAgentDir = getPiAgentDir();
     const allSessions: SessionMetadata[] = [];
+    const metaMap = getAllSessionMeta();
 
     if (projectPaths.length > 0) {
       // Scan sessions for specific projects
@@ -677,11 +683,12 @@ export class PilotSessionManager {
             try {
               const sessions = await SessionManager.list(cwd, sessionDir);
               for (const s of sessions) {
+                const meta = metaMap[s.path] || { isPinned: false, isArchived: false };
                 allSessions.push({
                   sessionPath: s.path,
                   projectPath: s.cwd || cwd,
-                  isPinned: false,
-                  isArchived: false,
+                  isPinned: meta.isPinned,
+                  isArchived: meta.isArchived,
                   customTitle: s.name || s.firstMessage || null,
                   messageCount: s.messageCount || 0,
                   created: s.created?.getTime() || 0,

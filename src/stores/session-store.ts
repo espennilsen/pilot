@@ -61,6 +61,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.path === path ? { ...s, isPinned: true } : s
       ),
     }));
+    invoke(IPC.SESSION_UPDATE_META, path, { isPinned: true }).catch(console.error);
   },
 
   unpinSession: (path: string) => {
@@ -69,6 +70,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.path === path ? { ...s, isPinned: false } : s
       ),
     }));
+    invoke(IPC.SESSION_UPDATE_META, path, { isPinned: false }).catch(console.error);
   },
 
   archiveSession: (path: string) => {
@@ -77,6 +79,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.path === path ? { ...s, isArchived: true } : s
       ),
     }));
+    invoke(IPC.SESSION_UPDATE_META, path, { isArchived: true }).catch(console.error);
   },
 
   unarchiveSession: (path: string) => {
@@ -85,6 +88,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.path === path ? { ...s, isArchived: false } : s
       ),
     }));
+    invoke(IPC.SESSION_UPDATE_META, path, { isArchived: false }).catch(console.error);
   },
 
   setSearchQuery: (query: string) => {
