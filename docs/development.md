@@ -1,0 +1,195 @@
+# Development Guide
+
+## Prerequisites
+- Node.js 20+ (recommended: use mise or nvm)
+- npm 10+
+- Git
+- macOS (primary platform), Linux, or Windows
+
+## Getting Started
+
+```bash
+git clone <repo-url>
+cd PiLot
+npm install
+npm run dev
+```
+
+`npm run dev` starts Electron with Vite HMR. DevTools open automatically.
+
+## Available Scripts
+
+| Script | Description |
+|---|---|
+| `npm run dev` | Development mode with HMR and DevTools |
+| `npm run build` | Production build to `out/` |
+| `npm run preview` | Preview production build |
+
+## Project Structure
+
+Refer to [Architecture Overview](./architecture.md) for the full structure.
+
+## Adding a New Feature
+
+### Adding a New IPC Domain
+
+Example: Adding a "notifications" domain.
+
+1. **Add channel constants** to `shared/ipc.ts`:
+```typescript
+// Notifications
+export const NOTIFICATIONS_LIST = 'notifications:list';
+export const NOTIFICATIONS_SEND = 'notifications:send';
+export const NOTIFICATIONS_DISMISS = 'notifications:dismiss';
+export const NOTIFICATIONS_NEW = 'notifications:new'; // push event
+```
+
+2. **Add types** to `shared/types.ts`:
+```typescript
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  type: 'info' | 'warning' | 'error';
+  timestamp: number;
+  read: boolean;
+}
+```
+
+3. **Create IPC handler** `electron/ipc/notifications.ts`:
+```typescript
+import { ipcMain, BrowserWindow } from 'electron';
+import * as IPC from '../../shared/ipc';
+import { NotificationService } from '../services/notification-service';
+
+export function registerNotificationsIpc(service: NotificationService) {
+  ipcMain.handle(IPC.NOTIFICATIONS_LIST, async () => {
+    return service.list();
+  });
+
+  ipcMain.handle(IPC.NOTIFICATIONS_SEND, async (_event, notification) => {
+    const result = await service.send(notification);
+    // Push to all windows
+    BrowserWindow.getAllWindows().forEach(win =>
+      win.webContents.send(IPC.NOTIFICATIONS_NEW, result)
+    );
+    return result;
+  });
+}
+```
+
+4. **Create service** `electron/services/notification-service.ts` if business logic needed.
+
+5. **Register in main** `electron/main/index.ts`:
+```typescript
+import { registerNotificationsIpc } from './ipc/notifications';
+const notificationService = new NotificationService();
+registerNotificationsIpc(notificationService);
+```
+
+6. **Create Zustand store** `src/stores/notification-store.ts`:
+```typescript
+import { create } from 'zustand';
+import * as IPC from '../../shared/ipc';
+
+interface NotificationStore {
+  notifications: Notification[];
+  loadNotifications: () => Promise<void>;
+}
+
+export const useNotificationStore = create<NotificationStore>((set) => ({
+  notifications: [],
+  loadNotifications: async () => {
+    const notifications = await window.api.invoke(IPC.NOTIFICATIONS_LIST);
+    set({ notifications });
+  },
+}));
+```
+
+7. **Listen for push events** in a hook or component:
+```typescript
+useEffect(() => {
+  const unsubscribe = window.api.on(IPC.NOTIFICATIONS_NEW, (notification) => {
+    useNotificationStore.getState().addNotification(notification);
+  });
+  return unsubscribe;
+}, []);
+```
+
+### Adding a New UI Panel
+
+- Create a folder under `src/components/<domain>/`
+- State in a Zustand store, not component `useState` (unless ephemeral)
+- IPC calls in the store or a hook, never in JSX event handlers
+- Use `useEffect` cleanup for `window.api.on()` listeners
+
+### Extending the Agent Sandbox
+
+- Edit `electron/services/sandboxed-tools.ts` to intercept additional tool types
+- Add new diff operation type to `StagedDiff['operation']` in `shared/types.ts`
+- Handle the new operation in `applyDiff` in `electron/ipc/sandbox.ts`
+
+## Conventions
+
+### TypeScript
+- No `any` in new code — use SDK types or define interfaces in `shared/types.ts`
+- Static imports only — no dynamic `require()`
+- Types shared across process boundary in `shared/types.ts`; internal types stay local
+
+### IPC
+- All channel names from `shared/ipc.ts` — never raw strings
+- Payloads must be Structured Clone serializable: no functions, classes, DOM nodes
+- Main→renderer pushes use `BrowserWindow.getAllWindows()`
+
+### Zustand
+- Always return new objects/arrays from `set()` — never mutate `state.*` in place
+- Derive computed values in selectors, not components
+- Access stores outside React via `useStore.getState()`
+
+### Electron Security
+- `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false` — never change
+- Validate file paths against project root (jail pattern from `sandboxed-tools.ts`)
+- Use `execFile`/`spawn` with argument arrays, not `exec` with interpolated strings
+
+### Error Handling
+- IPC handlers that can fail should `throw` — Electron serializes to rejected promise
+- Catch at the call site in the renderer
+- Silent errors acceptable only for truly non-critical background tasks
+
+## Config & Data Paths
+
+| Path | Contents |
+|---|---|
+| `~/.config/.pilot/` | All app-level config and data |
+| `~/.config/.pilot/auth.json` | API keys and OAuth tokens |
+| `~/.config/.pilot/models.json` | Model registry cache |
+| `~/.config/.pilot/app-settings.json` | App settings |
+| `~/.config/.pilot/workspace.json` | Saved tab layout and UI state |
+| `~/.config/.pilot/sessions/` | Session .jsonl files |
+| `~/.config/.pilot/extensions/` | Global extensions |
+| `~/.config/.pilot/skills/` | Global skills |
+| `~/.config/.pilot/MEMORY.md` | Global memory |
+| `<project>/.pilot/` | Project-level config |
+| `<project>/.pilot/settings.json` | Jail, yolo mode |
+| `<project>/.pilot/commands.json` | Dev command buttons |
+| `<project>/.pilot/MEMORY.md` | Project memory |
+| `<project>/.pilot/tasks.jsonl` | Project tasks |
+
+To reset all config: `rm -rf ~/.config/.pilot/`
+
+## Debugging
+
+### DevTools
+- Opens automatically in dev mode
+- Renderer DevTools: Cmd+Shift+I
+- Main process logs in terminal where `npm run dev` runs
+
+### Common Issues
+
+| Issue | Solution |
+|---|---|
+| White screen on launch | Check DevTools console for errors. Usually a missing import or type error. |
+| IPC handler not found | Verify channel constant matches in shared/ipc.ts, handler is registered in main/index.ts |
+| Store not updating | Check that `set()` returns new objects (immutability). Check selector in component. |
+| File operations failing | Check jail settings. Verify path resolves within project root. |
+| Memory not injecting | Verify MemoryManager instance is shared (known bug: two instances). |

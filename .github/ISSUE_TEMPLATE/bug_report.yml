@@ -1,0 +1,138 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in Pilot
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the form below to help us understand and reproduce the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Open Pilot
+        2. Click on '...'
+        3. Type '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: I expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, what happened was...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Critical - App crashes or data loss
+        - High - Major feature broken
+        - Medium - Feature partially broken
+        - Low - Minor inconvenience
+        - Cosmetic - Visual issue only
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Pilot Version
+      description: What version of Pilot are you running? (Help > About)
+      placeholder: "e.g., 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What OS are you running?
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows 11
+        - Windows 10
+        - Linux (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      description: Which part of the app is affected?
+      multiple: true
+      options:
+        - Agent / Chat
+        - Diff Review / Sandbox
+        - Git Integration
+        - Memory System
+        - Settings
+        - Terminal
+        - File Explorer
+        - Sessions
+        - Extensions / Skills
+        - Dev Commands
+        - Authentication
+        - UI / Layout
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please copy and paste any relevant log output. This will be automatically formatted into code.
+        You can find logs in DevTools (View > Toggle Developer Tools > Console tab).
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, workarounds, etc.)
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have included steps to reproduce the issue
+          required: true
+        - label: I have included my Pilot version and OS
+          required: true

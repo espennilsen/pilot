@@ -1,0 +1,110 @@
+# ========================================
+# Node.js
+# ========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm
+.yarn-integrity
+
+# ========================================
+# Build Output
+# ========================================
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# ========================================
+# Electron Builder
+# ========================================
+release/
+*.dmg
+*.exe
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+.electron-builder.env.*
+
+# ========================================
+# Environment Variables
+# ========================================
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ========================================
+# IDE & Editor
+# ========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# ========================================
+# OS Files
+# ========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ========================================
+# Logs
+# ========================================
+*.log
+logs/
+*.log.*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ========================================
+# Testing
+# ========================================
+coverage/
+.nyc_output/
+.cache/
+
+# ========================================
+# Temporary Files
+# ========================================
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ========================================
+# Pi Coding Agent
+# ========================================
+.pi/
+
+# ========================================
+# Pilot App Local Config
+# ========================================
+.pilot/

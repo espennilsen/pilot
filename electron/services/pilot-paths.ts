@@ -1,0 +1,49 @@
+import { join } from 'path';
+import { homedir } from 'os';
+import { mkdirSync, existsSync } from 'fs';
+
+// ─── Pilot App Directory (~/.config/.pilot/) ─────────────────────────────
+// App-level config that is NOT per-project and NOT related to pi agent settings.
+export const PILOT_APP_DIR = join(homedir(), '.config', '.pilot');
+
+// App settings file (includes piAgentDir override)
+export const PILOT_APP_SETTINGS_FILE = join(PILOT_APP_DIR, 'app-settings.json');
+
+// Workspace state (tabs, window bounds, UI layout)
+export const PILOT_WORKSPACE_FILE = join(PILOT_APP_DIR, 'workspace.json');
+
+// Auth credentials managed by Pilot (separate from pi CLI's auth)
+export const PILOT_AUTH_FILE = join(PILOT_APP_DIR, 'auth.json');
+
+// Model registry managed by Pilot
+export const PILOT_MODELS_FILE = join(PILOT_APP_DIR, 'models.json');
+
+// Extensions and skills installed through Pilot (NOT auto-discovered by pi agent)
+export const PILOT_EXTENSIONS_DIR = join(PILOT_APP_DIR, 'extensions');
+export const PILOT_SKILLS_DIR = join(PILOT_APP_DIR, 'skills');
+
+// Extension registry (enabled/disabled state)
+export const PILOT_EXTENSION_REGISTRY_FILE = join(PILOT_APP_DIR, 'extension-registry.json');
+
+// Prompt library
+export const PILOT_PROMPTS_DIR = join(PILOT_APP_DIR, 'prompts');
+
+// ─── Default Pi Agent Directory ──────────────────────────────────────────
+// Pilot uses its own app directory as the default agent dir.
+// Users can override this in Settings → General → Pi Config Directory.
+export const DEFAULT_PI_AGENT_DIR = PILOT_APP_DIR;
+
+// ─── Ensure directories exist ────────────────────────────────────────────
+export function ensurePilotAppDirs(): void {
+  const dirs = [
+    PILOT_APP_DIR,
+    PILOT_EXTENSIONS_DIR,
+    PILOT_SKILLS_DIR,
+    PILOT_PROMPTS_DIR,
+  ];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+  }
+}

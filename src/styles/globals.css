@@ -1,0 +1,80 @@
+@import "tailwindcss";
+@import "highlight.js/styles/atom-one-dark.min.css";
+
+@theme {
+  /* Colors */
+  --color-bg-base: #1a1b1e;
+  --color-bg-surface: #24262a;
+  --color-bg-elevated: #2c2e33;
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #8b8d91;
+  --color-accent: #4fc3f7;
+  --color-success: #66bb6a;
+  --color-error: #ef5350;
+  --color-warning: #ffa726;
+  --color-border: #333539;
+
+  /* Fonts */
+  --font-family-ui: 'Inter', 'Geist', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-ui);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Selection */
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* highlight.js — strip theme background so it inherits the app's bg */
+pre code.hljs,
+code.hljs {
+  background: transparent;
+  padding: 0;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

@@ -1,0 +1,134 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for Pilot
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out the form below to help us understand your idea.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: I'm frustrated when... / It would be helpful if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: I would like Pilot to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: I've tried... / Another approach could be...
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature Area
+      description: Which part of the app would this feature affect?
+      multiple: true
+      options:
+        - Agent / Chat
+        - Diff Review / Sandbox
+        - Git Integration
+        - Memory System
+        - Settings
+        - Terminal
+        - File Explorer
+        - Sessions
+        - Extensions / Skills
+        - Dev Commands
+        - Authentication
+        - UI / Layout
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical - Blocking my work
+        - High - Would significantly improve my workflow
+        - Medium - Nice to have
+        - Low - Small improvement
+    validations:
+      required: true
+
+  - type: dropdown
+    id: user-type
+    attributes:
+      label: User Type
+      description: Who would benefit from this feature?
+      multiple: true
+      options:
+        - Individual developer
+        - Team working on shared projects
+        - Open source maintainer
+        - Enterprise user
+        - New user / beginner
+        - Power user
+        - Extension developer
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Provide 1-3 concrete examples of how you would use this feature
+      placeholder: |
+        1. When working on a large refactoring, I would...
+        2. While reviewing git history, I could...
+      value: |
+        1. 
+        2. 
+        3.
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: Design Ideas / Mockups
+      description: If you have ideas for how this should look or work, describe or link them here
+      placeholder: Screenshots, wireframes, or detailed descriptions
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context, links, or references about the feature request here
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help implement this feature?
+      options:
+        - label: I would be willing to submit a PR for this feature
+        - label: I can help with testing/feedback
+        - label: I can help with documentation
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have described a clear use case for this feature
+          required: true

@@ -1,0 +1,51 @@
+appId: dev.e9n.pilot
+productName: Pilot
+copyright: Copyright © 2025-2026 Espen Nilsen
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+  - "!node_modules/**/*.{md,txt,map}"
+  - "!node_modules/**/{test,tests,__tests__}/**"
+  - "!node_modules/.cache/**"
+
+asarUnpack:
+  - "**/node_modules/node-pty/**"
+  - "**/resources/prompts/**"
+
+mac:
+  icon: resources/icon.icns
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+
+dmg:
+  artifactName: "${productName}-${version}-${arch}.dmg"
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+npmRebuild: true
+
+extraMetadata:
+  main: out/main/index.js

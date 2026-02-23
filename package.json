@@ -1,0 +1,53 @@
+{
+  "name": "pilot",
+  "version": "0.0.0",
+  "description": "Your cockpit for AI-powered coding",
+  "main": "out/main/index.js",
+  "author": "Espen Nornes",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev --config electron-vite.config.mjs",
+    "dev:trace": "NODE_OPTIONS='--trace-warnings' electron-vite dev --config electron-vite.config.mjs",
+    "build": "electron-vite build --config electron-vite.config.mjs",
+    "build:mac": "npm run build && electron-builder --mac",
+    "preview": "electron-vite preview --config electron-vite.config.mjs",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@homebridge/ciao": "^1.3.5",
+    "@mariozechner/pi-coding-agent": "^0.54.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "chokidar": "^5.0.0",
+    "diff": "^8.0.3",
+    "express": "^5.2.1",
+    "gray-matter": "^4.0.3",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^0.462.0",
+    "node-pty": "^1.1.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "simple-git": "^3.32.1",
+    "ws": "^8.19.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/express": "^5.0.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.0"
+  }
+}
