@@ -1,5 +1,6 @@
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, PanelRightClose } from 'lucide-react';
 import { useUIStore } from '../../stores/ui-store';
+import Tooltip from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
@@ -10,7 +11,7 @@ import GitPanel from '../git/GitPanel';
 import AgentsPanel from '../subagents/AgentsPanel';
 
 export default function ContextPanel() {
-  const { contextPanelVisible, contextPanelWidth, contextPanelTab, setContextPanelTab } = useUIStore();
+  const { contextPanelVisible, contextPanelWidth, contextPanelTab, setContextPanelTab, toggleContextPanel } = useUIStore();
   const { projectPath, openProjectDialog } = useProjectStore();
   const activeTabId = useTabStore((s) => s.activeTabId);
   const getPendingDiffs = useSandboxStore((s) => s.getPendingDiffs);
@@ -111,6 +112,18 @@ export default function ContextPanel() {
         ) : (
           <StagedDiffQueue />
         )}
+      </div>
+
+      {/* Collapse button */}
+      <div className="h-9 border-t border-border flex items-center px-2">
+        <Tooltip content="Collapse panel" position="left">
+          <button
+            className="p-1.5 hover:bg-bg-elevated rounded-md transition-colors text-text-secondary"
+            onClick={toggleContextPanel}
+          >
+            <PanelRightClose className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );
