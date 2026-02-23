@@ -1,6 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc';
-import { readdirSync, readFileSync, writeFileSync, statSync, renameSync, mkdirSync, rmSync, watch, type FSWatcher } from 'fs';
+import { readdirSync, readFileSync, writeFileSync, statSync, renameSync, mkdirSync, rmSync, existsSync, appendFileSync, watch, type FSWatcher } from 'fs';
 import { join, relative, resolve, sep } from 'path';
 import type { FileNode } from '../../shared/types';
 import { companionBridge } from '../services/companion-ipc-bridge';
@@ -218,5 +218,50 @@ export function registerProjectIpc() {
       return currentProjectPath;
     }
     return null;
+  });
+
+  // Check if project is a git repo that needs .pilot in .gitignore
+  ipcMain.handle(IPC.PROJECT_CHECK_GITIGNORE, async (_event, projectPath: string) => {
+    try {
+      const gitDir = join(projectPath, '.git');
+      if (!existsSync(gitDir)) return { needsUpdate: false }; // Not a git repo
+
+      const pilotDir = join(projectPath, '.pilot');
+      if (existsSync(pilotDir)) return { needsUpdate: false }; // .pilot already exists, too late to suggest
+
+      const gitignorePath = join(projectPath, '.gitignore');
+      if (existsSync(gitignorePath)) {
+        const content = readFileSync(gitignorePath, 'utf-8');
+        // Check if .pilot is already covered (exact line match, with or without trailing slash)
+        const lines = content.split(/\r?\n/);
+        const alreadyIgnored = lines.some(line => {
+          const trimmed = line.trim();
+          return trimmed === '.pilot' || trimmed === '.pilot/' || trimmed === '/.pilot' || trimmed === '/.pilot/';
+        });
+        if (alreadyIgnored) return { needsUpdate: false };
+      }
+
+      return { needsUpdate: true };
+    } catch {
+      return { needsUpdate: false };
+    }
+  });
+
+  // Add .pilot to .gitignore
+  ipcMain.handle(IPC.PROJECT_ADD_GITIGNORE, async (_event, projectPath: string) => {
+    try {
+      const gitignorePath = join(projectPath, '.gitignore');
+      if (existsSync(gitignorePath)) {
+        const content = readFileSync(gitignorePath, 'utf-8');
+        // Ensure we add on a new line
+        const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+        appendFileSync(gitignorePath, `${separator}.pilot\n`, 'utf-8');
+      } else {
+        writeFileSync(gitignorePath, '.pilot\n', 'utf-8');
+      }
+      return { ok: true };
+    } catch (err) {
+      return { error: String(err) };
+    }
   });
 }

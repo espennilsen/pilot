@@ -4,7 +4,7 @@ import { useExtensionStore } from '../../stores/extension-store';
 import type { InstalledSkill } from '../../../shared/types';
 
 export default function SkillManager() {
-  const { skills, loadSkills, removeSkill } = useExtensionStore();
+  const { skills, loadSkills, toggleSkill, removeSkill } = useExtensionStore();
 
   useEffect(() => {
     loadSkills();
@@ -34,7 +34,9 @@ export default function SkillManager() {
   };
 
   const SkillItem = ({ skill }: { skill: InstalledSkill }) => (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-bg-base/50 transition-colors">
+    <div className={`flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-bg-base/50 transition-colors ${
+      !skill.enabled ? 'opacity-50' : ''
+    }`}>
       {/* Icon */}
       <div className="w-8 h-8 rounded bg-accent/10 flex items-center justify-center">
         <BookOpen className="w-4 h-4 text-accent" />
@@ -47,12 +49,28 @@ export default function SkillManager() {
           <span className={`text-xs px-2 py-0.5 rounded-full ${getScopeBadgeColor(skill.scope)}`}>
             {skill.scope}
           </span>
+          {!skill.enabled && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-bg-elevated text-text-secondary">
+              disabled
+            </span>
+          )}
         </div>
         <p className="text-xs text-text-secondary truncate">{skill.description}</p>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => toggleSkill(skill.id)}
+          className={`relative w-8 h-[18px] rounded-full transition-colors ${
+            skill.enabled ? 'bg-accent' : 'bg-bg-elevated border border-border'
+          }`}
+          title={skill.enabled ? 'Disable skill' : 'Enable skill'}
+        >
+          <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all ${
+            skill.enabled ? 'right-0.5 bg-white' : 'left-0.5 bg-text-secondary'
+          }`} />
+        </button>
         <button
           onClick={() => handleRemove(skill.id)}
           className="p-1.5 rounded hover:bg-error/20 transition-colors"

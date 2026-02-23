@@ -140,6 +140,26 @@ window.api.on(IPC.MY_PUSH_CHANNEL, (payload) => { ... });
 
 ## Conventions & Best Practices
 
+### Cross-Platform (Windows / macOS / Linux)
+All code changes **must** work on Windows, macOS, and Linux. This is a hard requirement.
+
+- **Paths:** Use `path.join()` / `path.resolve()` — never hardcode `/` or `\` separators. Use helpers from `electron/utils/paths.ts` (`expandHome`, `normalizePath`, `isWithinDir`).
+- **Line endings:** Don't assume `\n` — use `os.EOL` when writing to disk where it matters. Be tolerant of `\r\n` when reading.
+- **Shell commands:** Never assume a specific shell. Use `spawn` / `execFile` with argument arrays. If `shell: true` is needed, keep commands POSIX-compatible or branch per platform. Check `process.platform` for platform-specific logic (`'win32'` | `'darwin'` | `'linux'`).
+- **File system:** Paths are case-sensitive on Linux, case-insensitive on Windows/macOS (mostly). Use `normalizePath()` from `electron/utils/paths.ts` for comparisons. Respect `APPDATA`, `XDG_CONFIG_HOME`, etc. — see `pilot-paths.ts`.
+- **Keyboard shortcuts:** macOS uses `Meta` (⌘), Windows/Linux use `Ctrl`. The keybinding system handles this — follow the existing patterns in `lib/keybindings.ts`.
+- **Native APIs:** Electron APIs like `dialog`, `shell`, `Menu` have platform quirks. Test or guard behind `process.platform` checks when behaviour differs.
+
+### Companion Mode
+Pilot supports a **companion client** (mobile/web) that connects over WebSocket and mirrors the desktop UI. Every user-facing feature must consider companion impact.
+
+- **IPC events forwarded to companion:** All `main → renderer` push events are also forwarded via `companionBridge.forwardEvent(channel, data)` in `PilotSessionManager.sendToRenderer()`. If you add a new push channel, it will automatically reach companion clients.
+- **New IPC invoke channels:** If you add a new `ipcMain.handle()` that the companion should also be able to call, expose it through the companion REST/WebSocket API (see `docs/companion-api.md` and `docs/companion-implementation.md`).
+- **UI-only state:** State that only exists in the renderer (Zustand stores) is **not** synced to companion by default. If companion needs it, add an IPC push event.
+- **Serialisation:** Companion payloads must be JSON-serialisable — same Structured Clone constraint as IPC. No functions, class instances, or DOM nodes.
+- **Testing companion impact:** When changing agent events, sandbox flow, session management, or any streamed data — verify the companion WebSocket protocol still works. Companion clients rely on the same event shapes.
+- **Docs:** `docs/companion-api.md` is the companion protocol spec. `docs/companion-implementation.md` covers the desktop-side implementation. Keep both in sync with code changes.
+
 ### TypeScript
 - **No `any`** in new code — use SDK types or define proper interfaces in `shared/types.ts`.
 - **Static imports only** — no dynamic `require()` in either process.
@@ -164,6 +184,10 @@ window.api.on(IPC.MY_PUSH_CHANNEL, (payload) => { ... });
 - All agent-initiated file writes go through `SandboxedTools` → `StagedDiffManager`. Do not write files directly from IPC handlers on behalf of the agent.
 - Project settings live in `<project>/.pilot/` — create the directory if missing before writing.
 - App-level settings live in the platform config directory (see below) — use helpers from `services/pilot-paths.ts` and `services/app-settings.ts`.
+
+### Git
+- **Always ask for confirmation** before running `git commit` or `git push`. Show the proposed commit message and list of changed files, then wait for explicit human approval before proceeding.
+- Never amend, force-push, or rebase without asking first.
 
 ### Error Handling
 - IPC handlers that can fail should `throw` — Electron serialises the error and the renderer receives it as a rejected promise. Catch at the call site.

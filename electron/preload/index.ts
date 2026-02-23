@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, shell } from 'electron';
+import { contextBridge, ipcRenderer, shell, webUtils } from 'electron';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('api', {
 
   // Open URL in default browser
   openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+
+  // Get native file path from a File object (needed in sandboxed renderers
+  // where File.path is unavailable — use this for drag-and-drop / file inputs)
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
 });
 
 // Expose version info for About dialog

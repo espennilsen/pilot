@@ -11,6 +11,7 @@ interface ExtensionStore {
   loadSkills: () => Promise<void>;
   toggleExtension: (extensionId: string) => Promise<boolean>;
   removeExtension: (extensionId: string) => Promise<boolean>;
+  toggleSkill: (skillId: string) => Promise<boolean>;
   removeSkill: (skillId: string) => Promise<boolean>;
   importExtensionZip: (zipPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
   importSkillZip: (zipPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
@@ -42,6 +43,14 @@ export const useExtensionStore = create<ExtensionStore>((set, get) => ({
     const success = await invoke(IPC.EXTENSIONS_REMOVE, extensionId);
     if (success) {
       await get().loadExtensions();
+    }
+    return success;
+  },
+
+  toggleSkill: async (skillId: string) => {
+    const success = await invoke(IPC.SKILLS_TOGGLE, skillId);
+    if (success) {
+      await get().loadSkills();
     }
     return success;
   },

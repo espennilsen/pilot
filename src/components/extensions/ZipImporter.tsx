@@ -43,9 +43,10 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
     }
 
     try {
+      const zipPath = window.api.getFilePath?.(zipFile) ?? (zipFile as any).path;
       const result = type === 'extension'
-        ? await importExtensionZip(zipFile.path, scope)
-        : await importSkillZip(zipFile.path, scope);
+        ? await importExtensionZip(zipPath, scope)
+        : await importSkillZip(zipPath, scope);
 
       setImportResult(result);
     } catch (error) {
@@ -66,9 +67,10 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
     if (!file) return;
 
     try {
+      const filePath = window.api.getFilePath?.(file) ?? (file as any).path;
       const result = type === 'extension'
-        ? await importExtensionZip(file.path, scope)
-        : await importSkillZip(file.path, scope);
+        ? await importExtensionZip(filePath, scope)
+        : await importSkillZip(filePath, scope);
 
       setImportResult(result);
     } catch (error) {

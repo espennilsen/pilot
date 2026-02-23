@@ -3,6 +3,20 @@ import type { FileNode } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
+/** Prompt user to add .pilot to .gitignore if this is a git repo without it. */
+async function checkGitignore(projectPath: string) {
+  try {
+    const result = await invoke(IPC.PROJECT_CHECK_GITIGNORE, projectPath) as { needsUpdate: boolean };
+    if (result.needsUpdate) {
+      if (confirm('This project is a git repo. Add .pilot to .gitignore to keep Pilot config out of version control?')) {
+        await invoke(IPC.PROJECT_ADD_GITIGNORE, projectPath);
+      }
+    }
+  } catch {
+    // Non-critical — don't block project opening
+  }
+}
+
 interface ProjectStore {
   projectPath: string | null;
   fileTree: FileNode[];
@@ -112,6 +126,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       } catch {
         // Ignore if tab store not available
       }
+
+      // Check if .pilot should be added to .gitignore
+      checkGitignore(path);
     }
   },
 

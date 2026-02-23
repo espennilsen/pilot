@@ -22,6 +22,8 @@ interface Window {
     windowIsMaximized: () => Promise<boolean>;
     onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => () => void;
     openExternal: (url: string) => Promise<void>;
+    /** Get native file path from a File object (sandboxed renderers can't use File.path) */
+    getFilePath: (file: File) => string;
   };
   electronVersions?: {
     electron: string;

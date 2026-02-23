@@ -209,6 +209,7 @@ export interface InstalledSkill {
   scope: 'global' | 'project' | 'built-in';
   path: string;
   skillMdPath: string;
+  enabled: boolean;
 }
 
 export interface ImportResult {

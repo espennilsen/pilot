@@ -36,6 +36,10 @@ export function registerExtensionsIpc(extensionManager: ExtensionManager) {
     }
   );
 
+  ipcMain.handle(IPC.SKILLS_TOGGLE, async (_, skillId: string): Promise<boolean> => {
+    return extensionManager.toggleSkill(skillId);
+  });
+
   ipcMain.handle(IPC.SKILLS_REMOVE, async (_, skillId: string): Promise<boolean> => {
     return extensionManager.removeSkill(skillId);
   });

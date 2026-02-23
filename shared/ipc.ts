@@ -68,6 +68,8 @@ export const IPC = {
   PROJECT_CREATE_DIRECTORY: 'project:create-directory',
   PROJECT_FS_CHANGED: 'project:fs-changed', // main → renderer
   PROJECT_OPEN_DIALOG: 'project:open-dialog',
+  PROJECT_CHECK_GITIGNORE: 'project:check-gitignore',
+  PROJECT_ADD_GITIGNORE: 'project:add-gitignore',
 
   // Shell / OS integration
   SHELL_REVEAL_IN_FINDER: 'shell:reveal-in-finder',
@@ -123,6 +125,7 @@ export const IPC = {
   EXTENSIONS_REMOVE: 'extensions:remove',
   SKILLS_LIST: 'skills:list',
   SKILLS_IMPORT_ZIP: 'skills:import-zip',
+  SKILLS_TOGGLE: 'skills:toggle',
   SKILLS_REMOVE: 'skills:remove',
 
   // Slash commands

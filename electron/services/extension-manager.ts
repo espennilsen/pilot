@@ -17,8 +17,16 @@ interface ExtensionRegistryEntry {
   installedAt: number;
 }
 
+interface SkillRegistryEntry {
+  id: string;
+  name: string;
+  path: string;
+  enabled: boolean;
+}
+
 interface ExtensionRegistry {
   extensions: ExtensionRegistryEntry[];
+  skills?: SkillRegistryEntry[];
   lastUpdated: number;
 }
 
@@ -229,22 +237,48 @@ export class ExtensionManager {
 
   listSkills(): InstalledSkill[] {
     const skills: InstalledSkill[] = [];
+    const registry = this.loadRegistry();
 
     // Global skills (from ~/.config/.pilot/skills/)
-    skills.push(...this.scanSkillsDir(PILOT_SKILLS_DIR, 'global'));
+    skills.push(...this.scanSkillsDir(PILOT_SKILLS_DIR, 'global', registry));
 
     // Project skills (from <project>/.pilot/skills/)
     if (this.projectPath) {
       const projectSkillsDir = join(this.projectPath, '.pilot', 'skills');
       if (existsSync(projectSkillsDir)) {
-        skills.push(...this.scanSkillsDir(projectSkillsDir, 'project'));
+        skills.push(...this.scanSkillsDir(projectSkillsDir, 'project', registry));
       }
     }
 
     return skills;
   }
 
-  private scanSkillsDir(dir: string, scope: 'global' | 'project' | 'built-in'): InstalledSkill[] {
+  toggleSkill(skillId: string): boolean {
+    const skills = this.listSkills();
+    const skill = skills.find((s) => s.id === skillId);
+    if (!skill) return false;
+
+    const registry = this.loadRegistry();
+    if (!registry.skills) registry.skills = [];
+
+    const registryEntry = registry.skills.find((s) => s.path === skill.path);
+
+    if (registryEntry) {
+      registryEntry.enabled = !registryEntry.enabled;
+    } else {
+      registry.skills.push({
+        id: skill.id,
+        name: skill.name,
+        path: skill.path,
+        enabled: !skill.enabled,
+      });
+    }
+
+    this.saveRegistry(registry);
+    return true;
+  }
+
+  private scanSkillsDir(dir: string, scope: 'global' | 'project' | 'built-in', registry: ExtensionRegistry): InstalledSkill[] {
     if (!existsSync(dir)) return [];
 
     const skills: InstalledSkill[] = [];
@@ -263,6 +297,8 @@ export class ExtensionManager {
         const descriptionMatch = content.match(/^#\s+(.+)$/m);
         const description = descriptionMatch ? descriptionMatch[1] : 'No description';
 
+        const registryEntry = registry.skills?.find((s) => s.path === skillPath);
+
         skills.push({
           id: entry.name,
           name: entry.name,
@@ -270,6 +306,7 @@ export class ExtensionManager {
           scope,
           path: skillPath,
           skillMdPath,
+          enabled: registryEntry?.enabled ?? true,
         });
       } catch (error) {
         console.error('Failed to read skill:', error);
