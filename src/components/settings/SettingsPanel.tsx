@@ -969,12 +969,27 @@ function CompanionSettings() {
     }
   };
 
+  /** Resolve the effective host: selectedHost state, or the first option from the dropdown (tunnel > LAN). */
+  const getEffectiveHost = (): string | undefined => {
+    if (selectedHost) return selectedHost;
+    // Mirror the dropdown's default: tunnel first, then LAN
+    if (status?.remoteUrl) {
+      try { return new URL(status.remoteUrl).hostname; } catch { /* ignore */ }
+    }
+    if (status?.lanAddresses?.length) {
+      return status.lanAddresses[0].address;
+    }
+    return undefined;
+  };
+
   const handleGenerateQR = async () => {
     if (qrVisible) {
       setQrVisible(false);
       return;
     }
-    await generateQRForHost(selectedHost || undefined);
+    const host = getEffectiveHost();
+    setSelectedHost(host || null);
+    await generateQRForHost(host);
   };
 
   const handleHostChange = async (host: string) => {
