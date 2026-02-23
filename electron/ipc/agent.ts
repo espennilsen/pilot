@@ -1,5 +1,4 @@
 import { ipcMain, BrowserWindow } from 'electron';
-import type { ImageContent } from '@mariozechner/pi-ai';
 import { IPC } from '../../shared/ipc';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 import type { PromptLibrary } from '../services/prompt-library';
@@ -18,7 +17,7 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
     await sessionManager.createSession(tabId, projectPath);
   });
 
-  ipcMain.handle(IPC.AGENT_PROMPT, async (_event, tabId: string, text: string, projectPath?: string, images?: ImageContent[], sessionPath?: string | null) => {
+  ipcMain.handle(IPC.AGENT_PROMPT, async (_event, tabId: string, text: string, projectPath?: string, _images?: unknown, sessionPath?: string | null) => {
     // Check for task commands BEFORE memory and agent
     if (projectPath) {
       const taskResult = sessionManager.handlePossibleTaskCommand(tabId, text, projectPath);
@@ -201,7 +200,6 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
         event: {
           type: 'user_message',
           content: text,
-          images,
           timestamp: Date.now(),
         },
       };
@@ -212,7 +210,7 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
       companionBridge.forwardEvent(IPC.AGENT_EVENT, userMessageEvent);
     }
 
-    await sessionManager.prompt(tabId, text, images);
+    await sessionManager.prompt(tabId, text);
   });
 
   ipcMain.handle(IPC.AGENT_STEER, async (_event, tabId: string, text: string) => {

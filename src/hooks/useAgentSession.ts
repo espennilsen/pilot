@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import type { AgentSessionEvent, ContextUsage, ModelCycleResult } from '@mariozechner/pi-coding-agent';
-import type { ImageContent } from '@mariozechner/pi-ai';
+// ImageContent import removed — images now saved to disk and read by the agent's read tool
 import { useChatStore } from '../stores/chat-store';
 import { useTabStore } from '../stores/tab-store';
 import { useProjectStore } from '../stores/project-store';
@@ -240,7 +240,7 @@ export function useAgentSession() {
     }
   }
 
-  const sendMessage = useCallback(async (text: string, images?: ImageContent[]) => {
+  const sendMessage = useCallback(async (text: string) => {
     if (!activeTabId) return;
 
     const projectPath = useProjectStore.getState().projectPath;
@@ -276,7 +276,7 @@ export function useAgentSession() {
     const tab = useTabStore.getState().tabs.find(t => t.id === activeTabId);
     const sessionPath = tab?.sessionPath || null;
     try {
-      await invoke(IPC.AGENT_PROMPT, activeTabId, text, projectPath, images, sessionPath);
+      await invoke(IPC.AGENT_PROMPT, activeTabId, text, projectPath, undefined, sessionPath);
       refreshSessionList();
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);

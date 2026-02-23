@@ -198,6 +198,9 @@ export const IPC = {
   COMPANION_REMOTE_ACTIVATION: 'companion:remote-activation',
   COMPANION_TUNNEL_OUTPUT: 'companion:tunnel-output',  // main → renderer (streaming output)
 
+  // Attachments
+  ATTACHMENT_SAVE: 'attachment:save',
+
   // Subagents
   SUBAGENT_SPAWN: 'subagent:spawn',
   SUBAGENT_SPAWN_POOL: 'subagent:spawn-pool',

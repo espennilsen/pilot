@@ -13,7 +13,7 @@ import {
   type ContextUsage,
   type SessionStats,
 } from '@mariozechner/pi-coding-agent';
-import type { TextContent, ThinkingContent, ImageContent } from '@mariozechner/pi-ai';
+import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { BrowserWindow } from 'electron';
 import { join } from 'path';
@@ -234,7 +234,7 @@ export class PilotSessionManager {
     this.tabProjectPaths.set(tabId, projectPath);
   }
 
-  async prompt(tabId: string, text: string, images?: ImageContent[]): Promise<void> {
+  async prompt(tabId: string, text: string): Promise<void> {
     const session = this.sessions.get(tabId);
     if (!session) throw new Error(`No session for tab ${tabId}`);
 
@@ -244,7 +244,7 @@ export class PilotSessionManager {
     if (session.state.isStreaming) {
       await session.followUp(text);
     } else {
-      await session.prompt(text, images ? { images } : undefined);
+      await session.prompt(text);
     }
   }
 

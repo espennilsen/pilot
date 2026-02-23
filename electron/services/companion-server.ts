@@ -2,7 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import { createServer as createHttpsServer, Server as HTTPSServer } from 'https';
 import { createServer as createHttpServer, Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { join } from 'path';
+import { join, extname } from 'path';
 import { existsSync } from 'fs';
 
 /**
@@ -128,6 +128,30 @@ export class CompanionServer {
         secure: this.config.protocol === 'https',
         tokenRequired: true,
       });
+    });
+
+    // Serve attachment files (images saved by the renderer)
+    // Validates the path is inside a .pilot/attachments directory.
+    this.app.get('/api/attachments', (req: Request, res: Response) => {
+      const filePath = req.query.path as string | undefined;
+      if (!filePath || !filePath.includes('.pilot/attachments/')) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      if (!existsSync(filePath)) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      const ext = extname(filePath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+      };
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+      res.sendFile(filePath);
     });
 
     // Serve static files from the React bundle directory

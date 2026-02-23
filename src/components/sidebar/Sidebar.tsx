@@ -1,9 +1,11 @@
+import { useState, useRef, useEffect } from 'react';
 import { useUIStore, type SidebarPane } from '../../stores/ui-store';
 import { useProjectStore } from '../../stores/project-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTaskStore } from '../../stores/task-store';
 import { useMemoryStore } from '../../stores/memory-store';
 import { useTabStore } from '../../stores/tab-store';
+import { isCompanionMode } from '../../lib/ipc-client';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
 import { SessionList } from './SessionList';
@@ -19,22 +21,119 @@ const PANE_LABELS: Record<SidebarPane, string> = {
 };
 
 export default function Sidebar() {
-  const { sidebarVisible, sidebarWidth, sidebarPane, setSidebarPane, toggleSidebar, openSettings } = useUIStore();
+  const { sidebarVisible, sidebarWidth, sidebarPane, setSidebarPane, toggleSidebar, toggleContextPanel, contextPanelVisible, openSettings, toggleTerminal, addTerminalTab, terminalTabs } = useUIStore();
   const { projectPath } = useProjectStore();
   const { developerMode, setDeveloperMode } = useAppSettingsStore();
   const { tasksEnabled, setTasksEnabled, setShowCreateDialog } = useTaskStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const { addTab, addTasksTab } = useTabStore();
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const companion = isCompanionMode();
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+          menuButtonRef.current && !menuButtonRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  // Close menu on Escape
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [menuOpen]);
+
+  const act = (fn: () => void) => {
+    fn();
+    setMenuOpen(false);
+  };
+
   const handlePaneClick = (pane: SidebarPane) => {
     if (sidebarPane === pane) return;
     setSidebarPane(pane);
   };
 
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const closeTab = useTabStore((s) => s.closeTab);
+
   return (
     <div className="flex flex-row flex-shrink-0">
       {/* Activity bar — always visible */}
-      <div className="flex flex-col items-center w-10 flex-shrink-0 bg-bg-surface border-r border-border py-2 gap-1">
+      <div className="flex flex-col items-center w-10 flex-shrink-0 bg-bg-surface border-r border-border py-2 gap-1 relative">
+        {/* Hamburger menu — companion mode only */}
+        {companion && (
+          <>
+            <Tooltip content="Menu" position="right">
+              <button
+                ref={menuButtonRef}
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+                aria-label="Menu"
+              >
+                <Icon name="Menu" className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            {menuOpen && (
+              <div
+                ref={menuRef}
+                className="absolute left-10 top-1 z-50 w-56 bg-bg-elevated border border-border rounded-lg shadow-xl py-1 animate-in fade-in slide-in-from-left-1 duration-100"
+              >
+                <MenuSection label="File">
+                  <MenuItem icon="Plus" label="New Conversation" onClick={() => act(() => addTab())} />
+                  {activeTabId && (
+                    <MenuItem icon="X" label="Close Tab" onClick={() => act(() => closeTab(activeTabId))} />
+                  )}
+                </MenuSection>
+                <MenuDivider />
+                <MenuSection label="View">
+                  <MenuItem
+                    icon="PanelLeft"
+                    label={sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+                    onClick={() => act(toggleSidebar)}
+                  />
+                  <MenuItem
+                    icon="PanelRight"
+                    label={contextPanelVisible ? 'Hide Context Panel' : 'Show Context Panel'}
+                    onClick={() => act(toggleContextPanel)}
+                  />
+                  {developerMode && (
+                    <MenuItem
+                      icon="Terminal"
+                      label="Toggle Terminal"
+                      onClick={() => act(() => {
+                        if (terminalTabs.length === 0) addTerminalTab();
+                        else toggleTerminal();
+                      })}
+                    />
+                  )}
+                </MenuSection>
+                <MenuDivider />
+                <MenuSection label="Help">
+                  <MenuItem icon="Book" label="Documentation" onClick={() => act(() => {
+                    useTabStore.getState().addDocsTab('index');
+                  })} />
+                  <MenuItem icon="Keyboard" label="Keyboard Shortcuts" onClick={() => act(() => openSettings('keybindings'))} />
+                  <MenuItem icon="Settings" label="Settings" onClick={() => act(() => openSettings())} />
+                  <MenuItem icon="Info" label="About Pilot" onClick={() => act(() => useUIStore.getState().openAbout())} />
+                </MenuSection>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Sessions */}
         <Tooltip content="Sessions" position="right">
           <button
@@ -212,4 +311,30 @@ export default function Sidebar() {
       </div>
     </div>
   );
+}
+
+/* Menu helper components for companion hamburger menu */
+function MenuSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function MenuItem({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left"
+    >
+      <Icon name={icon} className="w-3.5 h-3.5 text-text-secondary" />
+      <span className="text-sm text-text-primary flex-1">{label}</span>
+    </button>
+  );
+}
+
+function MenuDivider() {
+  return <div className="my-1 border-t border-border" />;
 }

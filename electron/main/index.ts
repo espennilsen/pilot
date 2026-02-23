@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, net, protocol, shell } from 'electron';
 import { join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
 import { PilotSessionManager } from '../services/pi-session-manager';
@@ -23,6 +23,7 @@ import { registerTasksIpc } from '../ipc/tasks';
 import { registerPromptsIpc } from '../ipc/prompts';
 import { registerCompanionIpc } from '../ipc/companion';
 import { registerSubagentIpc } from '../ipc/subagent';
+import { registerAttachmentIpc } from '../ipc/attachment';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
 import { CompanionAuth } from '../services/companion-auth';
@@ -219,8 +220,20 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 }
 
+// Register custom protocol for serving local attachment files in the renderer.
+// Must be called before app.whenReady().
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'pilot-attachment', privileges: { bypassCSP: true, supportFetchAPI: true } },
+]);
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
+  // Handle pilot-attachment:// URLs → read local files
+  protocol.handle('pilot-attachment', (request) => {
+    // URL format: pilot-attachment:///absolute/path/to/file.png
+    const filePath = decodeURIComponent(new URL(request.url).pathname);
+    return net.fetch(`file://${filePath}`);
+  });
   // Create window first (needed by terminal service)
   createWindow();
 
@@ -249,6 +262,7 @@ app.whenReady().then(async () => {
   registerMemoryIpc(sessionManager.memoryManager);
   registerTasksIpc(sessionManager.taskManager);
   registerSubagentIpc(sessionManager.subagentManager);
+  registerAttachmentIpc();
 
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');

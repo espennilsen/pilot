@@ -19,8 +19,14 @@ interface ModelInfo {
   name: string;
 }
 
+interface ImageAttachment {
+  path: string;       // absolute path on disk
+  name: string;       // original filename
+  previewUrl: string; // blob: URL for thumbnail
+}
+
 interface MessageInputProps {
-  onSend: (text: string, images?: any[]) => void;
+  onSend: (text: string) => void;
   onSteer: (text: string) => void;
   onFollowUp: (text: string) => void;
   onAbort: () => void;
@@ -32,7 +38,7 @@ interface MessageInputProps {
 
 export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onSelectModel, onCycleThinking, isStreaming, disabled }: MessageInputProps) {
   const [input, setInput] = useState('');
-  const [images, setImages] = useState<File[]>([]);
+  const [images, setImages] = useState<ImageAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -255,9 +261,36 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
     }
   }, [input]);
 
-  const handleSend = async () => {
-    if (!input.trim() || disabled) return;
+  /** Save a File to disk via IPC and return an ImageAttachment */
+  const saveImageToDisk = async (file: File): Promise<ImageAttachment> => {
+    const projectPath = useTabStore.getState().tabs.find(t => t.id === activeTabId)?.projectPath;
+    if (!projectPath) throw new Error('No project open');
 
+    // Electron File objects from drag & drop have a .path property
+    const electronPath = (file as any).path as string | undefined;
+    if (electronPath) {
+      return { path: electronPath, name: file.name, previewUrl: URL.createObjectURL(file) };
+    }
+
+    // For clipboard paste / no path: read as base64 and save via IPC
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve(dataUrl.split(',')[1] || '');
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    const savedPath = await invoke(IPC.ATTACHMENT_SAVE, projectPath, file.name || 'paste.png', base64) as string;
+    return { path: savedPath, name: file.name || 'paste.png', previewUrl: URL.createObjectURL(file) };
+  };
+
+  const handleSend = async () => {
+    if ((!input.trim() && images.length === 0) || disabled) return;
+
+    try {
     // Check if it's a prompt slash command (e.g., /review check auth for XSS)
     if (!isStreaming && input.startsWith('/')) {
       const slashMatch = input.match(/^\/([a-z][a-z0-9-]*)\s*(.*)?$/s);
@@ -268,12 +301,10 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
           if (prompt) {
             setInput('');
             if (prompt.variables.length === 0) {
-              // No variables — insert the filled content directly and send
-              onSend(prompt.content, images.length > 0 ? images : undefined);
+              onSend(prompt.content);
               setImages([]);
               resetHistory();
             } else {
-              // Has variables — open fill dialog, optionally pre-fill first variable
               setPromptFillTarget({
                 prompt,
                 initialValue: inlineText?.trim() || undefined,
@@ -285,23 +316,40 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
       }
     }
 
-    // Build the final message with file context prepended
+    // Build the final message with file context and image paths prepended
     let finalText = input.trim();
     if (attachedFiles.length > 0 && !isStreaming) {
       const fileList = attachedFiles.map(f => f.relativePath).join(', ');
       finalText = `[Attached files: ${fileList}]\n\nRead the attached files first, then respond to:\n\n${finalText}`;
     }
 
+    // Prepend image attachment paths so the agent reads them via the read tool
+    if (images.length > 0 && !isStreaming) {
+      const imagePaths = images.map(img => img.path).join('\n');
+      const imageInstruction = images.length === 1
+        ? `The user attached an image to this message. Use the read tool to view it before responding:\n${imagePaths}`
+        : `The user attached ${images.length} images to this message. Use the read tool to view each one before responding:\n${imagePaths}`;
+      finalText = `${imageInstruction}\n\n${finalText}`;
+    }
+
     if (isStreaming) {
       onSteer(finalText);
     } else {
-      onSend(finalText, images.length > 0 ? images : undefined);
+      onSend(finalText);
+    }
+
+    // Revoke blob URLs to prevent memory leaks
+    for (const img of images) {
+      URL.revokeObjectURL(img.previewUrl);
     }
 
     setInput('');
     setImages([]);
     setAttachedFiles([]);
     resetHistory();
+    } catch (err) {
+      console.error('[handleSend] error:', err);
+    }
   };
 
   const handleFollowUp = () => {
@@ -477,26 +525,42 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
     }
   };
 
+  /** Process dropped/pasted/picked image files: save to disk, add to state */
+  const addImageFiles = async (files: File[]) => {
+    for (const file of files) {
+      try {
+        const attachment = await saveImageToDisk(file);
+        setImages(prev => [...prev, attachment]);
+      } catch (err) {
+        console.error('[MessageInput] Failed to save image:', err);
+      }
+    }
+  };
+
+  const SUPPORTED_IMAGE_TYPES = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  ]);
+
+  const isSupportedImage = (file: File) => SUPPORTED_IMAGE_TYPES.has(file.type);
+
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files).filter(file =>
-      file.type.startsWith('image/')
-    );
+    const files = Array.from(e.dataTransfer.files).filter(isSupportedImage);
     if (files.length > 0) {
-      setImages(prev => [...prev, ...files]);
+      addImageFiles(files);
     }
   };
 
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items);
-    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    const imageItems = items.filter(item => SUPPORTED_IMAGE_TYPES.has(item.type));
     if (imageItems.length > 0) {
       e.preventDefault();
       const files = imageItems
         .map(item => item.getAsFile())
         .filter((file): file is File => file !== null);
-      setImages(prev => [...prev, ...files]);
+      addImageFiles(files);
     }
   };
 
@@ -505,17 +569,19 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file =>
-      file.type.startsWith('image/')
-    );
+    const files = Array.from(e.target.files || []).filter(isSupportedImage);
     if (files.length > 0) {
-      setImages(prev => [...prev, ...files]);
+      addImageFiles(files);
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => {
+      const removed = prev[index];
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSelectModel = (provider: string, modelId: string) => {
@@ -547,7 +613,7 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/webp"
         multiple
         className="hidden"
         onChange={handleFileChange}
@@ -669,11 +735,11 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
         {/* Image previews inside the box */}
         {images.length > 0 && (
           <div className="flex gap-2 px-3 pt-3 flex-wrap">
-            {images.map((file, index) => (
+            {images.map((img, index) => (
               <div key={index} className="relative group">
                 <img
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
+                  src={img.previewUrl}
+                  alt={img.name}
                   className="h-14 w-14 object-cover rounded-md border border-border"
                 />
                 <button
@@ -789,7 +855,7 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
             ) : (
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || disabled}
+                disabled={(!input.trim() && images.length === 0) || disabled}
                 className="h-7 w-7 rounded-lg bg-accent text-white flex items-center justify-center hover:bg-accent/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex-shrink-0"
                 title="Send"
               >

@@ -3,6 +3,7 @@ import { ChatMessage, ToolCallInfo } from '../../stores/chat-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
 import { renderMarkdown } from '../../lib/markdown';
+import { attachmentUrl } from '../../lib/attachment-url';
 import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
 
@@ -17,10 +18,37 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   return <AssistantMessage message={message} />;
 }
 
+/** Match the image attachment prefix injected by MessageInput */
+const IMAGE_PREFIX_RE = /^The user attached (?:an image|(\d+) images) to this message\. Use the read tool to view (?:it|each one) before responding:\n([\s\S]*?)\n\n/;
+
 function UserMessage({ message }: MessageBubbleProps) {
+  let displayContent = message.content;
+  let imagePaths: string[] = [];
+
+  const match = displayContent.match(IMAGE_PREFIX_RE);
+  if (match) {
+    // Extract paths (one per line) and strip the prefix from displayed text
+    imagePaths = match[2].split('\n').map(p => p.trim()).filter(Boolean);
+    displayContent = displayContent.slice(match[0].length);
+  }
+
   return (
     <div className="border-l-2 border-accent pl-4 py-2">
-      <div className="text-text-primary whitespace-pre-wrap">{message.content}</div>
+      {imagePaths.length > 0 && (
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {imagePaths.map((p, i) => (
+            <img
+              key={i}
+              src={attachmentUrl(p)}
+              alt={p.split('/').pop() || 'image'}
+              className="h-20 w-20 object-cover rounded-md border border-border"
+            />
+          ))}
+        </div>
+      )}
+      {displayContent && (
+        <div className="text-text-primary whitespace-pre-wrap">{displayContent}</div>
+      )}
     </div>
   );
 }

@@ -19,12 +19,13 @@ const saveScratchPadContent = (content: string) => {
 };
 
 export type SidebarPane = 'sessions' | 'memory' | 'tasks';
+export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents';
 
 interface UIStore {
   sidebarVisible: boolean;
   sidebarPane: SidebarPane;
   contextPanelVisible: boolean;
-  contextPanelTab: 'files' | 'git' | 'changes' | 'tasks' | 'agents';
+  contextPanelTab: ContextPanelTab;
   focusMode: boolean;
   sidebarWidth: number;
   contextPanelWidth: number;
@@ -41,7 +42,7 @@ interface UIStore {
   toggleSidebar: () => void;
   setSidebarPane: (pane: SidebarPane) => void;
   toggleContextPanel: () => void;
-  setContextPanelTab: (tab: 'files' | 'git' | 'changes' | 'tasks' | 'agents') => void;
+  setContextPanelTab: (tab: ContextPanelTab) => void;
   toggleFocusMode: () => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;

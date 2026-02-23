@@ -1,6 +1,6 @@
-import { FolderOpen, PanelRightClose } from 'lucide-react';
-import { useUIStore } from '../../stores/ui-store';
-import Tooltip from '../shared/Tooltip';
+import { FolderOpen, PanelRightClose, PanelRightOpen, FolderTree, GitBranch, FileDiff, Bot } from 'lucide-react';
+import { useUIStore, type ContextPanelTab } from '../../stores/ui-store';
+import { Tooltip } from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
@@ -27,10 +27,82 @@ export default function ContextPanel() {
   // If the active tab was 'tasks', fall back to 'files'
   const effectiveTab = contextPanelTab === 'tasks' ? 'files' : contextPanelTab;
 
+  const handleTabClick = (tab: ContextPanelTab) => {
+    if (!contextPanelVisible) toggleContextPanel();
+    setContextPanelTab(tab);
+  };
+
+  if (!contextPanelVisible) {
+    // Collapsed: show only a thin activity bar to re-expand
+    return (
+      <div className="flex flex-col items-center w-10 flex-shrink-0 bg-bg-surface border-l border-border py-2 gap-1">
+        {/* Files */}
+        <Tooltip content="Files" position="left">
+          <button
+            className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+            onClick={() => handleTabClick('files')}
+          >
+            <FolderTree className="w-4 h-4" />
+          </button>
+        </Tooltip>
+
+        {/* Git */}
+        <Tooltip content="Git" position="left">
+          <button
+            className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+            onClick={() => handleTabClick('git')}
+          >
+            <GitBranch className="w-4 h-4" />
+          </button>
+        </Tooltip>
+
+        {/* Changes */}
+        <Tooltip content="Changes" position="left">
+          <button
+            className="p-2 rounded-md transition-colors relative hover:bg-bg-elevated text-text-secondary"
+            onClick={() => handleTabClick('changes')}
+          >
+            <FileDiff className="w-4 h-4" />
+            {pendingCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-warning rounded-full" />
+            )}
+          </button>
+        </Tooltip>
+
+        {/* Agents */}
+        <Tooltip content="Agents" position="left">
+          <button
+            className="p-2 rounded-md transition-colors relative hover:bg-bg-elevated text-text-secondary"
+            onClick={() => handleTabClick('agents')}
+          >
+            <Bot className="w-4 h-4" />
+            {agentCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-accent rounded-full" />
+            )}
+          </button>
+        </Tooltip>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Expand */}
+        <Tooltip content="Expand panel" position="left">
+          <button
+            className="p-2 hover:bg-bg-elevated rounded-md transition-colors text-text-secondary"
+            onClick={toggleContextPanel}
+          >
+            <PanelRightOpen className="w-4 h-4" />
+          </button>
+        </Tooltip>
+      </div>
+    );
+  }
+
+  // Expanded: show the full panel with tabs, content, and collapse button
   return (
     <div
-      className="bg-bg-surface border-l border-border transition-[width] duration-200 ease-in-out overflow-hidden flex flex-col"
-      style={{ width: contextPanelVisible ? `${contextPanelWidth}px` : '0' }}
+      className="bg-bg-surface border-l border-border flex flex-col"
+      style={{ width: `${contextPanelWidth}px` }}
     >
       {/* Tab Switcher Header */}
       <div className="h-9 bg-bg-elevated border-b border-border flex items-center px-2 gap-1">
