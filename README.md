@@ -338,7 +338,7 @@ Full CRUD for all templates: set title, body, slash command slug, icon, color, a
 
 ### Companion Access (iOS / iPad / Browser)
 
-Access Pilot from any device on your network — or remotely — without additional client software.
+Access Pilot from any device on your network — or remotely — without additional client software. The dedicated iOS/iPadOS companion app is available at [**Wingman**](https://github.com/espennilsen/wingman).
 
 #### Setup
 Enable in **Settings → Companion**. This starts an HTTPS + WebSocket server on the default port **18088**. The renderer UI itself is served over the companion connection, so the experience is identical to the desktop app.
