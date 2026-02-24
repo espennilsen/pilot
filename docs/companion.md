@@ -27,10 +27,10 @@
 Pilot Desktop runs a companion server inside the Electron main process. It serves the same React UI over HTTPS and bridges all IPC over WebSocket. Companion clients get full parity — chat, diffs, file tree, terminal, git, everything.
 
 ```
-┌─────────────────────┐                        ┌─────────────────────┐
+┌─────────────────────┐                         ┌─────────────────────┐
 │   Companion Client  │         Network         │   Pilot Desktop     │
 │                     │                         │                     │
-│   1. mDNS browse    │    _pilot-comp     │   mDNS advertise    │
+│   1. mDNS browse    │    _pilot-comp          │   mDNS advertise    │
 │      ───────────────┼────────────────────────►│                     │
 │                     │                         │                     │
 │   2. HTTPS GET /    │    self-signed TLS      │   Express serves    │
@@ -252,17 +252,17 @@ Client                          Server
   │──── WSS connect ─────────────►│
   │                               │
   │──── { type: 'auth',      ────►│  First message MUST be auth
-  │       token: '...' }         │
+  │       token: '...' }          │
   │                               │
-  │◄─── { type: 'auth_ok' } ─────│  Success → client is registered
+  │◄─── { type: 'auth_ok' } ───-──│  Success → client is registered
   │  OR                           │
-  │◄─── { type: 'auth_error',    │  Failure → connection closed (code 4003)
-  │       reason: '...' }   ─────│
+  │◄─── { type: 'auth_error',     │  Failure → connection closed (code 4003)
+  │       reason: '...' }   ────-─│
   │                               │
-  │──── { type: 'ipc', ... } ───►│  IPC invocations (request/response)
-  │◄─── { type: 'ipc-response' } │
+  │──── { type: 'ipc', ... } ─-──►│  IPC invocations (request/response)
+  │◄─── { type: 'ipc-response' }  │
   │                               │
-  │◄─── { type: 'event', ... } ──│  Push events (server → client)
+  │◄─── { type: 'event', ... } ─-─│  Push events (server → client)
   │                               │
 ```
 

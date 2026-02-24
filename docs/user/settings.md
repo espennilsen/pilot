@@ -21,6 +21,7 @@ The settings panel opens as a modal overlay with tabs:
 - General
 - Auth & Models
 - Project
+- Files
 - Companion
 - Memory
 - Prompts
@@ -188,6 +189,67 @@ When you create a new project, the file picker starts here.
 
 ---
 
+## Files Settings
+
+### Hidden Files and Folders
+
+**Purpose**: Configure which files and folders are hidden in the file tree.
+
+**Pattern Syntax**: Uses `.gitignore` syntax for pattern matching.
+
+**Default Patterns**:
+- `node_modules/`
+- `.git/`
+- `.DS_Store`
+- `dist/`
+- `build/`
+- `.cache/`
+- `coverage/`
+- `__pycache__/`
+- `*.log`
+- `.env`
+
+### Adding Patterns
+
+1. Click **"Add Pattern"** in the Files tab
+2. Enter a pattern using `.gitignore` syntax
+3. Press `Enter` or click **"Add"**
+
+**Examples**:
+```
+*.pyc           # Hide all .pyc files
+temp/           # Hide temp directory
+*.test.js       # Hide all test files
+.vscode/        # Hide VS Code settings
+```
+
+### Pattern Syntax
+
+| Pattern | Matches |
+|---------|---------|
+| `file.txt` | Exact filename in any directory |
+| `*.log` | All files ending with `.log` |
+| `build/` | Directory named `build` |
+| `/build/` | Directory named `build` at root only |
+| `**/temp` | Any file or folder named `temp` |
+| `!important.log` | Exception — don't hide this file |
+
+### Removing Patterns
+
+1. Click the **trash icon** next to a pattern
+2. Pattern is removed immediately
+3. File tree updates to show previously hidden files
+
+### Resetting to Defaults
+
+1. Click **"Reset to Defaults"** at the bottom of the Files tab
+2. Confirm
+3. All custom patterns are removed and defaults are restored
+
+**Note**: Changes to hidden file patterns take effect immediately — the file tree updates without needing to reload the project.
+
+---
+
 ## Companion Settings
 
 Access Pilot from your iPhone, iPad, or any browser on the local network.
@@ -252,20 +314,27 @@ View and manage installed extensions:
 
 ### Installing Extensions
 
-1. **From Disk**:
+1. **Drag and Drop**:
+   - Drag a `.zip` extension file onto the Extensions tab
+   - Extension is extracted and installed automatically
+   - Extension appears in the list
+
+2. **File Picker**:
+   - Click **"Install Extension"**
+   - Select a `.zip` extension file
+   - Extension is extracted and installed automatically
+
+3. **From Folder**:
    - Click **"Install from Folder"**
    - Select the extension directory
    - Extension is copied to `<PILOT_DIR>/extensions/`
 
-2. **From URL** (coming soon):
-   - Click **"Install from URL"**
-   - Paste extension package URL
-   - Extension is downloaded and installed
-
-3. **Manual Installation**:
+4. **Manual Installation**:
    - Copy extension folder to `<PILOT_DIR>/extensions/`
    - Restart Pilot
    - Extension appears in the list
+
+**Note**: Extension `.zip` files should contain the extension folder at the root level.
 
 ### Creating Extensions
 
@@ -285,19 +354,41 @@ See [Pi SDK documentation](https://github.com/mariozechner/pi-coding-agent/blob/
 
 View and manage installed skills:
 
-| Skill | Status | Triggers |
-|-------|--------|----------|
-| changelog | Enabled | "generate changelog", "update CHANGELOG.md" |
-| code-review | Enabled | "review this code", "code audit" |
-| task-manager | Enabled | "/tasks", "create a task" |
+| Skill | Status | Actions |
+|-------|--------|---------|
+| changelog | Enabled | Disable, Remove |
+| code-review | Enabled | Disable, Remove |
+| task-manager | Disabled | Enable, Remove |
 
-**Enable/Disable**: Toggle the switch next to a skill.
+**Enable/Disable**: Toggle the switch next to a skill. Disabled skills are dimmed and labeled "Disabled". The agent will not load instructions from disabled skills.
 
-**Remove**: Click the trash icon to delete a skill.
+**Remove**: Click the trash icon to delete a skill (cannot be undone).
+
+**Persistence**: Skill enabled/disabled state is stored in `<PILOT_DIR>/extension-registry.json` and persists across app restarts.
 
 ### Installing Skills
 
-Same process as extensions (see above).
+1. **Drag and Drop**:
+   - Drag a `.zip` skill file onto the Skills tab
+   - Skill is extracted and installed automatically
+   - Skill appears in the list
+
+2. **File Picker**:
+   - Click **"Install Skill"**
+   - Select a `.zip` skill file
+   - Skill is extracted and installed automatically
+
+3. **From Folder**:
+   - Click **"Install from Folder"**
+   - Select the skill directory
+   - Skill is copied to `<PILOT_DIR>/skills/`
+
+4. **Manual Installation**:
+   - Copy skill folder to `<PILOT_DIR>/skills/`
+   - Restart Pilot
+   - Skill appears in the list
+
+**Note**: Skill `.zip` files should contain the skill folder at the root level.
 
 ### Creating Skills
 

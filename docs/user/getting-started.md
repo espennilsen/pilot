@@ -42,6 +42,7 @@ Pilot works with project folders on your local filesystem.
 
 - Pilot indexes the project directory structure
 - Git status is detected and displayed in the [Context Panel](./context-panel.md#git-tab)
+- **Git repositories**: When opening a git repo for the first time, Pilot will prompt you to add `.pilot/` to `.gitignore` to keep your project configuration out of version control
 - Project-specific memory is loaded (if `.pilot/MEMORY.md` exists)
 - Task list is loaded from `.pilot/tasks.jsonl` (if present)
 - The project path is displayed in the tab header
@@ -152,7 +153,8 @@ Toggle the sidebar with `Cmd+B`.
 ### Context Panel (Right)
 
 The [Context Panel](./context-panel.md) shows:
-- **Files** — Project directory tree with file preview
+- **Files** — Project directory tree with file preview  
+  (Configure hidden file patterns in [Settings](./settings.md) → Files tab)
 - **Git** — Status, branches, commit history
 - **Changes** — Staged diffs from agent tool execution
 

@@ -54,6 +54,7 @@ interface AppSettingsStore {
   onboardingComplete: boolean;
   developerMode: boolean;
   keybindOverrides: Record<string, string | null>;
+  hiddenPaths: string[];
   isLoading: boolean;
   error: string | null;
 }
@@ -69,6 +70,7 @@ interface AppSettingsStore {
 - `completeOnboarding()` — Mark onboarding as complete
 - `setKeybindOverride(id, combo)` — Override a keyboard shortcut
 - `clearKeybindOverride(id)` — Remove a keyboard shortcut override
+- `setHiddenPaths(paths)` — Set glob patterns to hide in file tree, persists and refreshes file tree
 
 **IPC Channels:**
 - `IPC.APP_SETTINGS_GET` — Fetch settings
@@ -77,6 +79,7 @@ interface AppSettingsStore {
 **Notes:**
 - Developer mode state is updated optimistically before IPC call
 - Default `piAgentDir` is `<PILOT_DIR>` (platform-dependent)
+- `hiddenPaths` contains glob patterns (e.g., `node_modules`, `*.log`) that are filtered from the file tree
 
 ---
 
@@ -291,6 +294,7 @@ interface ExtensionStore {
 - `loadExtensions()` — Load installed extensions
 - `loadSkills()` — Load installed skills
 - `toggleExtension(extensionId)` — Enable/disable an extension
+- `toggleSkill(skillId)` — Enable/disable a skill
 - `removeExtension(extensionId)` — Delete an extension
 - `removeSkill(skillId)` — Delete a skill
 - `importExtensionZip(zipPath, scope)` — Import extension from zip
@@ -300,6 +304,7 @@ interface ExtensionStore {
 - `IPC.EXTENSIONS_LIST` — List extensions
 - `IPC.SKILLS_LIST` — List skills
 - `IPC.EXTENSIONS_TOGGLE` — Enable/disable extension
+- `IPC.SKILLS_TOGGLE` — Enable/disable skill
 - `IPC.EXTENSIONS_REMOVE` — Delete extension
 - `IPC.SKILLS_REMOVE` — Delete skill
 - `IPC.EXTENSIONS_IMPORT_ZIP` — Import extension
@@ -606,6 +611,7 @@ interface SandboxStore {
 - Tool names: `bash`, `write`, `edit`
 - Diffs are staged in main process and pushed to renderer
 - `addDiff` checks `autoAcceptTools` and immediately accepts if enabled
+- **Bash auto-accept is safe:** Jail enforcement (`findEscapingPaths`) runs in main process before diffs are staged, so auto-accepting bash output does not bypass security checks
 
 ---
 
@@ -618,6 +624,7 @@ interface SandboxStore {
 interface SessionStore {
   sessions: SessionInfo[];
   searchQuery: string;
+  showArchived: boolean;
   isLoading: boolean;
 }
 
@@ -634,21 +641,25 @@ interface SessionInfo {
 
 **Actions:**
 - `loadSessions(projectPaths?)` — Load sessions for given projects
-- `pinSession(path)` — Pin session (optimistic)
-- `unpinSession(path)` — Unpin session (optimistic)
-- `archiveSession(path)` — Archive session (optimistic)
-- `unarchiveSession(path)` — Unarchive session (optimistic)
+- `pinSession(path)` — Pin session, persists via IPC
+- `unpinSession(path)` — Unpin session, persists via IPC
+- `archiveSession(path)` — Archive session, persists via IPC
+- `unarchiveSession(path)` — Unarchive session, persists via IPC
+- `deleteSession(path)` — Delete session file via IPC, removes from list
 - `setSearchQuery(query)` — Update search filter
-- `getFilteredSessions()` — Get filtered and sorted sessions
+- `setShowArchived(show)` — Toggle archived sessions visibility
+- `getFilteredSessions()` — Get filtered and sorted sessions (respects `showArchived` toggle)
 
 **IPC Channels:**
 - `IPC.SESSION_LIST_ALL` — List sessions
+- `IPC.SESSION_UPDATE_META` — Persist session metadata (pin/archive)
+- `IPC.SESSION_DELETE` — Delete session file
 
 **Notes:**
 - Pinned sessions sort first, then by last active
-- Archived sessions are filtered out
+- Archived sessions are filtered out unless `showArchived` is true
 - Search filters by title and project path
-- Optimistic updates for pin/archive (IPC calls not shown)
+- Pin/archive/unpin/unarchive now persist to session metadata via `SESSION_UPDATE_META` IPC
 
 ---
 

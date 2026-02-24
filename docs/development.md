@@ -33,6 +33,19 @@ npm run dev
 
 Refer to [Architecture Overview](./architecture.md) for the full structure.
 
+## CI/CD
+
+Continuous integration builds are **only** triggered when version tags are pushed:
+
+```bash
+git tag v0.x.x
+git push --tags
+```
+
+- Tags must match the `v*` pattern (e.g., `v0.1.0`, `v1.2.3`)
+- No builds run on push to `main` or on pull requests
+- Tagged releases trigger multi-platform builds (macOS, Windows, Linux)
+
 ## Adding a New Feature
 
 ### Adding a New IPC Domain
@@ -160,6 +173,17 @@ useEffect(() => {
 - Catch at the call site in the renderer
 - Silent errors acceptable only for truly non-critical background tasks
 
+## Implementation Notes
+
+### File Tree
+- Uses the [`ignore`](https://www.npmjs.com/package/ignore) npm package for `.gitignore`-syntax pattern matching
+- Hidden files (dotfiles) are filtered using the same patterns as git
+
+### Sandboxed File Access
+- The preload exposes `webUtils.getPathForFile()` as `window.api.getFilePath()`
+- This allows the renderer to safely obtain file paths from drag-and-drop or file input events
+- File objects cannot cross the context bridge directly; use this API instead
+
 ## Config & Data Paths
 
 The app config directory (`<PILOT_DIR>`) is platform-dependent:
@@ -176,6 +200,7 @@ The app config directory (`<PILOT_DIR>`) is platform-dependent:
 | `<PILOT_DIR>/models.json` | Model registry cache |
 | `<PILOT_DIR>/app-settings.json` | App settings |
 | `<PILOT_DIR>/workspace.json` | Saved tab layout and UI state |
+| `<PILOT_DIR>/session-metadata.json` | Session pin/archive state |
 | `<PILOT_DIR>/sessions/` | Session .jsonl files |
 | `<PILOT_DIR>/extensions/` | Global extensions |
 | `<PILOT_DIR>/skills/` | Global skills |

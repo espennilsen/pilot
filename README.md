@@ -118,7 +118,7 @@ The agent's file tools (`edit`, `write`, `bash`) are intercepted before anything
 
 **Yolo Mode** (`⌘⇧Y`) bypasses staging and writes directly to disk. A 🟡 YOLO badge in the status bar indicates when it's active.
 
-**Project Jail** restricts the agent to files within the project directory. 🔒 / 🔓 in the status bar shows jail state. `allowedPaths` in `.pilot/settings.json` can whitelist extra directories outside the project root (useful for monorepos).
+**Project Jail** restricts the agent to files within the project directory using intelligent path analysis that blocks bash commands referencing paths outside the project root. 🔒 / 🔓 in the status bar shows jail state. `allowedPaths` in `.pilot/settings.json` can whitelist extra directories outside the project root (useful for monorepos).
 
 ---
 
@@ -145,6 +145,8 @@ The left sidebar lists all past sessions for the current project, sourced from t
 - **Search** — filter sessions by title or content snippet
 - **Pin** sessions to keep them at the top regardless of recency
 - **Archive / unarchive** — archive old sessions to clean up the list without deleting them; archived sessions are hidden by default but accessible via a filter toggle
+- **Delete** — permanently remove sessions you no longer need
+- **Persistence** — all session management state (pins, archives, deletions) persists across app restarts
 - Click any session to switch the active tab to it
 - **Branch indicator** — shows the conversation tree depth when sessions have been forked
 - **New chat** (`+` button or `⌘N`) starts a fresh session
@@ -157,7 +159,7 @@ A resizable right panel with four tabs:
 
 | Tab | Contents |
 |---|---|
-| **Files** | Live file tree of the project root. Click any file for a read-only syntax-highlighted preview. |
+| **Files** | Live file tree of the project root. Click any file for a read-only syntax-highlighted preview. **Configurable visibility** — hide/show files using .gitignore-syntax patterns via **Settings → Files**. |
 | **Git** | Full git panel (see below). |
 | **Changes** | Staged diff queue for the active session with pending count badge. |
 | **Agents** | Subagent monitor — lists all spawned subagents with role, status, elapsed time, token counts, modified files, result/error preview, and a per-agent abort button. |
@@ -174,6 +176,7 @@ Powered by `simple-git`. Three sub-views:
 - Inline diff preview for any changed file
 - Branch list with upstream ahead/behind counts, create/switch/delete
 - Commit message input with **Commit** action
+- **Auto .gitignore** — when opening a git repository, Pilot prompts to add `.pilot/` to `.gitignore` if it's not already present, helping keep project metadata out of version control
 
 **History**
 - Scrollable commit log: short hash, author, relative date, message
@@ -460,7 +463,7 @@ A modal settings panel (`⌘,`) with ten sections:
 | **Prompts** | Full CRUD for global and project-scoped prompt library templates |
 | **Keybindings** | Rebind any global shortcut |
 | **Extensions** | Install, enable/disable, or remove extensions (global & project-scoped) |
-| **Skills** | Install or remove skills (global & project-scoped) |
+| **Skills** | Install, enable/disable, or remove skills (global & project-scoped) |
 | **Developer** | Toggle Developer Mode, configure dev commands |
 
 Extensions and skills are installed by importing `.zip` files via the UI or drag-and-drop. Global packages go to `<PILOT_DIR>/extensions/` or `<PILOT_DIR>/skills/`; project-scoped packages go to `<project>/.pilot/`.
@@ -505,12 +508,12 @@ A compact one-line bar at the bottom of the window:
 │                                                               │
 │  ┌────────────────────────────────────────────────────────┐   │
 │  │              Pi SDK Integration Layer                  │   │
-│  │  PilotSessionManager                                  │   │
-│  │  • createAgentSession / continueSession               │   │
-│  │  • session.subscribe → IPC → renderer                 │   │
-│  │  • AuthStorage · ModelRegistry                        │   │
-│  │  • SessionManager · SettingsManager                   │   │
-│  │  • DefaultResourceLoader (extensions/skills)         │   │
+│  │  PilotSessionManager                                   │   │
+│  │  • createAgentSession / continueSession                │   │
+│  │  • session.subscribe → IPC → renderer                  │   │
+│  │  • AuthStorage · ModelRegistry                         │   │
+│  │  • SessionManager · SettingsManager                    │   │
+│  │  • DefaultResourceLoader (extensions/skills)           │   │
 │  └────────────────────────────────────────────────────────┘   │
 │                                                               │
 │  ┌──────────────┐  ┌────────────┐  ┌──────────────────────┐   │
@@ -528,14 +531,14 @@ A compact one-line bar at the bottom of the window:
 │  └──────────────┘  │prompts/    │  │ HTTPS+WS, mDNS, TLS  │   │
 │                    └────────────┘  └──────────────────────┘   │
 │                                                               │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ TerminalService — node-pty PTY management                │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │ TerminalService — node-pty PTY management                │ │
+│  └──────────────────────────────────────────────────────────┘ │
 │                                                               │
-│  IPC domains: agent · model · session · auth · settings      │
-│  sandbox · git · project · shell · dev-commands              │
-│  extensions · workspace · tasks · prompts                    │
-│  companion · subagent · terminal · memory                    │
+│  IPC domains: agent · model · session · auth · settings       │
+│  sandbox · git · project · shell · dev-commands               │
+│  extensions · workspace · tasks · prompts                     │
+│  companion · subagent · terminal · memory                     │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -606,6 +609,8 @@ npm run build:linux    # Linux — AppImage + .deb + .tar.gz
 ```
 
 Output lands in `release/`.
+
+> **CI/CD:** Automated builds are triggered only on `v*` tags (e.g., `v1.0.0`). Push a version tag to trigger a release build across all platforms.
 
 ### Preview production build
 

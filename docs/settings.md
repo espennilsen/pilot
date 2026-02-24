@@ -10,6 +10,7 @@ Pilot has three layers of settings, each stored in a different location.
 <PILOT_DIR>/
 ├── app-settings.json          # Global app settings
 ├── workspace.json             # UI layout, tabs, window state
+├── session-metadata.json      # Session pinned/archived flags
 ├── auth.json                  # Auth credentials
 ├── models.json                # Model registry
 ├── extension-registry.json    # Extension enabled/disabled state
@@ -40,6 +41,7 @@ These are global, user-level preferences that persist across restarts.
 | `onboardingComplete` | `boolean` | `false` | Whether the onboarding wizard has been completed |
 | `developerMode` | `boolean` | `false` | Show developer tools (terminal menu, command center) |
 | `keybindOverrides` | `Record<string, string \| null>` | `{}` | Custom keybindings. Maps shortcut ID → combo string, or `null` to disable |
+| `hiddenPaths` | `string[]` | `['node_modules', '.git', '.DS_Store', 'dist', 'out', 'build', '.next', '.nuxt', '.cache', 'coverage', '__pycache__', '.tox', '.mypy_cache', 'target', '.gradle', '*.pyc']` | Array of glob patterns using .gitignore syntax to hide in the file tree. Managed via Settings → Files tab |
 
 ### Data Flow
 
@@ -121,6 +123,50 @@ Not a user-facing setting, but persisted automatically. Captures the full UI lay
 3. **On quit** — saves on `beforeunload` event.
 
 A `restoredRef` guard prevents writing empty/default state to disk before restoration completes (crash safety).
+
+---
+
+## Session Metadata
+
+**File:** `<PILOT_DIR>/session-metadata.json`
+
+Stores per-session UI flags for session management. Created and updated automatically when sessions are pinned or archived.
+
+### What's Saved
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `isPinned` | `boolean` | Whether the session is pinned to the top of the session list |
+| `isArchived` | `boolean` | Whether the session is archived (hidden from default view) |
+
+### Schema
+
+The file is a flat JSON object keyed by session path (relative to sessions directory):
+
+```json
+{
+  "project-name/2024-01-15-my-session": {
+    "isPinned": true,
+    "isArchived": false
+  },
+  "another-project/2024-01-20-old-work": {
+    "isPinned": false,
+    "isArchived": true
+  }
+}
+```
+
+### Data Flow
+
+```
+Renderer Store (useSessionStore)
+    ↕ IPC: SESSION_UPDATE_META
+Main Process (SessionMetadataService)
+    ↕ fs read/write
+<PILOT_DIR>/session-metadata.json
+```
+
+The file is created on first write. Sessions not in the file default to `isPinned: false, isArchived: false`.
 
 ---
 
@@ -394,3 +440,8 @@ Opened via ⌘, (or the gear icon). Has six tabs:
 |---------|-----------|------|---------|
 | `DEV_LOAD_CONFIG` | renderer → main | `projectPath` | `DevCommand[]` |
 | `DEV_SAVE_CONFIG` | renderer → main | `projectPath, DevCommand[]` | — |
+
+### Session Metadata
+| Channel | Direction | Args | Returns |
+|---------|-----------|------|---------|
+| `SESSION_UPDATE_META` | renderer → main | `sessionPath, { isPinned?, isArchived? }` | — |

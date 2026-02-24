@@ -19,6 +19,7 @@ Complete reference documentation for all services in `electron/services/`. Each 
 | **TerminalService** | `terminal-service.ts` | PTY management via node-pty for integrated terminals |
 | **ExtensionManager** | `extension-manager.ts` | Lists, enables/disables, imports, and removes extensions and skills |
 | **WorkspaceStateService** | `workspace-state.ts` | Persists and restores tab layout + UI state |
+| **SessionMetadata** | `session-metadata.ts` | Persists per-session metadata (isPinned, isArchived) |
 | **TaskManager** | `task-manager.ts` | Kanban-style task board with dependencies, epics, and agent integration |
 | **SubagentManager** | `subagent-manager.ts` | Parallel subagent orchestration with file conflict detection |
 | **CompanionServer** | `companion-server.ts` | HTTPS + WebSocket server for remote companion apps |
@@ -120,6 +121,7 @@ interface SandboxOptions {
 - Bash commands stage a pending approval request and block until user accepts/rejects
 - Yolo mode bypasses all staging and executes tools immediately
 - Jail enforcement uses `relative()` + `isAbsolute()` to detect path escapes
+- Bash jail enforcement uses `findEscapingPaths()` — extracts path-like tokens from bash commands using regex, expands environment variables (`$HOME`, `$TMPDIR`, `~`), and checks each against `isWithinProject()` + system path allowlist. Blocks commands referencing paths outside the project when jail is enabled.
 - Read-only tools (`read`, `grep`, `find`, `ls`) pass through unchanged
 - Handles `~` expansion for allowed paths
 - Generates unified diffs with 3 lines of context
@@ -441,8 +443,9 @@ No parameters. Initializes registry if missing.
 | `toggleExtension` | `(extensionId: string) => boolean` | Toggle extension enabled/disabled state. Returns true if successful. |
 | `removeExtension` | `(extensionId: string) => boolean` | Delete an extension from disk and remove from registry |
 | `importExtensionZip` | `(zipPath: string, scope: 'global'\|'project') => ImportResult` | Extract a ZIP archive to the extensions directory. Auto-detects GitHub ZIP subdirectory structure. |
-| `listSkills` | `() => InstalledSkill[]` | List all installed skills (global + project) |
-| `removeSkill` | `(skillId: string) => boolean` | Delete a skill from disk |
+| `listSkills` | `() => InstalledSkill[]` | List all installed skills (global + project) with enabled/disabled state |
+| `toggleSkill` | `(skillId: string) => boolean` | Toggle skill enabled/disabled state. Returns true if successful. |
+| `removeSkill` | `(skillId: string) => boolean` | Delete a skill from disk and remove from registry |
 | `importSkillZip` | `(zipPath: string, scope: 'global'\|'project') => ImportResult` | Extract a ZIP archive to the skills directory |
 
 **Extension Structure:**
@@ -452,14 +455,15 @@ No parameters. Initializes registry if missing.
 **Skill Structure:**
 - Must contain `SKILL.md` at root
 - Description extracted from first `# Heading` in SKILL.md
-- No enabled/disabled toggle — always active once installed
+- Enabled/disabled state is persisted in `<PILOT_DIR>/extension-registry.json` (skills array)
 
 **Key Implementation Notes:**
 - ZIP extraction uses system `unzip` command (macOS/Linux standard)
 - GitHub ZIP archives often have a single subdirectory — auto-detected and flattened
 - Import returns `{ success, id, name, type, scope, error? }`
 - Extension errors (missing package.json, parse errors) are tagged with `hasErrors: true`
-- Registry format: `{ extensions: [...], lastUpdated: timestamp }`
+- Registry format: `{ extensions: [...], skills: [...], lastUpdated: timestamp }`
+- Skill toggle support — `toggleSkill()` method persists enabled/disabled state in registry; `scanSkillsDir()` reads from registry to determine which skills are active
 - Project-local extensions/skills are only visible when `setProject()` has been called
 
 ---
@@ -516,6 +520,41 @@ interface SavedUIState {
 - Load returns null on any error (missing file, invalid JSON)
 - File is written atomically (full rewrite on each save)
 - Renderer debounces saves (500ms) to avoid excessive disk writes
+
+---
+
+### SessionMetadata
+
+**File:** `electron/services/session-metadata.ts`
+
+**Responsibility:**  
+Persists per-session metadata (isPinned, isArchived) to `<PILOT_DIR>/session-metadata.json`. Used by `PilotSessionManager.listSessions` and `PilotSessionManager.listAllSessions` to enrich session listings, and by IPC handlers for `SESSION_UPDATE_META` and `SESSION_DELETE`.
+
+**Key Functions:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `getSessionMeta` | `(sessionPath: string) => SessionMeta \| null` | Get metadata for a specific session. Returns null if not found. |
+| `updateSessionMeta` | `(sessionPath: string, updates: Partial<SessionMeta>) => SessionMeta` | Update metadata for a session. Creates entry if missing. |
+| `getAllSessionMeta` | `() => Record<string, SessionMeta>` | Get all session metadata. Returns map of sessionPath → metadata. |
+| `removeSessionMeta` | `(sessionPath: string) => void` | Remove metadata for a session (called when session is deleted). |
+
+**SessionMeta Type:**
+```typescript
+interface SessionMeta {
+  isPinned: boolean;
+  isArchived: boolean;
+  lastModified?: number;  // Unix timestamp
+}
+```
+
+**Key Implementation Notes:**
+- Metadata is stored as a JSON object with sessionPath as keys
+- File is written atomically on each update (full rewrite)
+- Read operations use in-memory cache, updated on write
+- Metadata survives session deletion until explicitly removed via `removeSessionMeta()`
+- Used by session sidebar to display pinned/archived badges and filter sessions
+- Session paths are normalized before use as keys to ensure consistency across platforms
 
 ---
 
@@ -617,6 +656,26 @@ interface ProjectSandboxSettings {
 - Invalid JSON falls back to defaults
 - Settings are not cached — loaded fresh on each call
 - Yolo mode overrides jail and bypasses all diff staging
+
+---
+
+## File System Utilities
+
+### buildFileTree (project.ts)
+
+**File:** `electron/ipc/project.ts`
+
+**Responsibility:**  
+Builds a hierarchical file tree for project file browsing. Filters files based on user-configurable ignore patterns.
+
+**Key Implementation Notes:**
+- Uses the `ignore` npm package to handle gitignore-style patterns
+- `hiddenPaths` are loaded from app settings (`app-settings.json`) and applied globally
+- Default patterns include common directories like `node_modules/`, `.git/`, `dist/`, `.DS_Store`, etc.
+- Supports all gitignore syntax: globs, negation (`!`), directory-only patterns (`dir/`), etc.
+- Replaces the previous hardcoded `IGNORED` Set with dynamic, user-configurable filtering
+- Tree is built recursively with depth limits to prevent infinite loops
+- Files are sorted alphabetically within each directory level
 
 ---
 

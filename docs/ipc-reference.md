@@ -178,6 +178,8 @@ Session management, stats, context usage, forking.
 | `SESSION_NEW` | renderer→main | `tabId: string` | `void` |
 | `SESSION_SWITCH` | renderer→main | `tabId: string, sessionPath: string` | `void` |
 | `SESSION_FORK` | renderer→main | `tabId: string` | `string` (new session path) |
+| `SESSION_UPDATE_META` | renderer→main | `sessionPath: string, update: Partial<{isPinned: boolean, isArchived: boolean}>` | `SessionMeta` |
+| `SESSION_DELETE` | renderer→main | `sessionPath: string` | `{success: boolean, error?: string}` |
 
 **`SessionStats` type:**
 
@@ -333,6 +335,8 @@ Project directory selection, file tree, file operations.
 | `PROJECT_CREATE_FILE` | renderer→main | `path: string` | `void` |
 | `PROJECT_CREATE_DIRECTORY` | renderer→main | `path: string` | `void` |
 | `PROJECT_OPEN_DIALOG` | renderer→main | — | `string \| null` |
+| `PROJECT_CHECK_GITIGNORE` | renderer→main | `projectPath: string` | `{needsUpdate: boolean}` |
+| `PROJECT_ADD_GITIGNORE` | renderer→main | `projectPath: string` | `{ok: boolean} \| {error: string}` |
 | `PROJECT_FS_CHANGED` | main→renderer | `void` | — | Push event |
 
 **`FileNode` type:**
@@ -583,6 +587,7 @@ Extension and skill management (list, toggle, remove, import).
 | `EXTENSIONS_REMOVE` | renderer→main | `extensionId: string` | `void` |
 | `SKILLS_LIST` | renderer→main | — | `InstalledSkill[]` |
 | `SKILLS_IMPORT_ZIP` | renderer→main | `zipPath: string, scope: 'global' \| 'project'` | `void` |
+| `SKILLS_TOGGLE` | renderer→main | `skillId: string` | `boolean` |
 | `SKILLS_REMOVE` | renderer→main | `skillId: string` | `void` |
 
 **`InstalledExtension` type:**

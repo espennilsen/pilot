@@ -187,6 +187,8 @@ The client auto-detects the environment and routes accordingly. Stores and hooks
 3. User sends message → `AGENT_SEND_MESSAGE` with `tabId` → Routed to correct session
 4. User closes tab → `TAB_CLOSE` → Session disposed, tab moved to closed-tab stack (can be restored)
 
+**Session Metadata Persistence**: Session metadata (pinned status, archived status) is persisted separately from session `.jsonl` files in `<PILOT_DIR>/session-metadata.json`. This allows metadata to survive session deletion and supports future features like favorites, tags, and custom grouping.
+
 ### 5. Project Jail
 
 **Problem**: Agent should not write files outside the project directory.
@@ -202,7 +204,37 @@ const isWithinProject = (filePath: string, projectRoot: string): boolean => {
 
 Paths that escape the project root are rejected. Optional allowed paths can be configured in `.pilot/settings.json`.
 
-### 6. Service Injection Pattern
+**Bash Jail Enforcement**: Beyond simple file path checks, bash commands use intelligent path analysis via `findEscapingPaths()`:
+- Extracts file paths from bash commands using regex patterns
+- Matches against ignore-style patterns (gitignore syntax)
+- System paths (e.g., `/usr/bin`, `/bin`, `/opt`) are automatically allowlisted
+- Only user-space paths outside the project jail trigger warnings
+
+### 6. File Tree Filtering
+
+**Problem**: Large projects with `node_modules`, build artifacts, and vendor directories clutter the file tree and slow down navigation.
+
+**Solution**: File tree filtering uses the `ignore` package with user-configurable patterns:
+- **Default Patterns**: Standard gitignore-style patterns (`node_modules/`, `.git/`, `dist/`, etc.)
+- **User Configuration**: Custom patterns stored in `<PILOT_DIR>/app-settings.json` under `fileTreePatterns`
+- **Syntax**: Full gitignore syntax support (glob patterns, negation, directory-only matches)
+- **Performance**: Patterns are compiled once and cached; filtering happens during tree traversal
+
+**Example Configuration**:
+```json
+{
+  "fileTreePatterns": [
+    "node_modules/",
+    ".git/",
+    "dist/",
+    "build/",
+    "*.log",
+    "!important.log"
+  ]
+}
+```
+
+### 7. Service Injection Pattern
 
 **Problem**: Services need to share state and dependencies (e.g., `MemoryManager` instance used by both session creation and UI updates).
 

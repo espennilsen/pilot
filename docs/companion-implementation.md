@@ -288,7 +288,7 @@ Settings → Companion
   │                                     │
   │ 📱 Espen's iPhone    Last: 2 min ago│
   │                          [Revoke]   │
-  │ 📱 Espen's iPad      Last: 3 days  │
+  │ 📱 Espen's iPad      Last: 3 days   │
   │                          [Revoke]   │
   │                                     │
   │ ── Remote Access ──                 │

@@ -88,6 +88,79 @@ Closed sessions are:
 
 ---
 
+## Managing Sessions
+
+Pilot provides several ways to organize and manage your sessions in the Sessions sidebar.
+
+### Pinning Sessions
+
+Pin important sessions to keep them at the top of the Sessions list:
+
+1. **Hover over a session** in the Sessions sidebar  
+   A pin icon appears on the right
+
+2. **Click the pin icon** to pin the session  
+   Pinned sessions move to the top of the list and show a filled pin icon
+
+3. **Click the pin icon again** to unpin
+
+**Pin state persists** — pinned sessions remain at the top across app restarts.
+
+Use pinning for:
+- Active projects you're working on daily
+- Reference conversations you frequently consult
+- Sessions you want to keep easily accessible
+
+### Archiving Sessions
+
+Archive completed or paused sessions to keep your Sessions list clean:
+
+1. **Hover over a session** in the Sessions sidebar  
+   An archive icon appears alongside the pin icon
+
+2. **Click the archive icon** to archive the session  
+   The session is removed from the default list view
+
+3. **Right-click a session** → "Archive" (also available in context menu)
+
+**Viewing Archived Sessions**:
+- A **"Show archived"** toggle appears below the search bar when you have archived sessions
+- Click to reveal all archived sessions (they appear with a dimmed style)
+- Click **"Hide archived"** to hide them again
+
+**Unarchiving**:
+- When viewing archived sessions, hover over one and click the **ArchiveRestore icon**
+- Or right-click → "Unarchive"
+- The session returns to the main list
+
+**Archive state persists** — archived sessions stay hidden across app restarts.
+
+Use archiving for:
+- Completed features or resolved bugs
+- Experiments or research that didn't pan out
+- Old sessions you want to keep but don't need to see daily
+
+### Deleting Sessions
+
+Permanently delete sessions you no longer need:
+
+1. **Right-click a session** in the Sessions sidebar  
+   Select "Delete Session" (marked with a trash icon in red/danger style)
+
+2. **Confirm deletion**  
+   A native dialog appears: *"Delete session 'title'? This cannot be undone."*
+
+3. **Confirm** to permanently delete the session
+
+**What gets deleted**:
+- The `.jsonl` session file is removed from disk
+- All session metadata is cleaned up
+- The session cannot be recovered
+
+**Warning**: Deletion is permanent and cannot be undone. Consider archiving instead if you might need the session later.
+
+---
+
 ## Multi-Tab Workflow
 
 Pilot supports multiple simultaneous sessions in tabs.
@@ -205,15 +278,17 @@ Session metadata is stored separately:
 
 ### Deleting Sessions
 
-Delete old sessions:
+Sessions can be permanently deleted via the Sessions sidebar (see [Managing Sessions](#managing-sessions) above for the full workflow).
 
-1. **Sessions Sidebar**  
-   Right-click a session → "Delete Session"
+When a session is deleted:
+- The `.jsonl` file is removed from `<PILOT_DIR>/sessions/`
+- All session metadata is cleaned up
+- A confirmation dialog protects against accidental deletion
 
-2. **Manual Deletion**  
-   Remove the `.jsonl` file from `<PILOT_DIR>/sessions/`
+**Manual Deletion**:  
+You can also manually remove `.jsonl` files from `<PILOT_DIR>/sessions/` if needed.
 
-**Warning**: Deleted sessions cannot be recovered.
+**Warning**: Deleted sessions cannot be recovered. Consider archiving instead of deleting if you might need the session in the future.
 
 ---
 
@@ -274,7 +349,10 @@ See [Agent Documentation](./agent.md#slash-commands) for the complete list.
 
 - **One Session Per Feature**: Create a new session for each distinct feature or bug fix
 - **Name Sessions Clearly**: Use descriptive titles so you can find them later in the Sessions sidebar
+- **Pin Active Work**: Pin the 2-3 sessions you're actively working on to keep them at the top
+- **Archive Completed Work**: Archive sessions when features are done or bugs are resolved — keeps your list clean while preserving history
 - **Close Finished Sessions**: Keep the tab bar clean by closing sessions when work is complete
+- **Delete Rarely**: Only delete sessions you're certain you won't need — archiving is usually the better choice
 
 ### Multi-Project Workflows
 

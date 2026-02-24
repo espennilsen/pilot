@@ -13,6 +13,8 @@ Browse your project's file tree. Click any file to open it in an editor tab.
 - Displays the full directory structure of the active project
 - Files and folders are expandable/collapsible
 - Click a file to open it in a new editor tab
+- Hidden files and dotfiles are shown by default (except those matching configured patterns)
+- Customize which files are hidden via **Settings > Files** using `.gitignore` syntax patterns
 
 ### Git
 

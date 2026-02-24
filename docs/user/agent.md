@@ -142,6 +142,73 @@ Run npm install to add the new dependency
 
 **Security**: Commands are restricted to the project directory (cannot escape the project jail).
 
+**Bash Jail Enforcement**:
+
+When the project jail is enabled, every bash command is analyzed before execution to prevent path escapes:
+
+1. **Path Extraction** — The system scans the command for:
+   - Absolute paths (`/home/user/file.txt`)
+   - Home directory references (`~/file.txt`, `$HOME/file.txt`)
+   - Parent directory escapes (`../outside-project/file.txt`)
+   - Redirect targets (`> /tmp/output.txt`)
+   - Paths in quotes or command substitution
+   - Environment variables (`$TMPDIR`, `$HOME`)
+
+2. **Path Validation** — Each extracted path is checked:
+   - Must be within the project root OR in the allowed paths list (`.pilot/settings.json`)
+   - System paths are implicitly allowed (`/usr`, `/bin`, `/dev`, `/etc`, `/opt`, etc.)
+   - Environment variables are expanded before checking
+
+3. **Enforcement** — If any path escapes:
+   - The command is **blocked immediately**
+   - A clear error message lists the offending paths
+   - The agent is told to add the paths to `allowedPaths` in `.pilot/settings.json`
+
+4. **Normal Flow** — If all paths are clean:
+   - The command proceeds through the normal yolo/staging/auto-accept flow
+
+**Example — Blocked Command**:
+```
+Agent: bash cd /tmp && echo "test" > output.txt
+System: ❌ Command blocked — paths outside project jail:
+  - /tmp
+  
+Add these paths to allowedPaths in .pilot/settings.json if needed.
+```
+
+**Example — Allowed Command**:
+```
+Agent: bash cat /usr/bin/env | head -1
+System: ✓ Allowed (system path)
+[Command executes normally]
+```
+
+**Configuring Allowed Paths**:
+
+If you need to grant access to specific directories outside the project:
+
+1. Open `.pilot/settings.json` in your project
+2. Add the paths to the `allowedPaths` array:
+   ```json
+   {
+     "jail": { "enabled": true },
+     "allowedPaths": [
+       "/tmp/my-project-cache",
+       "~/Documents/shared-config"
+     ]
+   }
+   ```
+3. Paths are automatically expanded (`~` becomes your home directory)
+
+**Disabling the Jail**:
+
+To disable jail enforcement entirely (not recommended):
+```json
+{
+  "jail": { "enabled": false }
+}
+```
+
 ### Task Tools
 
 See [Tasks documentation](./tasks.md#agent-integration) for details.
@@ -465,6 +532,7 @@ Even in YOLO mode, review the changes afterward:
 Pilot's sandboxing protects you from:
 - **Accidental deletions**: File changes are staged, not applied immediately
 - **Path traversal**: Agent cannot access files outside the project directory
+- **Bash jail enforcement**: Commands are analyzed for path escapes — any attempt to access files outside the project root (except system paths and configured allowed paths) is blocked before execution
 - **Destructive commands**: `rm`, `mv`, and other dangerous bash commands require approval
 
 ### API Key Security
