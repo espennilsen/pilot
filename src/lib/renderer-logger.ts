@@ -25,7 +25,7 @@ function send(source: string, level: string, msg: string, data?: unknown): void 
     } else {
       (console as any)[level]?.(`[${source}] ${msg}`, data ?? '');
     }
-  } catch {
+  } catch { /* Must not throw from logger — last-resort console fallback */
     (console as any)[level]?.(`[${source}] ${msg}`, data ?? '');
   }
 }

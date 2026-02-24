@@ -48,7 +48,7 @@ function resolveEditDiff(diff: StagedDiff) {
       // If original doesn't contain oldText (maybe also corrupted), just show the edit fragment
       return { oldContent: parsed.oldText, newContent: parsed.newText };
     }
-  } catch {
+  } catch { /* Expected: diff content may not be valid JSON */
     // Not JSON — proposedContent is actual file content (new format), use as-is
   }
 

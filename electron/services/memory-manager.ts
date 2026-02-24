@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { PILOT_APP_DIR } from './pilot-paths';
+import { getLogger } from './logger';
+
+const log = getLogger('MemoryManager');
 
 const GLOBAL_MEMORY_PATH = path.join(PILOT_APP_DIR, 'MEMORY.md');
 
@@ -270,7 +273,8 @@ If nothing worth remembering, respond: {"memories": []}`;
       }
 
       return { shouldSave: memories.length > 0, memories };
-    } catch {
+    } catch (err) {
+      log.debug('Memory extraction parse failed', err);
       return { shouldSave: false, memories: [] };
     }
   }
@@ -292,6 +296,7 @@ If nothing worth remembering, respond: {"memories": []}`;
     try {
       content = await fs.readFile(filePath, 'utf-8');
     } catch {
+      /* Expected: memory file may not exist yet */
       content = '# Memory\n';
     }
 
@@ -335,6 +340,7 @@ If nothing worth remembering, respond: {"memories": []}`;
           return true;
         }
       } catch {
+        /* Expected: memory file may not exist during remove */
         continue;
       }
     }
@@ -391,6 +397,7 @@ If nothing worth remembering, respond: {"memories": []}`;
     try {
       return await fs.readFile(filePath, 'utf-8');
     } catch {
+      /* Expected: memory file may not exist */
       return null;
     }
   }

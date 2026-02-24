@@ -26,6 +26,7 @@ export function loadProjectSettings(projectPath: string): ProjectSandboxSettings
       yoloMode: parsed.yoloMode ?? DEFAULT_SETTINGS.yoloMode,
     };
   } catch {
+    /* Expected: settings.json may not exist for project */
     return { ...DEFAULT_SETTINGS };
   }
 }

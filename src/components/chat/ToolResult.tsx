@@ -12,7 +12,7 @@ interface ToolResultProps {
 function tryParseJSON(str: string): any {
   try {
     return JSON.parse(str);
-  } catch {
+  } catch { /* Expected: tool result may not be valid JSON */
     return null;
   }
 }

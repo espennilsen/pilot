@@ -60,7 +60,7 @@ async function ensureLanguage(lang: string): Promise<boolean> {
     hljs.registerLanguage(lang, mod.default as Parameters<typeof hljs.registerLanguage>[1]);
     loadedLangs.add(lang);
     return true;
-  } catch {
+  } catch { /* Expected: language module may not be available */
     return false;
   }
 }

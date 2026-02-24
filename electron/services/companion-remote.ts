@@ -3,6 +3,9 @@ import { promisify } from 'util';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { PILOT_APP_DIR } from './pilot-paths';
+import { getLogger } from './logger';
+
+const log = getLogger('CompanionRemote');
 
 const execAsync = promisify(exec);
 
@@ -164,7 +167,8 @@ export async function setupTailscaleProxy(port: number): Promise<TailscaleResult
     // Check if tailscale CLI is installed
     try {
       execSync(process.platform === 'win32' ? 'where tailscale' : 'which tailscale', { stdio: 'ignore' });
-    } catch {
+    } catch (err) {
+      log.debug('Tailscale check failed', err);
       throw new Error('Tailscale CLI not found. Install Tailscale from https://tailscale.com/download');
     }
 

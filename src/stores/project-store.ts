@@ -73,7 +73,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     try {
       const tree = await invoke(IPC.PROJECT_FILE_TREE) as FileNode[];
       set({ fileTree: tree, isLoadingTree: false });
-    } catch {
+    } catch { /* Expected: project directory may not be accessible */
       set({ fileTree: [], isLoadingTree: false });
     }
   },
@@ -126,7 +126,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
         // Create a new tab for this project
         addTab(path);
-      } catch {
+      } catch { /* Expected: tab store may not be available during initialization */
         // Ignore if tab store not available
       }
 
@@ -136,7 +136,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         if (result.needsUpdate) {
           set({ showGitignorePrompt: true, gitignoreProjectPath: path });
         }
-      } catch {
+      } catch { /* Expected: .gitignore check may fail if .git directory doesn't exist */
         // Non-critical — don't block project opening
       }
     }

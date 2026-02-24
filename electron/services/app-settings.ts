@@ -72,7 +72,8 @@ export function loadAppSettings(): PilotAppSettings {
       logging: parsed.logging ?? DEFAULT_APP_SETTINGS.logging,
     };
     return cachedSettings;
-  } catch {
+  } catch (err) {
+    console.warn('[AppSettings] Corrupt settings file, using defaults:', err);
     cachedSettings = { ...DEFAULT_APP_SETTINGS };
     return cachedSettings;
   }

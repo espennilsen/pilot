@@ -66,7 +66,7 @@ class WebSocketIPCClient {
 
     try {
       this.ws = new WebSocket(this.wsUrl);
-    } catch {
+    } catch { /* Expected: WebSocket connection may fail during reconnect */
       this.scheduleReconnect();
       return;
     }
@@ -80,7 +80,7 @@ class WebSocketIPCClient {
       try {
         const msg = JSON.parse(event.data as string);
         this.handleMessage(msg);
-      } catch {
+      } catch { /* Expected: malformed WebSocket message */
         // ignore malformed messages
       }
     };

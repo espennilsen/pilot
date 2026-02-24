@@ -32,11 +32,11 @@ export function CommandButton({ command }: CommandButtonProps) {
   const handleOpenUrl = async (url: string) => {
     try {
       await invoke(IPC.COMPANION_OPEN_TUNNEL, url);
-    } catch {
+    } catch { /* Expected: primary open method may not be available */
       // Fallback: use shell:open-external or window.open
       try {
         await invoke('shell:open-external', url);
-      } catch {
+      } catch { /* Expected: fallback open method may also fail */
         window.open(url, '_blank');
       }
     }

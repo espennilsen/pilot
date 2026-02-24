@@ -81,7 +81,7 @@ export function registerProjectIpc() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(notifyFsChanged, 300);
       });
-    } catch {
+    } catch { /* Expected: watch target may not exist */
       // fs.watch may fail on some platforms/paths — degrade gracefully
     }
   }

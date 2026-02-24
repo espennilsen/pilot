@@ -14,6 +14,7 @@ function isEslintAvailable(projectPath: string): boolean {
     execSync(`${bin} eslint`, { stdio: 'ignore' });
     return true;
   } catch {
+    /* Expected: command may not be in PATH */
     return false;
   }
 }
@@ -36,7 +37,9 @@ function killProcessTree(proc: ChildProcess): void {
   if (process.platform === 'win32') {
     try {
       execSync(`taskkill /pid ${proc.pid} /T /F`, { stdio: 'ignore' });
-    } catch { /* process may have already exited */ }
+    } catch {
+      /* Expected: process may have already exited */
+    }
   } else {
     proc.kill('SIGTERM');
   }
@@ -86,7 +89,7 @@ export class DevCommandsService {
           const raw = readFileSync(configPath, 'utf-8');
           const parsed = JSON.parse(raw);
           commands = parsed.commands ?? DEFAULT_COMMANDS;
-        } catch {
+        } catch { /* Expected: config file may be malformed JSON */
           commands = DEFAULT_COMMANDS;
         }
       }
@@ -233,7 +236,7 @@ export class DevCommandsService {
       const { companionBridge } = require('./companion-ipc-bridge');
       companionBridge.forwardEvent(channel, args.length === 1 ? args[0] : args);
     } catch {
-      // Companion bridge not initialized yet
+      /* Expected: companion bridge not initialized during startup */
     }
   }
 }

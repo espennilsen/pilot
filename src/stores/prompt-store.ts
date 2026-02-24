@@ -47,7 +47,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
         try {
           await reloadPrompts();
           set({ loading: false });
-        } catch {
+        } catch { /* Expected: IPC may fail during app shutdown */
           set({ loading: false });
         }
       },
@@ -55,7 +55,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       getById: async (id: string) => {
         try {
           return await invoke(IPC.PROMPTS_GET, id) as PromptTemplate | null;
-        } catch {
+        } catch { /* Expected: prompt may not exist */
           return null;
         }
       },
@@ -63,7 +63,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       getByCommand: async (command: string) => {
         try {
           return await invoke(IPC.PROMPTS_GET_BY_COMMAND, command) as PromptTemplate | null;
-        } catch {
+        } catch { /* Expected: command may not be registered */
           return null;
         }
       },
@@ -71,7 +71,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       getCommands: async () => {
         try {
           return await invoke(IPC.PROMPTS_GET_COMMANDS) as Array<{ command: string; promptId: string; title: string; icon: string; description: string }>;
-        } catch {
+        } catch { /* Expected: IPC may fail during app shutdown */
           return [];
         }
       },
@@ -79,7 +79,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       getSystemCommands: async () => {
         try {
           return await invoke(IPC.PROMPTS_GET_SYSTEM_COMMANDS) as Array<{ command: string; owner: string; description: string }>;
-        } catch {
+        } catch { /* Expected: IPC may fail during app shutdown */
           return [];
         }
       },
@@ -87,7 +87,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       validateCommand: async (command: string, excludePromptId?: string) => {
         try {
           return await invoke(IPC.PROMPTS_VALIDATE_COMMAND, command, excludePromptId) as { valid: boolean; error?: string };
-        } catch {
+        } catch { /* Expected: validation may fail during app shutdown */
           return { valid: false, error: 'Validation failed' };
         }
       },
@@ -129,7 +129,7 @@ export const usePromptStore = create<PromptState>((set, get) => {
       fillTemplate: async (content: string, values: Record<string, string>) => {
         try {
           return await invoke(IPC.PROMPTS_FILL, content, values) as string;
-        } catch {
+        } catch { /* Expected: template fill may fail, return original content */
           return content;
         }
       },

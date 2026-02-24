@@ -9,7 +9,7 @@ import { create } from 'zustand';
 const loadScratchPadContent = (): string => {
   try {
     return localStorage.getItem('scratchPadContent') || '';
-  } catch {
+  } catch { /* Expected: localStorage may be unavailable in some environments */
     return '';
   }
 };
@@ -20,7 +20,7 @@ const loadScratchPadContent = (): string => {
 const saveScratchPadContent = (content: string) => {
   try {
     localStorage.setItem('scratchPadContent', content);
-  } catch {
+  } catch { /* Expected: localStorage write may fail (quota exceeded) */
     // Ignore errors
   }
 };

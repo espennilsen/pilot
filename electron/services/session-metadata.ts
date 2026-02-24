@@ -28,7 +28,7 @@ function load(): SessionMetadataFile {
       return { sessions: parsed.sessions || {} };
     }
   } catch {
-    // Corrupt file — start fresh
+    /* Expected: metadata file may not exist or be malformed */
   }
   return { sessions: {} };
 }

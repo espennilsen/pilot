@@ -14,6 +14,9 @@ import matter from 'gray-matter';
 import chokidar from 'chokidar';
 import { PILOT_PROMPTS_DIR } from './pilot-paths';
 import { CommandRegistry } from './command-registry';
+import { getLogger } from './logger';
+
+const log = getLogger('PromptLibrary');
 import type {
   PromptTemplate,
   PromptVariable,
@@ -171,6 +174,7 @@ export class PromptLibrary {
     try {
       files = (await fs.readdir(dir)).filter(f => f.endsWith('.md'));
     } catch {
+      /* Expected: prompt directory may not exist */
       return results;
     }
 
@@ -181,7 +185,7 @@ export class PromptLibrary {
         const parsed = this.parsePromptFile(filename, filePath, raw, layer);
         if (parsed) results.push(parsed);
       } catch {
-        // Skip malformed files silently
+        /* Expected: individual prompt file may be malformed */
       }
     }
 
@@ -550,7 +554,8 @@ export class PromptLibrary {
       await this.reload();
       this.emit();
       return true;
-    } catch {
+    } catch (err) {
+      log.warn('Failed to delete prompt file', err);
       return false;
     }
   }
@@ -583,6 +588,7 @@ export class PromptLibrary {
     try {
       bundledFiles = (await fs.readdir(bundledDir)).filter(f => f.endsWith('.md'));
     } catch {
+      /* Expected: bundled prompts directory may not exist */
       return;
     }
 
@@ -627,8 +633,8 @@ export class PromptLibrary {
           const fileContent = matter.stringify(srcBody.trim(), fm);
           await fs.writeFile(destPath, fileContent, 'utf-8');
         }
-      } catch {
-        // Skip on error
+      } catch (err) {
+        log.debug('Failed to scaffold prompt file', err);
       }
     }
   }

@@ -75,7 +75,7 @@ export default function MemorySettings() {
         : paths.projectShared;
       addFileTab(filePath, projectPath);
       closeSettings();
-    } catch {
+    } catch { /* Expected: file tab creation may fail if project not loaded */
       // Silently fail
     }
   }, [projectPath, activeScope, addFileTab, closeSettings]);

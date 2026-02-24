@@ -20,7 +20,7 @@ export class GitService {
     try {
       execSync('git --version', { stdio: 'pipe' });
       return true;
-    } catch {
+    } catch { /* Expected: git may not be installed */
       return false;
     }
   }
@@ -29,7 +29,7 @@ export class GitService {
   async isRepo(): Promise<boolean> {
     try {
       return await this.git.checkIsRepo();
-    } catch {
+    } catch { /* Expected: not a git repo */
       return false;
     }
   }
@@ -170,7 +170,7 @@ export class GitService {
     try {
       const raw = await this.git.raw(['blame', '--porcelain', filePath]);
       return this.parseBlame(raw);
-    } catch {
+    } catch { /* Expected: blame fails on uncommitted/binary files */
       return [];
     }
   }
@@ -184,7 +184,7 @@ export class GitService {
         date: new Date(entry.date).getTime(),
         branch: entry.refs || '',
       }));
-    } catch {
+    } catch { /* Expected: stash list fails on repos with no stashes */
       return [];
     }
   }

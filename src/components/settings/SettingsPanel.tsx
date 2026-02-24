@@ -1043,7 +1043,7 @@ function CompanionSettings() {
     try {
       const s = await invoke(IPC.COMPANION_GET_STATUS) as CompanionStatus;
       setStatus(s);
-    } catch {
+    } catch { /* Expected: companion server may not be running */
       // Companion not initialized yet
       setStatus({ enabled: false, port: 18088, protocol: 'https', running: false, connectedClients: 0, remoteUrl: null, remoteType: null, lanAddress: null, lanAddresses: [], autoStart: false });
     }
@@ -1053,7 +1053,7 @@ function CompanionSettings() {
     try {
       const d = await invoke(IPC.COMPANION_GET_DEVICES) as PairedDevice[];
       setDevices(d);
-    } catch {
+    } catch { /* Expected: companion server may not be running */
       setDevices([]);
     }
   };
@@ -1432,7 +1432,7 @@ function CompanionSettings() {
                           value: url.hostname,
                           label: `${url.hostname} (${status.remoteType || 'tunnel'})`,
                         });
-                      } catch {
+                      } catch { /* Expected: URL parsing may fail for non-standard hosts */
                         options.push({ value: status.remoteUrl, label: `${status.remoteUrl} (tunnel)` });
                       }
                     }

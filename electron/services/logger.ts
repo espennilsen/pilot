@@ -177,7 +177,7 @@ function stringify(data: unknown): string {
   try {
     const s = JSON.stringify(data);
     return s.length > 4096 ? s.slice(0, 4096) + '…(truncated)' : s;
-  } catch {
+  } catch { /* Must not log here — avoid infinite recursion */
     return String(data);
   }
 }

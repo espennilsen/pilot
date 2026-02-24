@@ -190,7 +190,7 @@ export class ExtensionManager {
             try {
               renameSync(src, dest);
             } catch {
-              // Cross-device fallback: copy then delete
+              /* Expected: cross-device rename fails, falls back to copy */
               cpSync(src, dest, { recursive: true });
               rmSync(src, { recursive: true, force: true });
             }
@@ -357,7 +357,7 @@ export class ExtensionManager {
             try {
               renameSync(src, dest);
             } catch {
-              // Cross-device fallback: copy then delete
+              /* Expected: cross-device rename fails, falls back to copy */
               cpSync(src, dest, { recursive: true });
               rmSync(src, { recursive: true, force: true });
             }
@@ -417,6 +417,7 @@ export class ExtensionManager {
       const raw = readFileSync(PILOT_EXTENSION_REGISTRY_FILE, 'utf-8');
       return JSON.parse(raw);
     } catch {
+      /* Expected: registry file may not exist */
       return { extensions: [], lastUpdated: Date.now() };
     }
   }

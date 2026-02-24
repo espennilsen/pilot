@@ -18,6 +18,7 @@ export class WorkspaceStateService {
       const data = await readFile(PILOT_WORKSPACE_FILE, 'utf-8');
       return JSON.parse(data) as WorkspaceState;
     } catch {
+      /* Expected: workspace.json may not exist on first launch */
       return null;
     }
   }

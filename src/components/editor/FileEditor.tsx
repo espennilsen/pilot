@@ -92,7 +92,7 @@ export default function FileEditor() {
         if (result.content != null && state.baseContent != null && result.content !== state.baseContent) {
           setState(s => ({ ...s, hasConflict: true, content: result.content! }));
         }
-      } catch {
+      } catch { /* Expected: file may have been deleted or moved */
         // ignore
       }
     });
