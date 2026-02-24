@@ -78,7 +78,8 @@ export function syncAllHandlers(): void {
     }
   }
 
-  console.log(`[CompanionIPCBridge] Synced ${registered} invoke handlers, ${sendHandlerRegistry.size} send handlers (${blocked} blocked)`);
+  // Debug-only: useful for development, noisy in production
+  console.debug(`[CompanionIPCBridge] Synced ${registered} invoke handlers, ${sendHandlerRegistry.size} send handlers (${blocked} blocked)`);
 }
 
 // WebSocket message types

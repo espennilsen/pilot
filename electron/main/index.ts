@@ -312,7 +312,7 @@ app.whenReady().then(async () => {
           auth: companionAuth!,
         });
       }
-      console.log(`[Companion] Server initialized (${companionSettings.protocol}:${companionSettings.port})`);
+      log.debug(`Companion server configured (${companionSettings.protocol}:${companionSettings.port}, not yet started)`);
 
       // Auto-start the companion server if the user has enabled it in settings
       if (loadAppSettings().companionAutoStart && companionServer) {
