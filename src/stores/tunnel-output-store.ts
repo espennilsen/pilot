@@ -66,8 +66,15 @@ export const useTunnelOutputStore = create<TunnelOutputStore>((set) => ({
   },
 }));
 
-// Listen for tunnel output from main process
-if (typeof window !== 'undefined' && window.api) {
+/**
+ * Register IPC push-event listener for tunnel output.
+ * Called once from main.tsx after window.api is available.
+ */
+let _tunnelListenersRegistered = false;
+export function initTunnelOutputListeners(): void {
+  if (_tunnelListenersRegistered) return;
+  _tunnelListenersRegistered = true;
+
   on(IPC.COMPANION_TUNNEL_OUTPUT, (provider: unknown, text: unknown) => {
     if (typeof provider === 'string' && typeof text === 'string') {
       useTunnelOutputStore.getState().appendOutput(provider as TunnelProvider, text);

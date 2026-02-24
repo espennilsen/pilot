@@ -108,8 +108,16 @@ export const useDevCommandStore = create<DevCommandStore>((set, get) => ({
   },
 }));
 
-// Set up IPC listeners
-if (typeof window !== 'undefined' && window.api) {
+/**
+ * Register IPC push-event listeners for dev command output.
+ * Called once from main.tsx after window.api is available (covers both Electron
+ * preload and companion polyfill).
+ */
+let _devCommandListenersRegistered = false;
+export function initDevCommandListeners(): void {
+  if (_devCommandListenersRegistered) return;
+  _devCommandListenersRegistered = true;
+
   on(IPC.DEV_COMMAND_OUTPUT, (commandId: string, output: string) => {
     useDevCommandStore.getState().appendOutput(commandId, output);
   });

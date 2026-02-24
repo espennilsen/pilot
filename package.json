@@ -6,8 +6,8 @@
   "author": "Espen Nornes",
   "license": "MIT",
   "scripts": {
-    "dev": "electron-vite dev --config electron-vite.config.mjs",
-    "dev:trace": "NODE_OPTIONS='--trace-warnings' electron-vite dev --config electron-vite.config.mjs",
+    "dev": "vite build -c vite.companion.mjs && electron-vite dev --config electron-vite.config.mjs",
+    "dev:trace": "vite build -c vite.companion.mjs && NODE_OPTIONS='--trace-warnings' electron-vite dev --config electron-vite.config.mjs",
     "build": "electron-vite build --config electron-vite.config.mjs",
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",

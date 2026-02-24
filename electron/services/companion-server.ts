@@ -482,6 +482,20 @@ export class CompanionServer {
   }
 
   /**
+   * Force-disconnect a client by session ID.
+   * Called when a device's auth token is revoked to immediately terminate the session.
+   */
+  disconnectClient(sessionId: string): void {
+    const ws = this.authenticatedClients.get(sessionId);
+    if (ws) {
+      ws.close(4001, 'Token revoked');
+      this.authenticatedClients.delete(sessionId);
+      this.config.ipcBridge.detachClient(sessionId);
+      console.log(`[CompanionServer] Client force-disconnected: ${sessionId}`);
+    }
+  }
+
+  /**
    * Update TLS certificates at runtime (e.g. when switching to Tailscale certs).
    * Uses Node's tls.Server.setSecureContext() to swap certs without restarting.
    */

@@ -203,6 +203,12 @@ export function registerCompanionIpc(deps: CompanionDeps) {
    * Revoke access for a specific device
    */
   ipcMain.handle(IPC.COMPANION_REVOKE_DEVICE, async (_event, sessionId: string) => {
+    // Force-disconnect the client's WebSocket before removing the token,
+    // so the revoked session can't send any more messages.
+    const server = deps.getServer();
+    if (server?.running) {
+      server.disconnectClient(sessionId);
+    }
     await auth.revokeDevice(sessionId);
     return { success: true };
   });
