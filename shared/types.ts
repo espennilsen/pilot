@@ -47,10 +47,10 @@ export interface PilotAppSettings {
     /** File logging (rotating logs in <PILOT_DIR>/logs/) */
     file?: {
       enabled: boolean;
-      /** Max file size in MB before rotation. Default: 10 */
+      /** Max size per log file in MB before mid-day rotation. Default: 10 */
       maxSizeMB?: number;
-      /** Max rotated files to keep. Default: 5 */
-      maxFiles?: number;
+      /** Days to keep log files. Default: 14 */
+      retainDays?: number;
     };
     /** Syslog UDP transport (RFC 5424) */
     syslog?: {

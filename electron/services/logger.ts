@@ -2,7 +2,8 @@
  * @file Centralized logging service for PiLot main process.
  *
  * - Log levels: debug (0), info (1), warn (2), error (3)
- * - File transport with rotation (default 10 MB, 5 files)
+ * - Daily log files (pilot-YYYY-MM-DD.log) with size-based mid-day rotation
+ * - Age-based cleanup (default: 14 days retention)
  * - Syslog transport via UDP (RFC 5424)
  * - Zero external dependencies
  *
@@ -12,7 +13,7 @@
  *   log.info('Hello', { key: 'value' });
  */
 
-import { createWriteStream, existsSync, statSync, renameSync, unlinkSync, type WriteStream } from 'fs';
+import { createWriteStream, existsSync, statSync, renameSync, unlinkSync, readdirSync, type WriteStream } from 'fs';
 import { join } from 'path';
 import { createSocket, type Socket } from 'dgram';
 import { hostname } from 'os';
@@ -58,9 +59,9 @@ function parseLevel(s: string): Level {
 
 interface FileConfig {
   enabled: boolean;
-  path: string;
+  dir: string;
   maxBytes: number;
-  maxFiles: number;
+  retainDays: number;
 }
 
 interface SyslogConfig {
@@ -81,6 +82,8 @@ interface Config {
 
 let cfg: Config | null = null;
 let fileStream: WriteStream | null = null;
+let currentFilePath: string | null = null;
+let currentFileDate: string | null = null;
 let udpSocket: Socket | null = null;
 const cachedHostname = hostname();
 
@@ -104,6 +107,8 @@ export function reloadLogger(): void {
 export function shutdownLogger(): void {
   if (fileStream) { fileStream.end(); fileStream = null; }
   if (udpSocket) { try { udpSocket.close(); } catch { /* already closed */ } udpSocket = null; }
+  currentFilePath = null;
+  currentFileDate = null;
   cfg = null;
 }
 
@@ -132,9 +137,9 @@ function buildConfig(s: PilotAppSettings): Config {
     level: parseLevel(l.level ?? 'warn'),
     file: {
       enabled: l.file?.enabled ?? true,
-      path: join(PILOT_LOGS_DIR, 'pilot.log'),
+      dir: PILOT_LOGS_DIR,
       maxBytes: (l.file?.maxSizeMB ?? 10) * 1024 * 1024,
-      maxFiles: l.file?.maxFiles ?? 5,
+      retainDays: l.file?.retainDays ?? 14,
     },
     syslog: {
       enabled: l.syslog?.enabled ?? false,
@@ -179,52 +184,108 @@ function stringify(data: unknown): string {
 
 // ─── File Transport ──────────────────────────────────────────────────────
 
+/** Today's date as YYYY-MM-DD */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Build the log file path for a given date, with optional part suffix for mid-day rotation */
+function logPath(date: string, part = 0): string {
+  if (!cfg) return '';
+  const suffix = part > 0 ? `-${part}` : '';
+  return join(cfg.file.dir, `pilot-${date}${suffix}.log`);
+}
+
+/** Find the next available part number for a date (0, 1, 2, ...) */
+function nextPart(date: string): number {
+  let part = 0;
+  while (existsSync(logPath(date, part + 1))) part++;
+  return part;
+}
+
 function openFileStream(): void {
   if (!cfg) return;
   ensurePilotAppDirs();
-  maybeRotate();
-  fileStream = createWriteStream(cfg.file.path, { flags: 'a' });
-  fileStream.on('error', () => { /* ignore write errors */ });
-}
 
-function maybeRotate(): void {
-  if (!cfg) return;
-  const { path, maxBytes, maxFiles } = cfg.file;
-  if (!existsSync(path)) return;
-  try {
-    if (statSync(path).size < maxBytes) return;
-  } catch { return; }
+  const date = today();
+  currentFileDate = date;
 
-  // Delete oldest
-  const oldest = `${path}.${maxFiles}`;
-  if (existsSync(oldest)) try { unlinkSync(oldest); } catch { /* ok */ }
-
-  // Shift .N → .N+1
-  for (let i = maxFiles - 1; i >= 1; i--) {
-    const src = `${path}.${i}`;
-    if (existsSync(src)) try { renameSync(src, `${path}.${i + 1}`); } catch { /* ok */ }
+  // If today's file already exceeds maxBytes, start a new part
+  let part = 0;
+  const base = logPath(date);
+  if (existsSync(base)) {
+    try {
+      if (statSync(base).size >= cfg.file.maxBytes) {
+        part = nextPart(date) + 1;
+      }
+    } catch { /* use base */ }
+  }
+  // Also check if we're already on a part file
+  if (part === 0 && existsSync(base)) {
+    currentFilePath = base;
+  } else if (part > 0) {
+    currentFilePath = logPath(date, part);
+  } else {
+    currentFilePath = base;
   }
 
-  // Current → .1
-  try { renameSync(path, `${path}.1`); } catch { /* ok */ }
+  fileStream = createWriteStream(currentFilePath, { flags: 'a' });
+  fileStream.on('error', () => { /* ignore write errors */ });
+
+  // Clean up old logs on startup
+  purgeOldLogs();
+}
+
+/** Delete log files older than retainDays */
+function purgeOldLogs(): void {
+  if (!cfg) return;
+  const { dir, retainDays } = cfg.file;
+  const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
+
+  try {
+    for (const name of readdirSync(dir)) {
+      // Match pilot-YYYY-MM-DD.log or pilot-YYYY-MM-DD-N.log
+      const m = name.match(/^pilot-(\d{4}-\d{2}-\d{2})(?:-\d+)?\.log$/);
+      if (!m) continue;
+      const fileDate = new Date(m[1] + 'T00:00:00Z').getTime();
+      if (fileDate < cutoff) {
+        try { unlinkSync(join(dir, name)); } catch { /* ok */ }
+      }
+    }
+  } catch { /* ignore readdir errors */ }
 }
 
 let bytesWritten = 0;
 
 function writeFile(line: string): void {
   if (!fileStream || !cfg?.file.enabled) return;
+
+  // Roll to new day file if date changed
+  const date = today();
+  if (date !== currentFileDate) {
+    fileStream.end();
+    currentFileDate = date;
+    currentFilePath = logPath(date);
+    fileStream = createWriteStream(currentFilePath, { flags: 'a' });
+    fileStream.on('error', () => {});
+    bytesWritten = 0;
+    purgeOldLogs();
+  }
+
   const buf = line + '\n';
   fileStream.write(buf);
   bytesWritten += Buffer.byteLength(buf);
 
-  // Check rotation every ~1 MB of writes to avoid stat() on every line
+  // Mid-day size rotation: if file exceeds maxBytes, start a new part
   if (bytesWritten > 1024 * 1024) {
     bytesWritten = 0;
     try {
-      if (cfg && existsSync(cfg.file.path) && statSync(cfg.file.path).size >= cfg.file.maxBytes) {
+      if (cfg && currentFilePath && existsSync(currentFilePath) &&
+          statSync(currentFilePath).size >= cfg.file.maxBytes) {
         fileStream.end();
-        maybeRotate();
-        fileStream = createWriteStream(cfg.file.path, { flags: 'a' });
+        const part = nextPart(date) + 1;
+        currentFilePath = logPath(date, part);
+        fileStream = createWriteStream(currentFilePath, { flags: 'a' });
         fileStream.on('error', () => {});
       }
     } catch { /* ignore rotation errors */ }

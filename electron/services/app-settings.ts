@@ -36,7 +36,7 @@ const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   hiddenPaths: DEFAULT_HIDDEN_PATHS,
   logging: {
     level: 'warn',
-    file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+    file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
     syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
   },
 };

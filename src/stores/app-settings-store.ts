@@ -17,7 +17,7 @@ interface AppSettingsStore {
   hiddenPaths: string[];
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
-    file?: { enabled: boolean; maxSizeMB?: number; maxFiles?: number };
+    file?: { enabled: boolean; maxSizeMB?: number; retainDays?: number };
     syslog?: { enabled: boolean; host: string; port: number; facility?: number; appName?: string };
   };
   isLoading: boolean;
@@ -71,7 +71,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     hiddenPaths: [],
     logging: {
       level: 'warn' as const,
-      file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+      file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
       syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
     },
     isLoading: false,
@@ -92,7 +92,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         hiddenPaths: settings.hiddenPaths ?? [],
         logging: settings.logging ?? {
           level: 'warn' as const,
-          file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+          file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
           syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
         },
         isLoading: false,
@@ -117,7 +117,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         hiddenPaths: updated.hiddenPaths ?? [],
         logging: updated.logging ?? {
           level: 'warn' as const,
-          file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+          file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
           syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
         },
         isLoading: false,
