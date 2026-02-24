@@ -105,16 +105,23 @@ class WebSocketIPCClient {
     switch (msg.type) {
       case 'auth_ok':
         this.authenticated = true;
+        // Ensure token is persisted for future sessions (covers migration
+        // from sessionStorage and any edge cases where localStorage was cleared).
+        try { localStorage.setItem('companion-auth-token', this.authToken); } catch { /* quota */ }
         this.authResolve?.();
         break;
 
       case 'auth_error':
         console.error('[CompanionIPC] Auth failed:', msg.reason);
-        // Token was revoked or is invalid — clear stored token so we don't
-        // loop reconnect with a bad credential. User will see pairing screen.
-        localStorage.removeItem('companion-auth-token');
-        sessionStorage.removeItem('companion-auth-token');
-        this.disposed = true; // stop reconnect loop
+        if (msg.reason === 'Invalid token') {
+          // Token was revoked server-side — clear stored credential and stop
+          // reconnecting. User will see the pairing screen on next load.
+          localStorage.removeItem('companion-auth-token');
+          sessionStorage.removeItem('companion-auth-token');
+          this.disposed = true;
+        }
+        // For transient errors (timeout, malformed message), don't clear the
+        // token — the reconnect loop will retry with the same credential.
         this.authResolve?.(); // unblock but leave authenticated=false
         break;
 
@@ -260,9 +267,15 @@ export function initCompanionPolyfill(): void {
   const wsUrl = localStorage.getItem('companion-ws-url')
     || sessionStorage.getItem('companion-ws-url')
     || `wss://${location.hostname}:${location.port}/`;
-  // Check localStorage first (persistent), fall back to sessionStorage (legacy/migration)
-  const authToken = localStorage.getItem('companion-auth-token')
-    || sessionStorage.getItem('companion-auth-token');
+  // Check localStorage first (persistent), fall back to sessionStorage (legacy/migration).
+  // If found only in sessionStorage, migrate to localStorage so it survives tab close.
+  let authToken = localStorage.getItem('companion-auth-token');
+  if (!authToken) {
+    authToken = sessionStorage.getItem('companion-auth-token');
+    if (authToken) {
+      localStorage.setItem('companion-auth-token', authToken);
+    }
+  }
 
   // Connect WebSocket if we have a non-empty auth token
   if (authToken) {
