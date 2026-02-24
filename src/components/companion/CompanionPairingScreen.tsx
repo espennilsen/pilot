@@ -140,7 +140,7 @@ export function CompanionPairingScreen({ onPaired }: CompanionPairingScreenProps
 
         {/* Footer */}
         <p className="text-xs text-text-secondary/60 text-center">
-          The PIN expires after 5 minutes. Generate a new one if it doesn't work.
+          The PIN expires after 30 seconds. Generate a new one if it doesn't work.
         </p>
       </div>
     </div>

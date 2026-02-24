@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
 /**
- * Transient pairing session — in-memory only, 5-minute expiry
+ * Transient pairing session — in-memory only, 30-second expiry
  */
 interface PairingSession {
   pin: string;
@@ -86,7 +86,7 @@ export class CompanionAuth {
     this.activePairing = {
       pin,
       createdAt: now,
-      expiresAt: now + 5 * 60 * 1000, // 5 minutes
+      expiresAt: now + 30 * 1000, // 30 seconds
     };
     return pin;
   }
@@ -104,7 +104,7 @@ export class CompanionAuth {
     this.activePairing = {
       pin: token, // Store token in pin field — validated the same way
       createdAt: now,
-      expiresAt: now + 5 * 60 * 1000, // 5 minutes
+      expiresAt: now + 30 * 1000, // 30 seconds
     };
     const payload: QRPayload = {
       type: 'pilot-companion',

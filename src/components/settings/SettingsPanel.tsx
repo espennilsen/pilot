@@ -1110,7 +1110,7 @@ function CompanionSettings() {
     try {
       const result = await invoke(IPC.COMPANION_GENERATE_PIN) as { pin: string };
       setPin(result.pin);
-      setPinExpiry(Date.now() + 5 * 60 * 1000);
+      setPinExpiry(Date.now() + 30 * 1000);
     } catch (err) {
       console.error('Failed to generate PIN:', err);
     }
@@ -1141,7 +1141,7 @@ function CompanionSettings() {
         setQrHost(result.payload?.host || null);
         setQrPort(result.payload?.port || null);
         setQrVisible(true);
-        setPinExpiry(Date.now() + 5 * 60 * 1000);
+        setPinExpiry(Date.now() + 30 * 1000);
       }
     } catch (err) {
       console.error('Failed to generate QR code:', err);
@@ -1257,8 +1257,6 @@ function CompanionSettings() {
   };
 
   const pinTimeRemaining = pinExpiry ? Math.max(0, Math.floor((pinExpiry - Date.now()) / 1000)) : 0;
-  const pinMinutes = Math.floor(pinTimeRemaining / 60);
-  const pinSeconds = pinTimeRemaining % 60;
 
   return (
     <div className="p-5 space-y-6">
@@ -1408,13 +1406,22 @@ function CompanionSettings() {
                   {qrVisible ? 'Hide QR Code' : 'Show QR Code'}
                 </button>
                 {pin && (
-                  <div className="text-center">
-                    <div className="font-mono text-2xl font-bold text-text-primary tracking-widest">
-                      {pin}
+                  <div className="flex items-center gap-2">
+                    <div className="text-center">
+                      <div className="font-mono text-2xl font-bold text-text-primary tracking-widest">
+                        {pin}
+                      </div>
+                      <p className="text-[11px] text-text-secondary mt-1">
+                        {pinTimeRemaining > 0 ? `Expires in ${pinTimeRemaining}s` : 'Expired'}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-text-secondary mt-1">
-                      Expires in {pinMinutes}:{pinSeconds.toString().padStart(2, '0')}
-                    </p>
+                    <button
+                      onClick={handleGeneratePIN}
+                      title="Generate new PIN"
+                      className="p-1.5 rounded hover:bg-bg-surface text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
               </div>
@@ -1468,7 +1475,7 @@ function CompanionSettings() {
                     />
                     <p className="text-[11px] text-gray-500">
                       Scan with Pilot Companion
-                      {pinExpiry && ` · ${pinMinutes}:${pinSeconds.toString().padStart(2, '0')}`}
+                      {pinExpiry && ` · ${pinTimeRemaining > 0 ? `${pinTimeRemaining}s` : 'expired'}`}
                     </p>
                     {qrHost && (
                       <p className="text-[10px] font-mono text-gray-400">
