@@ -34,6 +34,11 @@ const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   developerMode: false,
   keybindOverrides: {},
   hiddenPaths: DEFAULT_HIDDEN_PATHS,
+  logging: {
+    level: 'warn',
+    file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+    syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
+  },
 };
 
 // ─── Singleton ───────────────────────────────────────────────────────────
@@ -64,6 +69,7 @@ export function loadAppSettings(): PilotAppSettings {
       companionProtocol: parsed.companionProtocol ?? undefined,
       companionAutoStart: parsed.companionAutoStart ?? false,
       hiddenPaths: Array.isArray(parsed.hiddenPaths) ? parsed.hiddenPaths : DEFAULT_HIDDEN_PATHS,
+      logging: parsed.logging ?? DEFAULT_APP_SETTINGS.logging,
     };
     return cachedSettings;
   } catch {

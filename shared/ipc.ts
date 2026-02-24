@@ -216,4 +216,7 @@ export const IPC = {
   SUBAGENT_ABORT_POOL: 'subagent:abort-pool',
   SUBAGENT_EVENT: 'subagent:event',                 // main → renderer
   SUBAGENT_POOL_PROGRESS: 'subagent:pool-progress', // main → renderer
+
+  // Logging
+  LOG_MESSAGE: 'log:message',  // renderer → main
 } as const;

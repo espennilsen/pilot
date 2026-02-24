@@ -2,6 +2,8 @@
 // These types are used by both main and renderer processes
 // All types must be serializable over IPC (Structured Clone)
 
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
 // Session metadata (Pilot layer on top of SDK sessions)
 export interface SessionMetadata {
   sessionPath: string;
@@ -38,6 +40,31 @@ export interface PilotAppSettings {
   autoStartDevServer?: boolean;
   /** Glob patterns to hide in the file tree, using .gitignore syntax (e.g. 'node_modules', '*.log', 'dist/'). */
   hiddenPaths?: string[];
+  /** Logging configuration */
+  logging?: {
+    /** Minimum log level. Default: 'warn' */
+    level: 'debug' | 'info' | 'warn' | 'error';
+    /** File logging (rotating logs in <PILOT_DIR>/logs/) */
+    file?: {
+      enabled: boolean;
+      /** Max file size in MB before rotation. Default: 10 */
+      maxSizeMB?: number;
+      /** Max rotated files to keep. Default: 5 */
+      maxFiles?: number;
+    };
+    /** Syslog UDP transport (RFC 5424) */
+    syslog?: {
+      enabled: boolean;
+      /** Syslog server hostname or IP. Default: 'localhost' */
+      host: string;
+      /** Syslog server UDP port. Default: 514 */
+      port: number;
+      /** Syslog facility code (0-23). Default: 16 (local0) */
+      facility?: number;
+      /** App name in syslog messages. Default: 'pilot' */
+      appName?: string;
+    };
+  };
 }
 
 // Sandbox settings

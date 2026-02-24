@@ -15,6 +15,11 @@ interface AppSettingsStore {
   autoStartDevServer: boolean;
   keybindOverrides: Record<string, string | null>;
   hiddenPaths: string[];
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    file?: { enabled: boolean; maxSizeMB?: number; maxFiles?: number };
+    syslog?: { enabled: boolean; host: string; port: number; facility?: number; appName?: string };
+  };
   isLoading: boolean;
   error: string | null;
 
@@ -29,6 +34,9 @@ interface AppSettingsStore {
   completeOnboarding: () => Promise<void>;
   setKeybindOverride: (id: string, combo: string | null) => Promise<void>;
   clearKeybindOverride: (id: string) => Promise<void>;
+  setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<void>;
+  setFileLogging: (enabled: boolean) => Promise<void>;
+  setSyslogConfig: (config: Partial<{ enabled: boolean; host: string; port: number }>) => Promise<void>;
 }
 
 /**
@@ -61,6 +69,11 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
+    logging: {
+      level: 'warn' as const,
+      file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+      syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
+    },
     isLoading: false,
     error: null,
 
@@ -77,6 +90,11 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: settings.autoStartDevServer ?? false,
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
+        logging: settings.logging ?? {
+          level: 'warn' as const,
+          file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+          syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
+        },
         isLoading: false,
       });
     } catch (error) {
@@ -97,6 +115,11 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: updated.autoStartDevServer ?? false,
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
+        logging: updated.logging ?? {
+          level: 'warn' as const,
+          file: { enabled: true, maxSizeMB: 10, maxFiles: 5 },
+          syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
+        },
         isLoading: false,
       });
     } catch (error) {
@@ -118,6 +141,19 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     clearKeybindOverride: async (id: string) => {
       const { [id]: _, ...rest } = get().keybindOverrides;
       return updateSetting({ keybindOverrides: rest });
+    },
+    setLogLevel: async (level) => {
+      const current = get().logging;
+      return updateSetting({ logging: { ...current, level } }, true);
+    },
+    setFileLogging: async (enabled) => {
+      const current = get().logging;
+      return updateSetting({ logging: { ...current, file: { ...current.file, enabled } } }, true);
+    },
+    setSyslogConfig: async (config) => {
+      const current = get().logging;
+      const merged = { ...current.syslog, ...config } as typeof current.syslog;
+      return updateSetting({ logging: { ...current, syslog: merged } }, true);
     },
   };
 });

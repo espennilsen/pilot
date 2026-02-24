@@ -4,6 +4,7 @@ import { loadProjectSettings } from '../services/project-settings';
 import { loadAppSettings, saveAppSettings, getPiAgentDir } from '../services/app-settings';
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { getLogger } from '../services/logger';
 
 export function registerSettingsIpc() {
 
@@ -68,5 +69,15 @@ export function registerSettingsIpc() {
       mkdirSync(pilotDir, { recursive: true });
     }
     writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+  });
+
+  // ── Logging (renderer → main) ──────────────────────────────────────────
+
+  ipcMain.handle(IPC.LOG_MESSAGE, async (_event, source: string, level: string, message: string, data?: unknown) => {
+    const validLevels = ['debug', 'info', 'warn', 'error'];
+    if (!validLevels.includes(level)) return;
+    const logger = getLogger(`renderer:${source}`);
+    const fn = logger[level as keyof typeof logger];
+    if (typeof fn === 'function') fn(message, data);
   });
 }

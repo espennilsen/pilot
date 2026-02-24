@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, net, protocol, shell } from 'electron';
 import { join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
+import { initLogger, getLogger, shutdownLogger } from '../services/logger';
 import { PilotSessionManager } from '../services/pi-session-manager';
 import { DevCommandsService } from '../services/dev-commands';
 import { ExtensionManager } from '../services/extension-manager';
@@ -228,6 +229,11 @@ protocol.registerSchemesAsPrivileged([
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
+  // Initialize logger first
+  initLogger();
+  const log = getLogger('main');
+  log.info('Pilot starting', { version: app.getVersion(), platform: process.platform });
+
   // Handle pilot-attachment:// URLs → read local files
   protocol.handle('pilot-attachment', (request) => {
     // URL format: pilot-attachment:///absolute/path/to/file.png
@@ -487,4 +493,5 @@ app.on('will-quit', () => {
   companionDiscovery?.stop();
   companionRemote?.dispose();
   companionBridge.shutdown();
+  shutdownLogger();
 });

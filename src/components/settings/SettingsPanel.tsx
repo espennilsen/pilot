@@ -10,7 +10,7 @@ import {
   Shield, Zap, Code, Monitor, FolderOpen, RotateCcw,
   Plus, Trash2, Edit3, Check, XCircle, RotateCw,
   KeyRound, Eye, EyeOff, LogOut, ChevronDown, Brain, FileText,
-  Smartphone, QrCode, Wifi, WifiOff, Globe, RefreshCw,
+  Smartphone, QrCode, Wifi, WifiOff, Globe, RefreshCw, ScrollText,
 } from 'lucide-react';
 import { useMemoryStore } from '../../stores/memory-store';
 import { useAuthStore } from '../../stores/auth-store';
@@ -126,7 +126,7 @@ export default function SettingsPanel() {
 
 /* ── General ───────────────────────────────────── */
 function GeneralSettings() {
-  const { piAgentDir, load: loadAppSettings, setPiAgentDir } = useAppSettingsStore();
+  const { piAgentDir, load: loadAppSettings, setPiAgentDir, logging, setLogLevel, setFileLogging, setSyslogConfig } = useAppSettingsStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const [dirInput, setDirInput] = useState(piAgentDir);
   const [dirDirty, setDirDirty] = useState(false);
@@ -202,6 +202,83 @@ function GeneralSettings() {
       >
         <Toggle checked={memoryEnabled} onChange={setMemoryEnabled} />
       </SettingRow>
+
+      {/* ── Logging ── */}
+      <div className="border-t border-border pt-4 mt-2">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-4">Logging</h3>
+
+        <div className="space-y-6">
+          <SettingRow
+            icon={<ScrollText className="w-4 h-4 text-text-secondary" />}
+            label="Log Level"
+            description="Minimum severity to record. Debug is most verbose."
+          >
+            <select
+              value={logging.level}
+              onChange={(e) => setLogLevel(e.target.value as 'debug' | 'info' | 'warn' | 'error')}
+              className="text-xs bg-bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-accent"
+            >
+              <option value="debug">Debug</option>
+              <option value="info">Info</option>
+              <option value="warn">Warn</option>
+              <option value="error">Error</option>
+            </select>
+          </SettingRow>
+
+          <SettingRow
+            icon={<ScrollText className="w-4 h-4 text-text-secondary" />}
+            label="File Logging"
+            description="Write logs to ~/.config/.pilot/logs/ with automatic rotation."
+          >
+            <Toggle checked={logging.file?.enabled ?? true} onChange={setFileLogging} />
+          </SettingRow>
+
+          <SettingRow
+            icon={<ScrollText className="w-4 h-4 text-text-secondary" />}
+            label="Syslog (UDP)"
+            description="Forward logs to a remote syslog server via UDP."
+          >
+            <Toggle
+              checked={logging.syslog?.enabled ?? false}
+              onChange={(enabled) => setSyslogConfig({ enabled })}
+            />
+          </SettingRow>
+
+          {logging.syslog?.enabled && (
+            <div className="ml-7 space-y-4">
+              <SettingRow
+                icon={<div className="w-4 h-4" />}
+                label="Host"
+                description="Syslog server hostname or IP."
+              >
+                <input
+                  type="text"
+                  value={logging.syslog.host}
+                  onChange={(e) => setSyslogConfig({ enabled: true, host: e.target.value })}
+                  onBlur={(e) => setSyslogConfig({ enabled: true, host: e.target.value.trim() || 'localhost' })}
+                  className="text-xs bg-bg-surface border border-border rounded px-2 py-1 text-text-primary w-36 focus:outline-none focus:border-accent"
+                  placeholder="localhost"
+                />
+              </SettingRow>
+              <SettingRow
+                icon={<div className="w-4 h-4" />}
+                label="Port"
+                description="Syslog server UDP port."
+              >
+                <input
+                  type="number"
+                  value={logging.syslog.port}
+                  onChange={(e) => setSyslogConfig({ enabled: true, port: parseInt(e.target.value) || 514 })}
+                  className="text-xs bg-bg-surface border border-border rounded px-2 py-1 text-text-primary w-20 focus:outline-none focus:border-accent"
+                  placeholder="514"
+                  min="1"
+                  max="65535"
+                />
+              </SettingRow>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
