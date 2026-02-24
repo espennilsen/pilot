@@ -38,8 +38,9 @@ export function CompanionPairingScreen({ onPaired }: CompanionPairingScreenProps
       const { token } = await res.json();
       if (!token) throw new Error('No token received');
 
-      // Store token and reload to bootstrap the WebSocket connection
-      sessionStorage.setItem('companion-auth-token', token);
+      // Persist token so reconnects and new tabs don't require re-pairing.
+      // localStorage survives tab close; sessionStorage is only per-tab.
+      localStorage.setItem('companion-auth-token', token);
       onPaired();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pairing failed');

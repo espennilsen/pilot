@@ -110,6 +110,11 @@ class WebSocketIPCClient {
 
       case 'auth_error':
         console.error('[CompanionIPC] Auth failed:', msg.reason);
+        // Token was revoked or is invalid — clear stored token so we don't
+        // loop reconnect with a bad credential. User will see pairing screen.
+        localStorage.removeItem('companion-auth-token');
+        sessionStorage.removeItem('companion-auth-token');
+        this.disposed = true; // stop reconnect loop
         this.authResolve?.(); // unblock but leave authenticated=false
         break;
 
@@ -252,9 +257,12 @@ export function initCompanionPolyfill(): void {
   if (!_companionMode) return;
 
   // Derive WebSocket URL from current page location (same host:port, wss)
-  const wsUrl = sessionStorage.getItem('companion-ws-url')
+  const wsUrl = localStorage.getItem('companion-ws-url')
+    || sessionStorage.getItem('companion-ws-url')
     || `wss://${location.hostname}:${location.port}/`;
-  const authToken = sessionStorage.getItem('companion-auth-token');
+  // Check localStorage first (persistent), fall back to sessionStorage (legacy/migration)
+  const authToken = localStorage.getItem('companion-auth-token')
+    || sessionStorage.getItem('companion-auth-token');
 
   // Connect WebSocket if we have a non-empty auth token
   if (authToken) {
