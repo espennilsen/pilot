@@ -16,6 +16,10 @@ import type {
 import { invoke } from '../lib/ipc-client';
 import { invokeAndReload } from '../lib/invoke-and-reload';
 
+// ─── Filter memoization (module-scoped to avoid set() during render) ─────
+let _taskFilterCache = '';
+let _taskResultCache: TaskItem[] = [];
+
 /** Task board view mode: kanban columns or table rows. */
 export type TaskViewMode = 'kanban' | 'table';
 
@@ -47,10 +51,6 @@ interface TaskStore {
   readyTasks: TaskItem[];
   blockedTasks: TaskItem[];
   epics: TaskItem[];
-
-  // Memoization
-  _lastTaskFilter: string;
-  _lastTaskResult: TaskItem[];
 
   // Actions
   loadBoard: (projectPath: string) => Promise<void>;
@@ -100,21 +100,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   readyTasks: [],
   blockedTasks: [],
   epics: [],
-  _lastTaskFilter: '',
-  _lastTaskResult: [],
-
   loadBoard: async (projectPath: string) => {
     set({ isLoading: true });
     try {
       const board = (await invoke(IPC.TASKS_LOAD_BOARD, projectPath)) as TaskBoardData;
+      _taskFilterCache = ''; // Invalidate memoization
+      _taskResultCache = [];
       set({
         tasks: board.tasks,
         readyTasks: board.readyTasks,
         blockedTasks: board.blockedTasks,
         epics: board.epics,
         isLoading: false,
-        _lastTaskFilter: '', // Invalidate cache
-        _lastTaskResult: [],
       });
     } catch (err) {
       console.warn('[TaskStore]', err);
@@ -186,12 +183,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   setEditingTask: (task) => set({ editingTask: task, showCreateDialog: !!task }),
 
   getFilteredTasks: () => {
-    const { tasks, filters, _lastTaskFilter, _lastTaskResult } = get();
+    const { tasks, filters } = get();
     
-    // Memoization: serialize filters and check if they've changed
-    const currentFilter = JSON.stringify(filters);
-    if (currentFilter === _lastTaskFilter) {
-      return _lastTaskResult;
+    // Memoization: serialize current filters and return cached result if unchanged.
+    // Cache is module-scoped (not in store state) to avoid set() during render,
+    // which would trigger "Cannot update a component while rendering another".
+    const currentFilter = JSON.stringify({ filters, len: tasks.length });
+    if (currentFilter === _taskFilterCache) {
+      return _taskResultCache;
     }
     
     const result = tasks.filter((task) => {
@@ -214,8 +213,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       return true;
     });
     
-    // Cache the result
-    set({ _lastTaskFilter: currentFilter, _lastTaskResult: result });
+    // Cache without triggering store subscribers
+    _taskFilterCache = currentFilter;
+    _taskResultCache = result;
     return result;
   },
 

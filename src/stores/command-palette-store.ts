@@ -3,6 +3,10 @@
  */
 import { create } from 'zustand';
 
+// ─── Filter memoization (module-scoped to avoid set() during render) ─────
+let _cmdFilterCache = '';
+let _cmdResultCache: CommandAction[] = [];
+
 /**
  * A single command action in the command palette.
  */
@@ -23,8 +27,7 @@ interface CommandPaletteStore {
   selectedIndex: number;
   commands: CommandAction[];
   recentCommandIds: string[]; // track last 5 used commands
-  _lastFilterQuery: string;
-  _lastFilterResult: CommandAction[];
+
 
   open: () => void;
   close: () => void;
@@ -81,9 +84,6 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
   selectedIndex: 0,
   commands: [],
   recentCommandIds: [],
-  _lastFilterQuery: '',
-  _lastFilterResult: [],
-
   open: () => set({ isOpen: true, searchQuery: '', selectedIndex: 0 }),
   
   close: () => set({ isOpen: false, searchQuery: '', selectedIndex: 0 }),
@@ -107,19 +107,19 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
       const existingIds = new Set(state.commands.map(c => c.id));
       const commandsToAdd = newCommands.filter(c => !existingIds.has(c.id));
       
+      _cmdFilterCache = ''; // Invalidate memoization
+      _cmdResultCache = [];
       return {
         commands: [...state.commands, ...commandsToAdd],
-        _lastFilterQuery: '', // Invalidate cache
-        _lastFilterResult: [],
       };
     });
   },
   
   unregisterCommands: (ids: string[]) => {
+    _cmdFilterCache = ''; // Invalidate memoization
+    _cmdResultCache = [];
     set(state => ({
       commands: state.commands.filter(c => !ids.includes(c.id)),
-      _lastFilterQuery: '', // Invalidate cache
-      _lastFilterResult: [],
     }));
   },
   
@@ -147,11 +147,13 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
   },
   
   getFilteredCommands: () => {
-    const { commands, searchQuery, recentCommandIds, _lastFilterQuery, _lastFilterResult } = get();
+    const { commands, searchQuery, recentCommandIds } = get();
     
-    // Memoization: return cached result if query hasn't changed
-    if (searchQuery === _lastFilterQuery) {
-      return _lastFilterResult;
+    // Memoization: module-scoped cache avoids set() during render which
+    // would trigger "Cannot update a component while rendering another".
+    const cacheKey = JSON.stringify({ q: searchQuery, n: commands.length, r: recentCommandIds });
+    if (cacheKey === _cmdFilterCache) {
+      return _cmdResultCache;
     }
     
     // Filter commands by search query
@@ -198,8 +200,9 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
       });
     }
     
-    // Cache the result
-    set({ _lastFilterQuery: searchQuery, _lastFilterResult: result });
+    // Cache without triggering store subscribers
+    _cmdFilterCache = cacheKey;
+    _cmdResultCache = result;
     return result;
   },
 }));
