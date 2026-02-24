@@ -1,231 +1,158 @@
 # Development Guide
 
-## Prerequisites
-- Node.js 20+ (recommended: use mise or nvm)
-- npm 10+
-- Git
-- macOS, Windows, or Linux
-- **Linux only:** `sudo apt install build-essential libx11-dev libxkbfile-dev` (for node-pty native compilation)
+> Last updated: 2026-02-24
 
-## Getting Started
+How to set up, run, and extend Pilot locally.
+
+## Prerequisites
+
+- **Node.js** 20+ (LTS recommended)
+- **npm** 10+
+- **macOS, Windows, or Linux** — all three are supported; code must run on all platforms
+
+## Setup
 
 ```bash
 git clone <repo-url>
-cd PiLot
+cd pilot
 npm install
+```
+
+On macOS, the `postinstall` script automatically runs `chmod +x` on the `node-pty` spawn-helper binary.
+
+## Running in Development
+
+```bash
 npm run dev
 ```
 
-`npm run dev` starts Electron with Vite HMR. DevTools open automatically.
+This:
+1. Builds the companion UI bundle with Vite (`vite.companion.mjs`)
+2. Starts `electron-vite dev` with HMR for both main and renderer
+3. Opens DevTools automatically
 
-## Available Scripts
+The app writes all config to `<PILOT_DIR>` (platform-dependent, see [CONFIGURATION.md](CONFIGURATION.md)). Delete that directory to reset to factory defaults.
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Development mode with HMR and DevTools |
-| `npm run build` | Production build to `out/` |
-| `npm run build:mac` | Package for macOS (.dmg + .zip, arm64 & x64) |
-| `npm run build:win` | Package for Windows (NSIS installer + portable + .zip) |
-| `npm run build:linux` | Package for Linux (AppImage + .deb + .tar.gz) |
-| `npm run preview` | Preview production build |
-
-## Project Structure
-
-Refer to [Architecture Overview](./architecture.md) for the full structure.
-
-## CI/CD
-
-Continuous integration builds are **only** triggered when version tags are pushed:
-
+**Trace mode** (for debugging unhandled rejections):
 ```bash
-git tag v0.x.x
-git push --tags
+npm run dev:trace
 ```
 
-- Tags must match the `v*` pattern (e.g., `v0.1.0`, `v1.2.3`)
-- No builds run on push to `main` or on pull requests
-- Tagged releases trigger multi-platform builds (macOS, Windows, Linux)
+## Building
+
+```bash
+npm run build          # Compile only (out/)
+npm run build:mac      # Build + package for macOS
+npm run build:win      # Build + package for Windows
+npm run build:linux    # Build + package for Linux
+```
+
+Packaged output goes to `release/`. CI builds only on tag push.
+
+## Linting
+
+```bash
+npm run lint
+```
+
+Uses ESLint with TypeScript rules. Zero warnings policy (`--max-warnings 0`).
+
+## Testing
+
+There are no automated tests yet. Manual testing via `npm run dev`. Future plans:
+- Unit tests for services (Vitest)
+- Integration tests for IPC flows
+- E2E tests (Playwright)
 
 ## Adding a New Feature
 
-### Adding a New IPC Domain
+### New IPC Domain
 
-Example: Adding a "notifications" domain.
+1. Add constants to `shared/ipc.ts`
+2. Add types to `shared/types.ts` (if new payload shapes are needed)
+3. Create `electron/services/<domain>.ts` for business logic
+4. Create `electron/ipc/<domain>.ts` and register handlers with `ipcMain.handle()`
+5. Register the service and IPC module in `electron/main/index.ts`
+6. Create `src/stores/<domain>-store.ts` with Zustand
+7. Create `src/components/<domain>/` for UI
+8. Add a hook in `src/hooks/use<Domain>.ts` if push-event listening is needed
 
-1. **Add channel constants** to `shared/ipc.ts`:
-```typescript
-// Notifications
-export const NOTIFICATIONS_LIST = 'notifications:list';
-export const NOTIFICATIONS_SEND = 'notifications:send';
-export const NOTIFICATIONS_DISMISS = 'notifications:dismiss';
-export const NOTIFICATIONS_NEW = 'notifications:new'; // push event
-```
+### New UI Component
 
-2. **Add types** to `shared/types.ts`:
-```typescript
-export interface Notification {
-  id: string;
-  title: string;
-  body: string;
-  type: 'info' | 'warning' | 'error';
-  timestamp: number;
-  read: boolean;
-}
-```
+- One folder per domain under `src/components/<domain>/`
+- State in a store, not component-local `useState` (unless truly ephemeral UI)
+- IPC calls belong in stores or hooks, not in JSX event handlers
+- Use `useEffect` with returned unsubscribe for `window.api.on()` listeners
 
-3. **Create IPC handler** `electron/ipc/notifications.ts`:
-```typescript
-import { ipcMain, BrowserWindow } from 'electron';
-import * as IPC from '../../shared/ipc';
-import { NotificationService } from '../services/notification-service';
-
-export function registerNotificationsIpc(service: NotificationService) {
-  ipcMain.handle(IPC.NOTIFICATIONS_LIST, async () => {
-    return service.list();
-  });
-
-  ipcMain.handle(IPC.NOTIFICATIONS_SEND, async (_event, notification) => {
-    const result = await service.send(notification);
-    // Push to all windows
-    BrowserWindow.getAllWindows().forEach(win =>
-      win.webContents.send(IPC.NOTIFICATIONS_NEW, result)
-    );
-    return result;
-  });
-}
-```
-
-4. **Create service** `electron/services/notification-service.ts` if business logic needed.
-
-5. **Register in main** `electron/main/index.ts`:
-```typescript
-import { registerNotificationsIpc } from './ipc/notifications';
-const notificationService = new NotificationService();
-registerNotificationsIpc(notificationService);
-```
-
-6. **Create Zustand store** `src/stores/notification-store.ts`:
-```typescript
-import { create } from 'zustand';
-import * as IPC from '../../shared/ipc';
-
-interface NotificationStore {
-  notifications: Notification[];
-  loadNotifications: () => Promise<void>;
-}
-
-export const useNotificationStore = create<NotificationStore>((set) => ({
-  notifications: [],
-  loadNotifications: async () => {
-    const notifications = await window.api.invoke(IPC.NOTIFICATIONS_LIST);
-    set({ notifications });
-  },
-}));
-```
-
-7. **Listen for push events** in a hook or component:
-```typescript
-useEffect(() => {
-  const unsubscribe = window.api.on(IPC.NOTIFICATIONS_NEW, (notification) => {
-    useNotificationStore.getState().addNotification(notification);
-  });
-  return unsubscribe;
-}, []);
-```
-
-### Adding a New UI Panel
-
-- Create a folder under `src/components/<domain>/`
-- State in a Zustand store, not component `useState` (unless ephemeral)
-- IPC calls in the store or a hook, never in JSX event handlers
-- Use `useEffect` cleanup for `window.api.on()` listeners
-
-### Extending the Agent Sandbox
+### Extending the Sandbox
 
 - Edit `electron/services/sandboxed-tools.ts` to intercept additional tool types
-- Add new diff operation type to `StagedDiff['operation']` in `shared/types.ts`
-- Handle the new operation in `applyDiff` in `electron/ipc/sandbox.ts`
+- Add new operation type to `StagedDiff['operation']` in `shared/types.ts`
+- Handle the new operation in `applyDiff()` in `electron/ipc/sandbox.ts`
 
-## Conventions
+### Adding a New Service
 
-### TypeScript
-- No `any` in new code — use SDK types or define interfaces in `shared/types.ts`
-- Static imports only — no dynamic `require()`
-- Types shared across process boundary in `shared/types.ts`; internal types stay local
-
-### IPC
-- All channel names from `shared/ipc.ts` — never raw strings
-- Payloads must be Structured Clone serializable: no functions, classes, DOM nodes
-- Main→renderer pushes use `BrowserWindow.getAllWindows()`
-
-### Zustand
-- Always return new objects/arrays from `set()` — never mutate `state.*` in place
-- Derive computed values in selectors, not components
-- Access stores outside React via `useStore.getState()`
-
-### Electron Security
-- `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false` — never change
-- Validate file paths against project root (jail pattern from `sandboxed-tools.ts`)
-- Use `execFile`/`spawn` with argument arrays, not `exec` with interpolated strings
-
-### Error Handling
-- IPC handlers that can fail should `throw` — Electron serializes to rejected promise
-- Catch at the call site in the renderer
-- Silent errors acceptable only for truly non-critical background tasks
-
-## Implementation Notes
-
-### File Tree
-- Uses the [`ignore`](https://www.npmjs.com/package/ignore) npm package for `.gitignore`-syntax pattern matching
-- Hidden files (dotfiles) are filtered using the same patterns as git
-
-### Sandboxed File Access
-- The preload exposes `webUtils.getPathForFile()` as `window.api.getFilePath()`
-- This allows the renderer to safely obtain file paths from drag-and-drop or file input events
-- File objects cannot cross the context bridge directly; use this API instead
-
-## Config & Data Paths
-
-The app config directory (`<PILOT_DIR>`) is platform-dependent:
-
-| Platform | Default location |
-|---|---|
-| macOS | `~/.config/.pilot/` |
-| Windows | `%APPDATA%\.pilot\` |
-| Linux | `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`) |
-
-| Path | Contents |
-|---|---|
-| `<PILOT_DIR>/auth.json` | API keys and OAuth tokens |
-| `<PILOT_DIR>/models.json` | Model registry cache |
-| `<PILOT_DIR>/app-settings.json` | App settings |
-| `<PILOT_DIR>/workspace.json` | Saved tab layout and UI state |
-| `<PILOT_DIR>/session-metadata.json` | Session pin/archive state |
-| `<PILOT_DIR>/sessions/` | Session .jsonl files |
-| `<PILOT_DIR>/extensions/` | Global extensions |
-| `<PILOT_DIR>/skills/` | Global skills |
-| `<PILOT_DIR>/MEMORY.md` | Global memory |
-| `<project>/.pilot/` | Project-level config |
-| `<project>/.pilot/settings.json` | Jail, yolo mode |
-| `<project>/.pilot/commands.json` | Dev command buttons |
-| `<project>/.pilot/MEMORY.md` | Project memory |
-| `<project>/.pilot/tasks.jsonl` | Project tasks |
-
-To reset all config, delete the `<PILOT_DIR>` directory.
+1. Create `electron/services/<name>.ts` — one class, focused responsibility
+2. Constructor takes injected dependencies
+3. Public methods for operations; emit events for async results
+4. Instantiate in `electron/main/index.ts` and inject into IPC handlers
 
 ## Debugging
 
-### DevTools
-- Opens automatically in dev mode
-- Renderer DevTools: Cmd+Shift+I
-- Main process logs in terminal where `npm run dev` runs
+### Main Process
 
-### Common Issues
+DevTools open automatically in `npm run dev`. The main process logs to the console.
 
-| Issue | Solution |
-|---|---|
-| White screen on launch | Check DevTools console for errors. Usually a missing import or type error. |
-| IPC handler not found | Verify channel constant matches in shared/ipc.ts, handler is registered in main/index.ts |
-| Store not updating | Check that `set()` returns new objects (immutability). Check selector in component. |
-| File operations failing | Check jail settings. Verify path resolves within project root. |
-| Memory not injecting | Verify MemoryManager instance is shared (known bug: two instances). |
+Enable verbose logging:
+```json
+// <PILOT_DIR>/app-settings.json
+{
+  "logging": { "level": "debug" }
+}
+```
+
+### Renderer
+
+Use the Electron DevTools (auto-opened in dev mode). React DevTools can be installed as a Chrome extension.
+
+### IPC Tracing
+
+Enable `developerMode` in settings to unlock additional debug panels. Use `npm run dev:trace` for Node.js warning traces.
+
+### Resetting State
+
+```bash
+rm -rf ~/.config/.pilot   # macOS/Linux
+rmdir /s %APPDATA%\.pilot  # Windows
+```
+
+## Project Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `electron-vite.config.mjs` | electron-vite build config (main, preload, renderer) |
+| `vite.companion.mjs` | Companion UI bundle build config |
+| `electron-builder.yml` | Electron Builder packaging config (icons, targets, notarization) |
+| `tsconfig.json` | Root TypeScript config |
+| `tsconfig.node.json` | Main process TypeScript config |
+| `tsconfig.web.json` | Renderer TypeScript config |
+
+## Key Conventions Checklist
+
+Before submitting a change:
+
+- [ ] No `any` types in new code
+- [ ] All IPC channels use constants from `shared/ipc.ts`
+- [ ] No IPC calls inside JSX event handlers (use store actions)
+- [ ] `window.api.on()` listeners return unsubscribe in `useEffect` cleanup
+- [ ] `BrowserWindow.getAllWindows().forEach()` for push events (not `[0]`)
+- [ ] File paths validated against project root before FS operations
+- [ ] `execFile`/`spawn` with argument arrays (no `exec` with interpolated strings)
+- [ ] `path.join()` used (no hardcoded `/` or `\\`)
+- [ ] Works on Windows, macOS, and Linux
+- [ ] Companion impact considered (new push channels auto-forwarded; new invoke channels may need REST/WS exposure)
+- [ ] Docs updated if architecture changed
+
+## Changes Log
+
+- 2026-02-24: Initial documentation generated

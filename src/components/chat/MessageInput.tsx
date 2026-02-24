@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent, DragEvent, ClipboardEvent } from 'react';
-import { createPortal } from 'react-dom';
-import { Plus, ArrowUp, Square, ChevronDown, Search, Check, Zap, Clock } from 'lucide-react';
+import { Plus, ArrowUp, Square, ChevronDown, Zap, Clock } from 'lucide-react';
 import { useChatStore } from '../../stores/chat-store';
 import { useTabStore } from '../../stores/tab-store';
 import { IPC } from '../../../shared/ipc';
@@ -11,19 +10,10 @@ import { PromptLibraryButton } from '../prompts/PromptLibraryButton';
 import PromptPicker from '../prompts/PromptPicker';
 import { PromptFillDialog } from '../prompts/PromptFillDialog';
 import PromptEditor from '../prompts/PromptEditor';
+import { ModelPicker } from './ModelPicker';
+import type { ImageAttachment } from './message-input-helpers';
+import { SUPPORTED_IMAGE_TYPES, isSupportedImage } from './message-input-helpers';
 import type { PromptTemplate } from '../../../shared/types';
-
-interface ModelInfo {
-  provider: string;
-  id: string;
-  name: string;
-}
-
-interface ImageAttachment {
-  path: string;       // absolute path on disk
-  name: string;       // original filename
-  previewUrl: string; // blob: URL for thumbnail
-}
 
 interface MessageInputProps {
   onSend: (text: string) => void;
@@ -461,6 +451,13 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
       }
     }
 
+    // Escape = stop agent when streaming
+    if (e.key === 'Escape' && isStreaming && !slashMenuVisible && !mentionVisible) {
+      e.preventDefault();
+      onAbort();
+      return;
+    }
+
     if (e.key === 'Tab' && e.shiftKey) {
       e.preventDefault();
       onCycleThinking();
@@ -536,12 +533,6 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
       }
     }
   };
-
-  const SUPPORTED_IMAGE_TYPES = new Set([
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  ]);
-
-  const isSupportedImage = (file: File) => SUPPORTED_IMAGE_TYPES.has(file.type);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -834,7 +825,7 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
                   </button>
                 )}
                 {/* Steer button (Enter) */}
-                {input.trim() ? (
+                {input.trim() && (
                   <button
                     onClick={handleSend}
                     className="h-7 px-2 rounded-lg bg-amber-600 text-white flex items-center gap-1 justify-center hover:bg-amber-500 transition-all flex-shrink-0 text-[10px] font-medium"
@@ -842,15 +833,15 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
                   >
                     <Zap className="w-3 h-3" />
                   </button>
-                ) : (
-                  <button
-                    onClick={onAbort}
-                    className="h-7 w-7 rounded-lg bg-error text-white flex items-center justify-center hover:bg-error/80 transition-all flex-shrink-0"
-                    title="Stop"
-                  >
-                    <Square className="w-3 h-3 fill-current" />
-                  </button>
                 )}
+                {/* Stop button (Esc) — always visible when streaming */}
+                <button
+                  onClick={onAbort}
+                  className="h-7 w-7 rounded-lg bg-error text-white flex items-center justify-center hover:bg-error/80 transition-all flex-shrink-0"
+                  title="Stop (Esc)"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                </button>
               </div>
             ) : (
               <button
@@ -869,166 +860,4 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
   );
 }
 
-// ─── Model Picker ────────────────────────────────────────────────────────
 
-function ModelPicker({
-  currentModel,
-  currentModelInfo,
-  onSelect,
-  onClose,
-  anchorRef,
-}: {
-  currentModel: string | undefined;
-  currentModelInfo: { provider: string; id: string } | undefined;
-  onSelect: (provider: string, modelId: string) => void;
-  onClose: () => void;
-  anchorRef: React.RefObject<HTMLButtonElement | null>;
-}) {
-  const [filter, setFilter] = useState('');
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const filterRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [highlightIndex, setHighlightIndex] = useState(0);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  // Position relative to anchor button
-  useEffect(() => {
-    if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.top,
-      left: rect.right - 288, // 288 = w-72 (18rem)
-    });
-  }, [anchorRef]);
-
-  // Fetch available models
-  useEffect(() => {
-    invoke(IPC.MODEL_GET_AVAILABLE).then((result: any) => {
-      setModels(result as ModelInfo[]);
-      setLoading(false);
-    });
-  }, []);
-
-  // Focus filter input on open
-  useEffect(() => {
-    filterRef.current?.focus();
-  }, []);
-
-  // Close on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current && !containerRef.current.contains(e.target as Node) &&
-        anchorRef.current && !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose, anchorRef]);
-
-  const filtered = models.filter((m) => {
-    if (!filter) return true;
-    const q = filter.toLowerCase();
-    return (
-      m.name.toLowerCase().includes(q) ||
-      m.id.toLowerCase().includes(q) ||
-      m.provider.toLowerCase().includes(q)
-    );
-  });
-
-  // Group by provider
-  const grouped = filtered.reduce<Record<string, ModelInfo[]>>((acc, m) => {
-    (acc[m.provider] ??= []).push(m);
-    return acc;
-  }, {});
-
-  // Flat list for keyboard nav
-  const flatList = Object.values(grouped).flat();
-
-  // Reset highlight when filter changes
-  useEffect(() => {
-    setHighlightIndex(0);
-  }, [filter]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.min(i + 1, flatList.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const m = flatList[highlightIndex];
-      if (m) onSelect(m.provider, m.id);
-    } else if (e.key === 'Escape') {
-      onClose();
-    }
-  };
-
-  if (!pos) return null;
-
-  return createPortal(
-    <div
-      ref={containerRef}
-      onKeyDown={handleKeyDown}
-      style={{ position: 'fixed', bottom: `${window.innerHeight - pos.top + 8}px`, left: `${pos.left}px` }}
-      className="w-72 bg-bg-elevated border border-border rounded-lg shadow-2xl overflow-hidden z-[9999]"
-    >
-      {/* Search */}
-      <div className="p-2 border-b border-border">
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-bg-surface rounded-md border border-border focus-within:border-accent/50">
-          <Search className="w-3.5 h-3.5 text-text-secondary flex-shrink-0" />
-          <input
-            ref={filterRef}
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search models…"
-            className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-secondary/40 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Model list */}
-      <div className="max-h-64 overflow-y-auto py-1">
-        {loading ? (
-          <div className="px-3 py-4 text-xs text-text-secondary text-center">Loading models…</div>
-        ) : flatList.length === 0 ? (
-          <div className="px-3 py-4 text-xs text-text-secondary text-center">No models found</div>
-        ) : (
-          Object.entries(grouped).map(([provider, providerModels]) => (
-            <div key={provider}>
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider">
-                {provider}
-              </div>
-              {providerModels.map((m) => {
-                const flatIdx = flatList.indexOf(m);
-                const isActive = (currentModelInfo && currentModelInfo.provider === m.provider && currentModelInfo.id === m.id)
-                  || currentModel === m.name || currentModel === m.id;
-                const isHighlighted = flatIdx === highlightIndex;
-                return (
-                  <button
-                    key={`${m.provider}/${m.id}`}
-                    onClick={() => onSelect(m.provider, m.id)}
-                    onMouseEnter={() => setHighlightIndex(flatIdx)}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                      isHighlighted ? 'bg-accent/15 text-text-primary' : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    <span className="flex-1 truncate font-mono">{m.name || m.id}</span>
-                    {isActive && <Check className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))
-        )}
-      </div>
-    </div>,
-    document.body
-  );
-}

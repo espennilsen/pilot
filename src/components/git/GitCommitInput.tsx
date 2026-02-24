@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGitStore } from '../../stores/git-store';
+import { useProjectStore } from '../../stores/project-store';
 import { modKey } from '../../lib/keybindings';
 import { Button } from '../shared/Button';
+import { invoke } from '../../lib/ipc-client';
+import { IPC } from '../../../shared/ipc';
+import { Sparkles } from 'lucide-react';
+
+const GENERATE_TIMEOUT_S = 60;
 
 const CONVENTIONAL_PREFIXES = [
   { label: 'feat:', desc: 'New feature' },
@@ -18,6 +24,26 @@ export default function GitCommitInput() {
   const [message, setMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const projectPath = useProjectStore(s => s.projectPath);
+
+  // Countdown timer — ticks every second while generating
+  useEffect(() => {
+    if (isGenerating && countdown > 0) {
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+    }
+  }, [isGenerating, countdown > 0]);
 
   const hasStagedFiles = status && status.staged.length > 0;
   const canCommit = hasStagedFiles && message.trim().length > 0 && !isCommitting && !isPushing;
@@ -65,6 +91,29 @@ export default function GitCommitInput() {
     }
   };
 
+  const handleGenerateMessage = async () => {
+    if (!hasStagedFiles || isGenerating) return;
+    setIsGenerating(true);
+    setCountdown(GENERATE_TIMEOUT_S);
+    try {
+      // Get the staged diff
+      const diff = await invoke(IPC.GIT_DIFF, '--cached', undefined, projectPath) as string;
+      if (!diff || !diff.trim()) {
+        console.warn('No staged diff to generate commit message from');
+        return;
+      }
+      const generated = await invoke(IPC.GIT_GENERATE_COMMIT_MSG, diff) as string;
+      if (generated) {
+        setMessage(generated);
+      }
+    } catch (error) {
+      console.error('Failed to generate commit message:', error);
+    } finally {
+      setIsGenerating(false);
+      setCountdown(0);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -94,15 +143,28 @@ export default function GitCommitInput() {
         </div>
 
         {/* Commit message textarea */}
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={`Commit message... (${modKey()}Enter to commit)`}
-          className="w-full bg-bg-elevated border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent resize-none"
-          style={{ minHeight: '60px' }}
-          disabled={!hasStagedFiles || isCommitting || isPushing}
-        />
+        <div className="relative">
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={`Commit message... (${modKey()}Enter to commit)`}
+            className="w-full bg-bg-elevated border border-border rounded-md px-3 py-2 pr-9 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent resize-none"
+            style={{ minHeight: '60px' }}
+            disabled={!hasStagedFiles || isCommitting || isPushing}
+          />
+          <button
+            onClick={handleGenerateMessage}
+            disabled={!hasStagedFiles || isGenerating || isCommitting || isPushing}
+            className={`absolute top-2 right-2 p-1 rounded text-text-secondary hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isGenerating ? 'animate-pulse text-accent' : ''}`}
+            title="Generate commit message with AI"
+          >
+            {isGenerating && countdown > 0
+              ? <span className="text-[10px] font-mono leading-4 w-4 text-center inline-block">{countdown}</span>
+              : <Sparkles className="w-4 h-4" />
+            }
+          </button>
+        </div>
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">

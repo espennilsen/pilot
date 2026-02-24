@@ -45,9 +45,10 @@ export default function GitStatus() {
       {/* Staged Changes */}
       {status.staged.length > 0 && (
         <div className="border border-border rounded-md overflow-hidden">
-          <button
+          <div
             onClick={() => setStagedExpanded(!stagedExpanded)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-success/10 hover:bg-success/20 transition-colors text-sm font-medium"
+            className="w-full flex items-center justify-between px-3 py-2 bg-success/10 hover:bg-success/20 transition-colors text-sm font-medium cursor-pointer select-none"
+            role="button"
           >
             <div className="flex items-center gap-2">
               {stagedExpanded ? (
@@ -69,7 +70,7 @@ export default function GitStatus() {
                 Unstage All
               </button>
             )}
-          </button>
+          </div>
           {stagedExpanded && (
             <div className="bg-bg-base">
               {status.staged.map((file) => (
@@ -100,9 +101,10 @@ export default function GitStatus() {
       {/* Unstaged Changes */}
       {status.unstaged.length > 0 && (
         <div className="border border-border rounded-md overflow-hidden">
-          <button
+          <div
             onClick={() => setChangesExpanded(!changesExpanded)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-warning/10 hover:bg-warning/20 transition-colors text-sm font-medium"
+            className="w-full flex items-center justify-between px-3 py-2 bg-warning/10 hover:bg-warning/20 transition-colors text-sm font-medium cursor-pointer select-none"
+            role="button"
           >
             <div className="flex items-center gap-2">
               {changesExpanded ? (
@@ -124,7 +126,7 @@ export default function GitStatus() {
                 Stage All
               </button>
             )}
-          </button>
+          </div>
           {changesExpanded && (
             <div className="bg-bg-base">
               {status.unstaged.map((file) => (
@@ -155,9 +157,10 @@ export default function GitStatus() {
       {/* Untracked Files */}
       {status.untracked.length > 0 && (
         <div className="border border-border rounded-md overflow-hidden">
-          <button
+          <div
             onClick={() => setUntrackedExpanded(!untrackedExpanded)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-bg-surface hover:bg-bg-elevated transition-colors text-sm font-medium"
+            className="w-full flex items-center justify-between px-3 py-2 bg-bg-surface hover:bg-bg-elevated transition-colors text-sm font-medium cursor-pointer select-none"
+            role="button"
           >
             <div className="flex items-center gap-2">
               {untrackedExpanded ? (
@@ -179,7 +182,7 @@ export default function GitStatus() {
                 Stage All
               </button>
             )}
-          </button>
+          </div>
           {untrackedExpanded && (
             <div className="bg-bg-base">
               {status.untracked.map((path) => (

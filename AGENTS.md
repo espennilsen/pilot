@@ -4,6 +4,19 @@ Quick orientation for AI coding agents working on this codebase.
 
 ---
 
+## Read the Docs First
+
+Before searching files manually, read **[docs/INDEX.md](docs/INDEX.md)**. It links to structured documentation covering architecture, data models, IPC reference, configuration, patterns, and glossary. Use those docs to answer "where does X live?" before reaching for grep or find.
+
+Recommended reading order:
+1. [docs/OVERVIEW.md](docs/OVERVIEW.md) — what the project is
+2. [docs/STRUCTURE.md](docs/STRUCTURE.md) — where things live
+3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how components connect
+4. [docs/GLOSSARY.md](docs/GLOSSARY.md) — domain terminology
+5. [docs/PATTERNS.md](docs/PATTERNS.md) — conventions to follow
+
+---
+
 ## What This Project Is
 
 Pilot is an **Electron 40 + React 19 + TypeScript** desktop app that wraps the `@mariozechner/pi-coding-agent` SDK in a GUI shell. Users chat with an AI agent, review diffs before they touch disk, manage git, and run dev commands — all from one keyboard-driven app.
@@ -31,19 +44,7 @@ src/
   hooks/                 # useAgentSession, useSandboxEvents, useWorkspacePersistence, …
   lib/                   # ipc-client.ts, keybindings.ts, markdown.tsx, utils.ts, …
 docs/
-  README.md              # Documentation index — links to all docs
-  PRD.md                 # Full product requirements and SDK integration details
-  architecture.md        # High-level architecture overview
-  ipc-reference.md       # Complete IPC channel reference
-  services.md            # Main process services reference
-  stores-and-hooks.md    # Renderer stores and hooks reference
-  development.md         # Developer setup, conventions, debugging
-  settings.md            # Settings layers, schemas, IPC reference
-  memory.md              # Memory system deep-dive
-  companion-api.md       # Companion client API spec
-  companion-implementation.md  # Companion desktop implementation spec
-  code-review.md         # Code review — known bugs, issues, action plan
-  user/                  # User-facing guides (12 files)
+  INDEX.md               # Documentation index — start here
 ```
 
 ---
@@ -154,11 +155,10 @@ All code changes **must** work on Windows, macOS, and Linux. This is a hard requ
 Pilot supports a **companion client** (mobile/web) that connects over WebSocket and mirrors the desktop UI. Every user-facing feature must consider companion impact.
 
 - **IPC events forwarded to companion:** All `main → renderer` push events are also forwarded via `companionBridge.forwardEvent(channel, data)` in `PilotSessionManager.sendToRenderer()`. If you add a new push channel, it will automatically reach companion clients.
-- **New IPC invoke channels:** If you add a new `ipcMain.handle()` that the companion should also be able to call, expose it through the companion REST/WebSocket API (see `docs/companion-api.md` and `docs/companion-implementation.md`).
+- **New IPC invoke channels:** If you add a new `ipcMain.handle()` that the companion should also be able to call, expose it through the companion REST/WebSocket API.
 - **UI-only state:** State that only exists in the renderer (Zustand stores) is **not** synced to companion by default. If companion needs it, add an IPC push event.
 - **Serialisation:** Companion payloads must be JSON-serialisable — same Structured Clone constraint as IPC. No functions, class instances, or DOM nodes.
 - **Testing companion impact:** When changing agent events, sandbox flow, session management, or any streamed data — verify the companion WebSocket protocol still works. Companion clients rely on the same event shapes.
-- **Docs:** `docs/companion-api.md` is the companion protocol spec. `docs/companion-implementation.md` covers the desktop-side implementation. Keep both in sync with code changes.
 
 ### TypeScript
 - **No `any`** in new code — use SDK types or define proper interfaces in `shared/types.ts`.
@@ -183,7 +183,7 @@ Pilot supports a **companion client** (mobile/web) that connects over WebSocket 
 ### File Operations
 - All agent-initiated file writes go through `SandboxedTools` → `StagedDiffManager`. Do not write files directly from IPC handlers on behalf of the agent.
 - Project settings live in `<project>/.pilot/` — create the directory if missing before writing.
-- App-level settings live in the platform config directory (see below) — use helpers from `services/pilot-paths.ts` and `services/app-settings.ts`.
+- App-level settings live in the platform config directory — use helpers from `services/pilot-paths.ts` and `services/app-settings.ts`.
 
 ### Git
 - **Always ask for confirmation** before running `git commit` or `git push`. Show the proposed commit message and list of changed files, then wait for explicit human approval before proceeding.
@@ -257,23 +257,4 @@ npm run build      # Production build → out/
 npm run preview    # Preview production build
 ```
 
-The app writes all config to `<PILOT_DIR>` (see [Important File Paths](#important-file-paths-runtime)) — safe to delete that directory to reset to factory defaults.
-
----
-
-## Further Reading
-
-| Document | What's in it |
-|---|---|
-| `docs/README.md` | Documentation index — links to all docs |
-| `docs/PRD.md` | Full product requirements, SDK integration patterns, data models |
-| `docs/architecture.md` | High-level architecture — process model, data flow, tech stack, key decisions |
-| `docs/ipc-reference.md` | Complete IPC channel reference — every channel, direction, args, returns |
-| `docs/services.md` | Main process services — all service classes, methods, responsibilities |
-| `docs/stores-and-hooks.md` | Renderer state — all Zustand stores and React hooks with full API |
-| `docs/settings.md` | Settings layers, storage locations, schemas, IPC reference |
-| `docs/memory.md` | Memory system architecture, file formats, extraction flow |
-| `docs/development.md` | Setup, scripts, adding features, conventions, debugging |
-| `docs/companion.md` | Companion client API — protocol, WebSocket messages, REST endpoints |
-| `docs/code-review.md` | Full code review — bugs, issues, security observations, action plan |
-| `docs/user/` | User-facing guides — sessions, agent, memory, tasks, settings, companion |
+The app writes all config to `<PILOT_DIR>` — safe to delete that directory to reset to factory defaults.

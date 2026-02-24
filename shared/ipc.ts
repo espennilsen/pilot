@@ -104,6 +104,7 @@ export const IPC = {
   GIT_PUSH: 'git:push',
   GIT_PULL: 'git:pull',
   GIT_DIFF: 'git:diff',
+  GIT_GENERATE_COMMIT_MSG: 'git:generate-commit-msg',
   GIT_LOG: 'git:log',
   GIT_BLAME: 'git:blame',
   GIT_STASH_LIST: 'git:stash-list',

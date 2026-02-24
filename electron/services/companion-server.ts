@@ -1,69 +1,19 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express } from 'express';
 import { createServer as createHttpsServer, Server as HTTPSServer } from 'https';
 import { createServer as createHttpServer, Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { join, extname, resolve, normalize } from 'path';
-import { existsSync } from 'fs';
-
-/** Default port for the companion HTTPS + WebSocket server */
-export const DEFAULT_COMPANION_PORT = 18088;
-
-/**
- * Minimal interface for the CompanionIPCBridge
- * The actual implementation will be in companion-ipc-bridge.ts
- */
-interface CompanionIPCBridge {
-  attachClient(ws: WebSocket, clientId: string): void;
-  detachClient(clientId: string): void;
-  forwardEvent(channel: string, payload: unknown): void;
-}
-
-/**
- * Minimal interface for the CompanionAuth service
- * The actual implementation will be in companion-auth.ts
- */
-interface CompanionAuth {
-  validateToken(token: string): Promise<{ sessionId: string; deviceName: string } | null>;
-}
-
-/**
- * Configuration for the CompanionServer
- */
-interface CompanionServerConfig {
-  /** Port to listen on (default: DEFAULT_COMPANION_PORT) */
-  port?: number;
-  /** Path to the built React renderer bundle */
-  reactBundlePath?: string;
-  /** Protocol to use. Default: 'https' */
-  protocol?: 'http' | 'https';
-  /** TLS certificate buffer (required for https) */
-  tlsCert?: Buffer;
-  /** TLS private key buffer (required for https) */
-  tlsKey?: Buffer;
-  /** IPC bridge for forwarding events to WebSocket clients */
-  ipcBridge: CompanionIPCBridge;
-  /** Auth service for validating tokens */
-  auth: CompanionAuth;
-}
-
-/**
- * WebSocket message types
- */
-interface WSAuthMessage {
-  type: 'auth';
-  token: string;
-}
-
-interface WSAuthOkMessage {
-  type: 'auth_ok';
-}
-
-interface WSAuthErrorMessage {
-  type: 'auth_error';
-  reason: string;
-}
-
-type WSMessage = WSAuthMessage | WSAuthOkMessage | WSAuthErrorMessage;
+import { join } from 'path';
+import {
+  DEFAULT_COMPANION_PORT,
+  CompanionIPCBridge,
+  CompanionAuth,
+  CompanionServerConfig,
+  WSAuthMessage,
+  WSAuthOkMessage,
+  WSAuthErrorMessage,
+  WSMessage,
+} from './companion-server-types';
+import { setupCompanionRoutes } from './companion-routes';
 
 /**
  * CompanionServer - HTTP + WebSocket server for Pilot Companion
@@ -106,139 +56,7 @@ export class CompanionServer {
     };
 
     this.app = express();
-    this.setupRoutes();
-  }
-
-  /**
-   * Set up Express routes
-   */
-  private setupRoutes(): void {
-    // CORS headers - restrict to same-origin; companion clients connect via WebSocket, not CORS
-    this.app.use((_req: Request, res: Response, next: NextFunction) => {
-      res.setHeader('Access-Control-Allow-Origin', 'null');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      if (_req.method === 'OPTIONS') { res.status(204).end(); return; }
-      next();
-    });
-
-    // JSON middleware for API routes
-    this.app.use(express.json());
-
-    // Companion mode detection endpoint
-    // The renderer checks this to know it's running in companion mode
-    this.app.get('/api/companion-mode', (_req: Request, res: Response) => {
-      res.json({ companion: true });
-    });
-
-    // Companion WebSocket connection info
-    // Returns the WebSocket connection details for the companion client
-    this.app.get('/api/companion-config', (_req: Request, res: Response) => {
-      res.json({
-        wsPort: this.config.port,
-        wsPath: '/',
-        secure: this.config.protocol === 'https',
-        tokenRequired: true,
-      });
-    });
-
-    // Serve attachment files (images saved by the renderer)
-    // Validates the path is inside a .pilot/attachments directory.
-    this.app.get('/api/attachments', (req: Request, res: Response) => {
-      const filePath = req.query.path as string | undefined;
-      if (!filePath) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
-
-      // Canonicalize and normalize the path
-      const normalizedPath = normalize(resolve(filePath));
-
-      // Reject paths containing .. segments after normalization
-      if (normalizedPath.includes('..')) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
-
-      // Verify path contains /.pilot/attachments/ as a real directory component
-      const attachmentsPattern = /[\/\\]\.pilot[\/\\]attachments[\/\\]/;
-      if (!attachmentsPattern.test(normalizedPath)) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
-
-      // Only allow image extensions
-      const ext = extname(normalizedPath).toLowerCase();
-      const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-      if (!allowedExtensions.includes(ext)) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
-
-      // Verify file exists
-      if (!existsSync(normalizedPath)) {
-        res.status(404).json({ error: 'Not found' });
-        return;
-      }
-
-      // Serve the file with proper content type
-      const mimeTypes: Record<string, string> = {
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-      };
-      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-      res.sendFile(normalizedPath);
-    });
-
-    // Serve static files from the React bundle directory
-    const staticPath = this.config.reactBundlePath;
-    this.app.use(express.static(staticPath));
-
-    // Pairing endpoint — mobile app submits PIN/QR token here to get a session token
-    this.app.post('/api/companion-pair', async (req: Request, res: Response) => {
-      const { credential, deviceName } = req.body || {};
-      if (!credential || !deviceName) {
-        res.status(400).json({ error: 'Missing credential or deviceName' });
-        return;
-      }
-      try {
-        const token = await (this.config.auth as any).pair(credential, deviceName);
-        if (!token) {
-          res.status(401).json({ error: 'Invalid or expired credential' });
-          return;
-        }
-        // Return token + WS URL so the client can connect
-        const wsProto = this.config.protocol === 'https' ? 'wss' : 'ws';
-        res.json({ token, wsUrl: `${wsProto}://${req.hostname}:${this.config.port}/` });
-      } catch (err) {
-        res.status(500).json({ error: String(err) });
-      }
-    });
-
-    // SPA fallback - all other routes return index.html
-    // Injects companion connection params into the HTML as a <script> tag
-    // so the WebSocket IPC client can bootstrap without manual configuration.
-    this.app.get('/{*path}', (req: Request, res: Response, next: NextFunction) => {
-      // Skip API routes
-      if (req.path.startsWith('/api/')) {
-        return next();
-      }
-
-      const indexPath = join(staticPath, 'index.html');
-      
-      if (!existsSync(indexPath)) {
-        res.status(404).send('Renderer bundle not found. Build the app first.');
-        return;
-      }
-
-      // Serve the HTML as-is. The renderer's initCompanionPolyfill() detects
-      // companion mode (no window.api from preload) and derives the WS URL
-      // from location.hostname:port. No inline script injection needed.
-      res.sendFile(indexPath);
-    });
+    setupCompanionRoutes(this.app, this.config);
   }
 
   /**

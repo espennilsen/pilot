@@ -48,6 +48,7 @@ export const DEFAULT_KEYBINDINGS: KeybindingDef[] = [
   { id: 'open-memory',          label: 'Open Memory Panel',    defaultCombo: 'meta+shift+m',       category: 'General',   displaySymbol: shortcutLabel('M', true) },
   { id: 'open-prompts',         label: 'Prompt Library',       defaultCombo: 'meta+/',             category: 'General',   displaySymbol: shortcutLabel('/') },
   { id: 'open-tasks',           label: 'Open Task Board',      defaultCombo: 'meta+shift+t',       category: 'General',   displaySymbol: shortcutLabel('T', true) },
+  { id: 'stop-agent',           label: 'Stop Agent',           defaultCombo: 'escape',             category: 'General',   displaySymbol: 'Esc' },
 ];
 
 /** Parse "meta+shift+b" → { key: 'b', modifiers: ['meta', 'shift'] } */

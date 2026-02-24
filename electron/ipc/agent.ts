@@ -292,4 +292,9 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
       sessionPath: sessionManager.getSessionPath(tabId) || null,
     };
   });
+
+  // Generate a commit message from a git diff (one-shot LLM call, no session)
+  ipcMain.handle(IPC.GIT_GENERATE_COMMIT_MSG, async (_event, diff: string) => {
+    return sessionManager.generateCommitMessage(diff);
+  });
 }

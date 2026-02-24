@@ -9,12 +9,18 @@
 import fs from 'fs/promises';
 import { existsSync, readFileSync, mkdirSync } from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import matter from 'gray-matter';
 import chokidar from 'chokidar';
 import { PILOT_PROMPTS_DIR } from './pilot-paths';
 import { CommandRegistry } from './command-registry';
 import { getLogger } from './logger';
+import {
+  COMMAND_REGEX,
+  parsePromptFile,
+  computeHash,
+  slugify,
+  type ParsedPromptFile,
+} from './prompt-parser';
 
 const log = getLogger('PromptLibrary');
 import type {
@@ -25,33 +31,9 @@ import type {
   PromptUpdateInput,
 } from '../../shared/types';
 
-// ─── Constants ────────────────────────────────────────────────────────────
-
-const MULTILINE_VARIABLE_NAMES = new Set([
-  'code', 'diff', 'description', 'context', 'error', 'test_output', 'changes',
-]);
-
-const FILE_VARIABLE_NAMES = new Set([
-  'file', 'files', 'path', 'paths', 'filepath', 'file_path', 'file_paths',
-  'folder', 'directory', 'dir', 'target', 'source', 'input_file', 'output_file',
-]);
-
-const VALID_CATEGORIES = new Set([
-  'Code', 'Writing', 'Debug', 'Refactor', 'Explain', 'Custom',
-]);
-
-const COMMAND_REGEX = /^[a-z][a-z0-9-]{1,19}$/;
-const VARIABLE_REGEX = /\{\{(\w+)\}\}/g;
-
 // ─── Types ────────────────────────────────────────────────────────────────
 
 type ChangeCallback = () => void;
-
-interface ParsedPromptFile {
-  id: string;
-  filePath: string;
-  template: PromptTemplate;
-}
 
 // ─── PromptLibrary ────────────────────────────────────────────────────────
 
@@ -182,7 +164,7 @@ export class PromptLibrary {
       try {
         const filePath = path.join(dir, filename);
         const raw = await fs.readFile(filePath, 'utf-8');
-        const parsed = this.parsePromptFile(filename, filePath, raw, layer);
+        const parsed = parsePromptFile(filename, filePath, raw, layer);
         if (parsed) results.push(parsed);
       } catch {
         /* Expected: individual prompt file may be malformed */
@@ -192,101 +174,7 @@ export class PromptLibrary {
     return results;
   }
 
-  /**
-   * Parse a single .md file into a PromptTemplate.
-   */
-  private parsePromptFile(
-    filename: string,
-    filePath: string,
-    raw: string,
-    layer: 'global' | 'project'
-  ): ParsedPromptFile | null {
-    const { data: fm, content } = matter(raw);
-    const id = filename.replace(/\.md$/, '');
-    const body = content.trim();
 
-    if (!body) return null;
-
-    // Determine source
-    let source: PromptTemplate['source'];
-    if (layer === 'project') {
-      source = 'project';
-    } else {
-      source = fm.source === 'builtin' ? 'builtin' : 'user';
-    }
-
-    // Extract variables from content
-    const variables = this.extractVariables(body, fm.variables);
-
-    // File stats for timestamps
-    const now = new Date().toISOString();
-
-    const template: PromptTemplate = {
-      id,
-      title: fm.title || id,
-      description: fm.description || '',
-      content: body,
-      category: VALID_CATEGORIES.has(fm.category) ? fm.category : 'Custom',
-      icon: fm.icon || '📝',
-      command: fm.command && typeof fm.command === 'string' ? fm.command : null,
-      commandConflict: null, // computed after all prompts are loaded
-      variables,
-      source,
-      hidden: fm.hidden === true,
-      createdAt: fm.createdAt || now,
-      updatedAt: fm.updatedAt || now,
-    };
-
-    return { id, filePath, template };
-  }
-
-  /**
-   * Extract variables from {{...}} patterns in content.
-   * Merge with frontmatter overrides if present.
-   */
-  private extractVariables(
-    content: string,
-    fmVariables?: Record<string, any>
-  ): PromptVariable[] {
-    const seen = new Set<string>();
-    const variables: PromptVariable[] = [];
-    let match: RegExpExecArray | null;
-
-    // Reset regex state
-    VARIABLE_REGEX.lastIndex = 0;
-    while ((match = VARIABLE_REGEX.exec(content)) !== null) {
-      const name = match[1];
-      if (seen.has(name)) continue;
-      seen.add(name);
-
-      // Check for frontmatter override
-      const override = fmVariables?.[name];
-
-      let type: PromptVariable['type'] = FILE_VARIABLE_NAMES.has(name) ? 'file'
-        : MULTILINE_VARIABLE_NAMES.has(name) ? 'multiline' : 'text';
-      let options: string[] | undefined;
-      let defaultValue: string | undefined;
-      let placeholder = name.replace(/_/g, ' ');
-      let required = true;
-
-      if (override && typeof override === 'object') {
-        if (override.type === 'select' || override.type === 'multiline' || override.type === 'text' || override.type === 'file') {
-          type = override.type;
-        }
-        if (Array.isArray(override.options)) {
-          options = override.options;
-          type = 'select';
-        }
-        if (override.default != null) defaultValue = String(override.default);
-        if (override.placeholder) placeholder = override.placeholder;
-        if (override.required === false) required = false;
-      }
-
-      variables.push({ name, placeholder, type, options, required, defaultValue });
-    }
-
-    return variables;
-  }
 
   // ── Conflict Detection ──────────────────────────────────────────────
 
@@ -464,7 +352,7 @@ export class PromptLibrary {
     await fs.mkdir(dir, { recursive: true });
 
     // Generate filename
-    const baseSlug = input.command || this.slugify(input.title);
+    const baseSlug = input.command || slugify(input.title);
     let filename = `${baseSlug}.md`;
     let counter = 2;
     while (existsSync(path.join(dir, filename))) {
@@ -520,7 +408,7 @@ export class PromptLibrary {
 
     // Update content hash if this is a built-in being edited
     if (fm.source === 'builtin' && updates.content !== undefined) {
-      fm._contentHash = this.computeHash(updates.content);
+      fm._contentHash = computeHash(updates.content);
     }
 
     const body = updates.content !== undefined ? updates.content : content.trim();
@@ -600,7 +488,7 @@ export class PromptLibrary {
         // New file — copy and add content hash
         const content = await fs.readFile(srcPath, 'utf-8');
         const { data: fm, content: body } = matter(content);
-        fm._contentHash = this.computeHash(body.trim());
+        fm._contentHash = computeHash(body.trim());
         const fileContent = matter.stringify(body.trim(), fm);
         await fs.writeFile(destPath, fileContent, 'utf-8');
         continue;
@@ -620,7 +508,7 @@ export class PromptLibrary {
         if (srcVersion > destVersion) {
           // Check if user has edited the file
           const storedHash = destFm._contentHash;
-          const currentHash = this.computeHash(destBody.trim());
+          const currentHash = computeHash(destBody.trim());
 
           if (storedHash && storedHash !== currentHash) {
             // User has edited — don't overwrite
@@ -629,7 +517,7 @@ export class PromptLibrary {
 
           // Safe to update
           const fm = { ...srcFm };
-          fm._contentHash = this.computeHash(srcBody.trim());
+          fm._contentHash = computeHash(srcBody.trim());
           const fileContent = matter.stringify(srcBody.trim(), fm);
           await fs.writeFile(destPath, fileContent, 'utf-8');
         }
@@ -687,17 +575,4 @@ export class PromptLibrary {
     }
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────
-
-  private computeHash(content: string): string {
-    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
-  }
-
-  private slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 20) || 'prompt';
-  }
 }

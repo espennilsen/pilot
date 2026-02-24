@@ -15,6 +15,8 @@ interface AppSettingsStore {
   autoStartDevServer: boolean;
   keybindOverrides: Record<string, string | null>;
   hiddenPaths: string[];
+  commitMsgModel: string;
+  commitMsgMaxTokens: number;
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
     file?: { enabled: boolean; maxSizeMB?: number; retainDays?: number };
@@ -69,6 +71,8 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
+    commitMsgModel: '',
+    commitMsgMaxTokens: 4096,
     logging: {
       level: 'warn' as const,
       file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
@@ -90,6 +94,8 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: settings.autoStartDevServer ?? false,
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
+        commitMsgModel: settings.commitMsgModel ?? '',
+        commitMsgMaxTokens: settings.commitMsgMaxTokens ?? 4096,
         logging: settings.logging ?? {
           level: 'warn' as const,
           file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
@@ -115,6 +121,8 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: updated.autoStartDevServer ?? false,
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
+        commitMsgModel: updated.commitMsgModel ?? '',
+        commitMsgMaxTokens: updated.commitMsgMaxTokens ?? 4096,
         logging: updated.logging ?? {
           level: 'warn' as const,
           file: { enabled: true, maxSizeMB: 10, retainDays: 14 },

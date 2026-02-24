@@ -26,7 +26,8 @@ import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
-import { isCompanionMode, on, send } from './lib/ipc-client';
+import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
+import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
 
 function App() {
@@ -263,6 +264,13 @@ function App() {
       if (!sidebarVisible) toggleSidebar();
     },
     'open-prompts':         () => window.dispatchEvent(new CustomEvent('pilot:toggle-prompt-picker')),
+    'stop-agent':           () => {
+      const tabId = useTabStore.getState().activeTabId;
+      if (tabId && useChatStore.getState().streamingByTab[tabId]) {
+        invoke(IPC.AGENT_ABORT, tabId).catch(() => {});
+        useChatStore.getState().setQueued(tabId, { steering: [], followUp: [] });
+      }
+    },
   }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
 
   // Build shortcut configs from keybinding defs + overrides

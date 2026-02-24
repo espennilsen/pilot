@@ -13,15 +13,16 @@ import {
   type ContextUsage,
   type SessionStats,
 } from '@mariozechner/pi-coding-agent';
-import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
+import type { TextContent, ThinkingContent, Context } from '@mariozechner/pi-ai';
+import { completeSimple } from '@mariozechner/pi-ai';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { extractLastAssistantText } from '../utils/message-utils';
 import { join } from 'path';
-import { existsSync, readdirSync, mkdirSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
 import { loadProjectSettings } from './project-settings';
 import { StagedDiffManager } from './staged-diffs';
-import { getPiAgentDir } from './app-settings';
+import { getPiAgentDir, loadAppSettings } from './app-settings';
 import { ExtensionManager } from './extension-manager';
 import { MemoryManager } from './memory-manager';
 import {
@@ -38,117 +39,7 @@ import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
 import { broadcastToRenderer } from '../utils/broadcast';
-
-/**
- * Make a lightweight API call to the cheapest available model for memory extraction.
- * Each provider uses a slightly different request format.
- */
-async function callCheapModel(
-  provider: string,
-  apiKey: string,
-  modelId: string,
-  prompt: string,
-  signal: AbortSignal
-): Promise<string | null> {
-  if (provider === 'anthropic') {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'content-type': 'application/json',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: modelId,
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal,
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  }
-
-  if (provider === 'openai') {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: modelId,
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal,
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
-  }
-
-  if (provider === 'google') {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 500 },
-        }),
-        signal,
-      }
-    );
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  }
-
-  return null;
-}
-
-/**
- * Encode a path separator as `+` so that hyphens in directory names round-trip safely.
- * Legacy directories used `-` (lossy for hyphenated names); new ones use `+`.
- * Format: --Users+espen+Dev+my-project--
- * @example getSessionDir('/home/pi', '/Users/espen/Dev/my-project') // → '<piDir>/sessions/--Users+espen+Dev+my-project--'
- */
-function getSessionDir(piAgentDir: string, cwd: string): string {
-  const safePath = `--${cwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '+')}--`;
-  const sessionDir = join(piAgentDir, 'sessions', safePath);
-  if (!existsSync(sessionDir)) {
-    mkdirSync(sessionDir, { recursive: true });
-  }
-  return sessionDir;
-}
-
-/**
- * Decode a session directory name back to a cwd.
- * Handles both new `+` encoding and legacy `-` encoding.
- * On Windows, reconstructs drive letters properly (e.g., "C/Users/foo" → "C:\Users\foo").
- * @example decodeDirName('--Users+espen+Dev+my-project--') // → '/Users/espen/Dev/my-project'
- */
-function decodeDirName(dirName: string): string {
-  const inner = dirName.replace(/^--/, '').replace(/--$/, '');
-  // New format uses `+` as separator (round-trips safely with hyphens in names)
-  // Legacy format uses `-` (lossy for hyphenated names, but best-effort)
-  const decoded = inner.includes('+') ? inner.replace(/\+/g, '/') : inner.replace(/-/g, '/');
-  
-  // On Windows, detect drive letter pattern (e.g., "C/Users/foo") and reconstruct as "C:\Users\foo"
-  if (process.platform === 'win32' && /^[a-zA-Z]\//.test(decoded)) {
-    const driveLetter = decoded[0];
-    const restOfPath = decoded.slice(2); // Everything after "C/"
-    if (restOfPath) {
-      return `${driveLetter}:\\${restOfPath.replace(/\//g, '\\')}`;
-    }
-    return `${driveLetter}:\\`;
-  }
-  
-  return '/' + decoded;
-}
+import { callCheapModel, getSessionDir, decodeDirName } from './pi-session-helpers';
 
 export class PilotSessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -735,6 +626,97 @@ export class PilotSessionManager {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Failed to delete session:', message);
       return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Generate a commit message from a git diff using a cheap/fast model.
+   * Uses the Pi SDK's completeSimple() — handles all providers, auth (API key + OAuth), retries.
+   */
+  async generateCommitMessage(diff: string): Promise<string> {
+    const settings = loadAppSettings();
+    const availableModels = this.modelRegistry.getAvailable();
+
+    // User override: "provider/model-id" format
+    let cheapModel = undefined as typeof availableModels[0] | undefined;
+    if (settings.commitMsgModel) {
+      const [provider, ...rest] = settings.commitMsgModel.split('/');
+      const modelId = rest.join('/');
+      cheapModel = availableModels.find(m => m.provider === provider && m.id === modelId);
+      if (!cheapModel) {
+        console.warn(`[commit-msg] Configured model "${settings.commitMsgModel}" not found or not authenticated, falling back to auto-select`);
+      }
+    }
+
+    // Auto-select: prefer cheap/fast models
+    if (!cheapModel) {
+      cheapModel = availableModels.find(m =>
+        m.id.includes('claude-haiku-4') || m.id.includes('gpt-5.1-codex-mini') || m.id.includes('flash')
+      ) || availableModels.find(m =>
+        m.id.includes('haiku') || m.id.includes('mini') || m.id.includes('flash')
+      ) || availableModels[0];
+    }
+
+    if (!cheapModel) throw new Error('No models available');
+    console.log(`[commit-msg] Using model: ${cheapModel.provider}/${cheapModel.id}`);
+
+    const apiKey = await this.authStorage.getApiKey(cheapModel.provider);
+    if (!apiKey) {
+      throw new Error('No API key configured — add an API key or login via OAuth in Settings → Auth');
+    }
+
+    const maxTokens = loadAppSettings().commitMsgMaxTokens ?? 4096;
+
+    const context: Context = {
+      systemPrompt: `You generate concise git commit messages following Conventional Commits format.
+Output ONLY the commit message — no quotes, no markdown fences, no explanation.`,
+      messages: [{
+        role: 'user' as const,
+        content: [{
+          type: 'text' as const,
+          text: `Write a commit message for this diff:
+
+Rules:
+- First line: type(optional scope): short description (max 72 chars)
+- If multiple unrelated changes, use the most significant one for the first line
+- Add a blank line and bullet points for additional changes only if truly needed
+- Be specific about what changed, not why
+
+Diff:
+${diff.slice(0, 50000)}`,
+        }],
+        timestamp: Date.now(),
+      }],
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+
+    try {
+      const response = await completeSimple(cheapModel, context, {
+        apiKey,
+        maxTokens,
+        signal: controller.signal,
+      });
+
+      if (response.errorMessage) {
+        throw new Error(`Model error: ${response.errorMessage}`);
+      }
+
+      const text = response.content
+        .filter((c): c is TextContent => c.type === 'text')
+        .map(c => c.text)
+        .join('')
+        .trim();
+
+      if (!text) {
+        throw new Error(
+          `Empty response from ${cheapModel.provider}/${cheapModel.id} (stop: ${response.stopReason}, content types: ${response.content.map(c => c.type).join(',')})`
+        );
+      }
+      return text;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

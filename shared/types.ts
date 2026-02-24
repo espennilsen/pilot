@@ -40,6 +40,10 @@ export interface PilotAppSettings {
   autoStartDevServer?: boolean;
   /** Glob patterns to hide in the file tree, using .gitignore syntax (e.g. 'node_modules', '*.log', 'dist/'). */
   hiddenPaths?: string[];
+  /** Max tokens for AI commit message generation. Default: 4096 */
+  commitMsgMaxTokens?: number;
+  /** Preferred model for AI commit message generation (e.g. "anthropic/claude-haiku-4-5"). Format: "provider/model-id". When unset, auto-selects cheapest available. */
+  commitMsgModel?: string;
   /** Logging configuration */
   logging?: {
     /** Minimum log level. Default: 'warn' */

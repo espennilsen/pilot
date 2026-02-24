@@ -3,7 +3,6 @@ import {
   SessionManager,
   SettingsManager,
   DefaultResourceLoader,
-  type AgentSession,
   type AgentSessionEvent,
   type ToolDefinition,
 } from '@mariozechner/pi-coding-agent';
@@ -29,29 +28,16 @@ import type {
   SubagentPoolResult,
 } from '../../shared/types';
 import type { PilotSessionManager } from './pi-session-manager';
-
-interface SubagentInternal extends SubagentRecord {
-  session: AgentSession | null;
-  unsub: () => void;
-}
-
-interface PoolInternal {
-  id: string;
-  parentTabId: string;
-  subagentIds: string[];
-  total: number;
-  completed: number;
-  failures: number;
-  resolveAll?: (results: SubagentResult[]) => void;
-  results: Map<string, SubagentResult>;
-}
-
-// Default limits
-const DEFAULT_MAX_PER_TAB = 10;
-const DEFAULT_MAX_CONCURRENT = 4;
-const DEFAULT_MAX_TURNS = 20;
-const DEFAULT_MAX_TOKENS = 200000;
-const DEFAULT_TIMEOUT = 300000; // 5 minutes
+import {
+  type SubagentInternal,
+  type PoolInternal,
+  DEFAULT_MAX_PER_TAB,
+  DEFAULT_MAX_CONCURRENT,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_TIMEOUT,
+  buildPoolResult,
+} from './subagent-helpers';
 
 export class SubagentManager {
   private subagents = new Map<string, SubagentInternal>();
@@ -198,7 +184,7 @@ export class SubagentManager {
     }
     // Already done
     if (pool.completed >= pool.total) {
-      return Promise.resolve(this.buildPoolResult(pool));
+      return Promise.resolve(buildPoolResult(pool));
     }
     // Wait for completion via callback
     return new Promise(resolve => {
@@ -606,7 +592,7 @@ export class SubagentManager {
         if (pool.completed >= pool.total) {
           const poolResolvers = this.poolResolvers.get(sub.poolId!);
           if (poolResolvers) {
-            const poolResult = this.buildPoolResult(pool);
+            const poolResult = buildPoolResult(pool);
             for (const resolve of poolResolvers) resolve(poolResult);
             this.poolResolvers.delete(sub.poolId!);
           }
@@ -637,19 +623,6 @@ export class SubagentManager {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────
-
-  private buildPoolResult(pool: PoolInternal): SubagentPoolResult {
-    const results: SubagentResult[] = [];
-    const failures: SubagentResult[] = [];
-    for (const subId of pool.subagentIds) {
-      const r = pool.results.get(subId);
-      if (r) {
-        if (r.error) failures.push(r);
-        else results.push(r);
-      }
-    }
-    return { poolId: pool.id, results, failures };
-  }
 
   private getTabSubagentCount(parentTabId: string): number {
     let count = 0;

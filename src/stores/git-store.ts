@@ -79,7 +79,9 @@ export const useGitStore = create<GitStore>((set, get) => ({
 
       // Now safe to fetch status
       const status = await invoke(IPC.GIT_STATUS) as GitStatus;
-      set({ isAvailable: true, isRepo: true, status, isLoading: false });
+      const stagedPaths = new Set(status.staged.map(f => f.path));
+      const deduped = { ...status, unstaged: status.unstaged.filter(f => !stagedPaths.has(f.path)) };
+      set({ isAvailable: true, isRepo: true, status: deduped, isLoading: false });
       
       // Load branches in parallel
       get().refreshBranches();
@@ -108,7 +110,12 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const status = await invoke(IPC.GIT_STATUS) as GitStatus;
-      set({ status, isLoading: false });
+      // Deduplicate: if a file is already staged, don't also show it in unstaged.
+      // Git can report the same path in both (partial staging), but the UI should
+      // show each file in one place only to avoid duplicate-key errors and confusion.
+      const stagedPaths = new Set(status.staged.map(f => f.path));
+      const dedupedUnstaged = status.unstaged.filter(f => !stagedPaths.has(f.path));
+      set({ status: { ...status, unstaged: dedupedUnstaged }, isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -126,22 +133,76 @@ export const useGitStore = create<GitStore>((set, get) => ({
   },
 
   stageFiles: async (paths: string[]) => {
-    set({ isLoading: true, error: null });
+    const pathSet = new Set(paths);
+    const prev = get().status;
+
+    // Optimistic update: move matched files from unstaged/untracked → staged
+    if (prev) {
+      const movingFromUnstaged = prev.unstaged.filter(f => pathSet.has(f.path));
+      const movingFromUntracked = prev.untracked.filter(p => pathSet.has(p));
+      const existingStagedPaths = new Set(prev.staged.map(f => f.path));
+      const newStaged = [
+        ...prev.staged,
+        ...movingFromUnstaged.filter(f => !existingStagedPaths.has(f.path)),
+        ...movingFromUntracked
+          .filter(p => !existingStagedPaths.has(p))
+          .map(p => ({ path: p, status: 'added' as const })),
+      ];
+      set({
+        status: {
+          ...prev,
+          staged: newStaged,
+          unstaged: prev.unstaged.filter(f => !pathSet.has(f.path)),
+          untracked: prev.untracked.filter(p => !pathSet.has(p)),
+          isClean: newStaged.length === 0 && prev.unstaged.filter(f => !pathSet.has(f.path)).length === 0 && prev.untracked.filter(p => !pathSet.has(p)).length === 0,
+        },
+      });
+    }
+
     try {
       await invoke(IPC.GIT_STAGE, paths);
-      await get().refreshStatus();
+      // Quiet refresh: sync with git truth without flashing isLoading
+      const freshStatus = await invoke(IPC.GIT_STATUS) as GitStatus;
+      const stagedPaths = new Set(freshStatus.staged.map(f => f.path));
+      set({ status: { ...freshStatus, unstaged: freshStatus.unstaged.filter(f => !stagedPaths.has(f.path)) } });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      if (prev) set({ status: prev });
+      set({ error: String(error) });
     }
   },
 
   unstageFiles: async (paths: string[]) => {
-    set({ isLoading: true, error: null });
+    const pathSet = new Set(paths);
+    const prev = get().status;
+
+    // Optimistic update: move matched files from staged → unstaged
+    if (prev) {
+      const moving = prev.staged.filter(f => pathSet.has(f.path));
+      const existingUnstagedPaths = new Set(prev.unstaged.map(f => f.path));
+      const newUnstaged = [
+        ...prev.unstaged,
+        ...moving.filter(f => !existingUnstagedPaths.has(f.path)),
+      ];
+      const newStaged = prev.staged.filter(f => !pathSet.has(f.path));
+      set({
+        status: {
+          ...prev,
+          staged: newStaged,
+          unstaged: newUnstaged,
+          isClean: newStaged.length === 0 && newUnstaged.length === 0 && prev.untracked.length === 0,
+        },
+      });
+    }
+
     try {
       await invoke(IPC.GIT_UNSTAGE, paths);
-      await get().refreshStatus();
+      // Quiet refresh: sync with git truth without flashing isLoading
+      const freshStatus = await invoke(IPC.GIT_STATUS) as GitStatus;
+      const stagedPaths = new Set(freshStatus.staged.map(f => f.path));
+      set({ status: { ...freshStatus, unstaged: freshStatus.unstaged.filter(f => !stagedPaths.has(f.path)) } });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      if (prev) set({ status: prev });
+      set({ error: String(error) });
     }
   },
 

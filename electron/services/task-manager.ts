@@ -4,110 +4,47 @@ import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { watch, type FSWatcher } from 'chokidar';
 
-// ============================================================================
-// Types & Interfaces
-// ============================================================================
+// Import types
+import type {
+  Task,
+  TaskBoard,
+  TaskFilter,
+  EpicProgress,
+  DependencyChain,
+  TaskCreateInput,
+  TaskUpdateInput,
+  Comment,
+  BoardEntry
+} from './task-types';
 
-export type TaskStatus = 'open' | 'in_progress' | 'review' | 'done';
-export type TaskPriority = 0 | 1 | 2 | 3 | 4;
-export type TaskType = 'epic' | 'task' | 'bug' | 'feature';
-export type TaskAssignee = 'human' | 'agent' | null;
-export type TaskCreator = 'human' | 'agent';
+// Import helpers
+import {
+  computeDerivedState,
+  filterTasks,
+  buildDependencyChain,
+  calculateEpicProgress,
+  validateNoCycles,
+  checkEpicAutoCompletion,
+  formatAgentTaskSummary
+} from './task-helpers';
 
-export interface Dependency {
-  type: 'blocks' | 'blocked_by' | 'related';
-  taskId: string;
-}
-
-export interface Comment {
-  id: string;
-  text: string;
-  author: 'human' | 'agent';
-  createdAt: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  type: TaskType;
-  parentId: string | null;
-  dependencies: Dependency[];
-  labels: string[];
-  assignee: TaskAssignee;
-  estimateMinutes: number | null;
-  createdAt: string;
-  updatedAt: string;
-  closedAt: string | null;
-  createdBy: TaskCreator;
-  comments: Comment[];
-}
-
-export interface TaskBoard {
-  projectPath: string;
-  tasks: Task[];
-  readyTasks: Task[];
-  blockedTasks: Task[];
-  epics: Task[];
-}
-
-export interface TaskFilter {
-  status?: TaskStatus[];
-  priority?: TaskPriority[];
-  type?: TaskType[];
-  labels?: string[];
-  assignee?: TaskAssignee[];
-  parentId?: string | null;
-  search?: string;
-}
-
-export interface EpicProgress {
-  total: number;
-  open: number;
-  inProgress: number;
-  review: number;
-  done: number;
-  percentComplete: number;
-}
-
-export interface DependencyChain {
-  blockers: Task[];
-  dependents: Task[];
-}
-
-export interface TaskCreateInput {
-  title: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  type?: TaskType;
-  parentId?: string | null;
-  dependencies?: Dependency[];
-  labels?: string[];
-  assignee?: TaskAssignee;
-  estimateMinutes?: number | null;
-  createdBy?: TaskCreator;
-}
-
-export interface TaskUpdateInput {
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  type?: TaskType;
-  parentId?: string | null;
-  dependencies?: Dependency[];
-  labels?: string[];
-  assignee?: TaskAssignee;
-  estimateMinutes?: number | null;
-}
-
-interface BoardEntry {
-  board: TaskBoard;
-  watcher: FSWatcher | null;
-}
+// Re-export all types for backward compatibility
+export type {
+  TaskStatus,
+  TaskPriority,
+  TaskType,
+  TaskAssignee,
+  TaskCreator,
+  Dependency,
+  Comment,
+  Task,
+  TaskBoard,
+  TaskFilter,
+  EpicProgress,
+  DependencyChain,
+  TaskCreateInput,
+  TaskUpdateInput
+} from './task-types';
 
 // ============================================================================
 // TaskManager Service
@@ -210,7 +147,7 @@ export class TaskManager {
       epics: []
     };
 
-    this.computeDerivedState(board);
+    computeDerivedState(board);
 
     // Start file watcher
     const watcher = this.startWatcher(projectPath);
@@ -262,51 +199,12 @@ export class TaskManager {
 
     const filePath = this.getTaskFilePath(projectPath);
     entry.board.tasks = await this.parseTasksFile(filePath);
-    this.computeDerivedState(entry.board);
+    computeDerivedState(entry.board);
 
     // Notify listeners
     if (this.onBoardChanged) {
       this.onBoardChanged(projectPath);
     }
-  }
-
-  private computeDerivedState(board: TaskBoard): void {
-    const taskMap = new Map(board.tasks.map(t => [t.id, t]));
-
-    // Compute epics
-    board.epics = board.tasks.filter(t => t.type === 'epic');
-
-    // Compute ready tasks: open + all blocked_by deps are done
-    board.readyTasks = board.tasks
-      .filter(task => {
-        if (task.status !== 'open') return false;
-        
-        const blockers = task.dependencies.filter(d => d.type === 'blocked_by');
-        if (blockers.length === 0) return true;
-
-        return blockers.every(dep => {
-          const blocker = taskMap.get(dep.taskId);
-          return blocker && blocker.status === 'done';
-        });
-      })
-      .sort((a, b) => {
-        // Sort by priority (0 first), then createdAt
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
-
-    // Compute blocked tasks: open or in_progress + at least one blocked_by dep NOT done
-    board.blockedTasks = board.tasks.filter(task => {
-      if (task.status !== 'open' && task.status !== 'in_progress') return false;
-      
-      const blockers = task.dependencies.filter(d => d.type === 'blocked_by');
-      if (blockers.length === 0) return false;
-
-      return blockers.some(dep => {
-        const blocker = taskMap.get(dep.taskId);
-        return !blocker || blocker.status !== 'done';
-      });
-    });
   }
 
   // --------------------------------------------------------------------------
@@ -338,13 +236,13 @@ export class TaskManager {
 
     // Check for circular dependencies
     if (task.dependencies.some(d => d.type === 'blocked_by')) {
-      this.validateNoCycles(board, task);
+      validateNoCycles(board.tasks, task);
     }
 
     // Add to board and save
     board.tasks.push(task);
     this.appendToFile(projectPath, task);
-    this.computeDerivedState(board);
+    computeDerivedState(board);
 
     // Notify listeners
     if (this.onBoardChanged) {
@@ -388,16 +286,16 @@ export class TaskManager {
 
     // Check for circular dependencies if dependencies changed
     if (updates.dependencies && updates.dependencies.some(d => d.type === 'blocked_by')) {
-      this.validateNoCycles(board, task);
+      validateNoCycles(board.tasks, task);
     }
 
     // Append to file and recompute
     this.appendToFile(projectPath, task);
-    this.computeDerivedState(board);
+    computeDerivedState(board);
 
     // Check for epic auto-completion
     if (task.parentId) {
-      await this.checkEpicAutoCompletion(projectPath, task.parentId);
+      await this.handleEpicAutoCompletion(projectPath, task.parentId);
     }
 
     // Notify listeners
@@ -454,7 +352,7 @@ export class TaskManager {
 
     // Compact file (full rewrite)
     this.compactFile(projectPath, board.tasks);
-    this.computeDerivedState(board);
+    computeDerivedState(board);
 
     // Notify listeners
     if (this.onBoardChanged) {
@@ -470,57 +368,7 @@ export class TaskManager {
 
   async queryTasks(projectPath: string, filter: TaskFilter): Promise<Task[]> {
     const board = await this.loadBoard(projectPath);
-    
-    return board.tasks.filter(task => {
-      // Status filter
-      if (filter.status && !filter.status.includes(task.status)) {
-        return false;
-      }
-
-      // Priority filter
-      if (filter.priority && !filter.priority.includes(task.priority)) {
-        return false;
-      }
-
-      // Type filter
-      if (filter.type && !filter.type.includes(task.type)) {
-        return false;
-      }
-
-      // Labels filter (any match)
-      if (filter.labels && filter.labels.length > 0) {
-        if (!filter.labels.some(label => task.labels.includes(label))) {
-          return false;
-        }
-      }
-
-      // Assignee filter
-      if (filter.assignee && !filter.assignee.includes(task.assignee)) {
-        return false;
-      }
-
-      // ParentId filter
-      if (filter.parentId !== undefined) {
-        if (task.parentId !== filter.parentId) {
-          return false;
-        }
-      }
-
-      // Search filter (case-insensitive on title, description, id)
-      if (filter.search) {
-        const searchLower = filter.search.toLowerCase();
-        const matches = 
-          task.id.toLowerCase().includes(searchLower) ||
-          task.title.toLowerCase().includes(searchLower) ||
-          task.description.toLowerCase().includes(searchLower);
-        
-        if (!matches) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    return filterTasks(board.tasks, filter);
   }
 
   async getReadyTasks(projectPath: string): Promise<Task[]> {
@@ -530,76 +378,12 @@ export class TaskManager {
 
   async getDependencyChain(projectPath: string, taskId: string): Promise<DependencyChain> {
     const board = await this.loadBoard(projectPath);
-    const taskMap = new Map(board.tasks.map(t => [t.id, t]));
-    const task = taskMap.get(taskId);
-
-    if (!task) {
-      return { blockers: [], dependents: [] };
-    }
-
-    // Blockers: tasks this is blocked_by
-    const blockers: Task[] = [];
-    for (const dep of task.dependencies) {
-      if (dep.type === 'blocked_by') {
-        const blocker = taskMap.get(dep.taskId);
-        if (blocker) {
-          blockers.push(blocker);
-        }
-      }
-    }
-
-    // Dependents: tasks that are blocked_by this task
-    const dependents: Task[] = [];
-    for (const otherTask of board.tasks) {
-      if (otherTask.id === taskId) continue;
-      
-      const hasDep = otherTask.dependencies.some(
-        d => d.type === 'blocked_by' && d.taskId === taskId
-      );
-      
-      if (hasDep) {
-        dependents.push(otherTask);
-      }
-    }
-
-    return { blockers, dependents };
+    return buildDependencyChain(board.tasks, taskId);
   }
 
   async getEpicProgress(projectPath: string, epicId: string): Promise<EpicProgress> {
     const board = await this.loadBoard(projectPath);
-    const children = board.tasks.filter(t => t.parentId === epicId);
-
-    const progress: EpicProgress = {
-      total: children.length,
-      open: 0,
-      inProgress: 0,
-      review: 0,
-      done: 0,
-      percentComplete: 0
-    };
-
-    for (const child of children) {
-      switch (child.status) {
-        case 'open':
-          progress.open++;
-          break;
-        case 'in_progress':
-          progress.inProgress++;
-          break;
-        case 'review':
-          progress.review++;
-          break;
-        case 'done':
-          progress.done++;
-          break;
-      }
-    }
-
-    if (progress.total > 0) {
-      progress.percentComplete = Math.round((progress.done / progress.total) * 100);
-    }
-
-    return progress;
+    return calculateEpicProgress(board.tasks, epicId);
   }
 
   // --------------------------------------------------------------------------
@@ -608,146 +392,28 @@ export class TaskManager {
 
   async getAgentTaskSummary(projectPath: string): Promise<string> {
     const board = await this.loadBoard(projectPath);
-    
-    if (board.tasks.length === 0) {
-      return '';
-    }
-
-    const taskMap = new Map(board.tasks.map(t => [t.id, t]));
-    const lines: string[] = ['<tasks>'];
-
-    // Group by status
-    const inProgress = board.tasks.filter(t => t.status === 'in_progress');
-    const inReview = board.tasks.filter(t => t.status === 'review');
-    const ready = await this.getReadyTasks(projectPath);
-    const blocked = board.blockedTasks;
-    const doneCount = board.tasks.filter(t => t.status === 'done').length;
-
-    // IN PROGRESS
-    if (inProgress.length > 0) {
-      lines.push('\nIN PROGRESS:');
-      for (const task of inProgress) {
-        lines.push(`- [${task.id}] P${task.priority} ${task.title}`);
-      }
-    }
-
-    // IN REVIEW
-    if (inReview.length > 0) {
-      lines.push('\nIN REVIEW:');
-      for (const task of inReview) {
-        lines.push(`- [${task.id}] P${task.priority} ${task.title}`);
-      }
-    }
-
-    // READY
-    if (ready.length > 0) {
-      lines.push('\nREADY:');
-      for (const task of ready) {
-        lines.push(`- [${task.id}] P${task.priority} ${task.title}`);
-      }
-    }
-
-    // BLOCKED
-    if (blocked.length > 0) {
-      lines.push('\nBLOCKED:');
-      for (const task of blocked) {
-        const blockerIds = task.dependencies
-          .filter(d => d.type === 'blocked_by')
-          .map(d => d.taskId)
-          .filter(id => {
-            const blocker = taskMap.get(id);
-            return blocker && blocker.status !== 'done';
-          });
-        
-        const blockerStr = blockerIds.length > 0 ? ` (blocked by: ${blockerIds.join(', ')})` : '';
-        lines.push(`- [${task.id}] P${task.priority} ${task.title}${blockerStr}`);
-      }
-    }
-
-    // DONE (count only)
-    if (doneCount > 0) {
-      lines.push(`\nDONE: ${doneCount} task${doneCount === 1 ? '' : 's'}`);
-    }
-
-    lines.push('</tasks>');
-    return lines.join('\n');
-  }
-
-  // --------------------------------------------------------------------------
-  // Dependency Validation
-  // --------------------------------------------------------------------------
-
-  private validateNoCycles(board: TaskBoard, task: Task): void {
-    const blockedByIds = task.dependencies
-      .filter(d => d.type === 'blocked_by')
-      .map(d => d.taskId);
-
-    for (const blockerId of blockedByIds) {
-      if (this.hasCycle(board, task.id, blockerId)) {
-        throw new Error(`Circular dependency detected: ${task.id} -> ${blockerId}`);
-      }
-    }
-  }
-
-  private hasCycle(board: TaskBoard, startId: string, targetId: string): boolean {
-    const taskMap = new Map(board.tasks.map(t => [t.id, t]));
-    const visited = new Set<string>();
-    const stack = [targetId];
-
-    while (stack.length > 0) {
-      const currentId = stack.pop()!;
-      
-      if (currentId === startId) {
-        return true;
-      }
-
-      if (visited.has(currentId)) {
-        continue;
-      }
-
-      visited.add(currentId);
-
-      const currentTask = taskMap.get(currentId);
-      if (!currentTask) continue;
-
-      const blockedByIds = currentTask.dependencies
-        .filter(d => d.type === 'blocked_by')
-        .map(d => d.taskId);
-
-      stack.push(...blockedByIds);
-    }
-
-    return false;
+    return formatAgentTaskSummary(board);
   }
 
   // --------------------------------------------------------------------------
   // Epic Auto-Completion
   // --------------------------------------------------------------------------
 
-  private async checkEpicAutoCompletion(projectPath: string, epicId: string): Promise<void> {
+  private async handleEpicAutoCompletion(projectPath: string, epicId: string): Promise<void> {
     const board = await this.loadBoard(projectPath);
-    const epic = board.tasks.find(t => t.id === epicId);
+    const updatedEpic = checkEpicAutoCompletion(board.tasks, epicId);
     
-    if (!epic || epic.type !== 'epic' || epic.status === 'done') {
-      return;
-    }
-
-    const children = board.tasks.filter(t => t.parentId === epicId);
-    
-    if (children.length === 0) {
-      return;
-    }
-
-    const allDone = children.every(child => child.status === 'done');
-    
-    if (allDone) {
-      // Auto-close the epic
-      epic.status = 'done';
-      epic.closedAt = new Date().toISOString();
-      epic.updatedAt = epic.closedAt;
-      
-      this.appendToFile(projectPath, epic);
-      this.computeDerivedState(board);
+    if (updatedEpic) {
+      // Find and update the epic in the board
+      const epic = board.tasks.find(t => t.id === epicId);
+      if (epic) {
+        epic.status = updatedEpic.status;
+        epic.closedAt = updatedEpic.closedAt;
+        epic.updatedAt = updatedEpic.updatedAt;
+        
+        this.appendToFile(projectPath, epic);
+        computeDerivedState(board);
+      }
     }
   }
 
