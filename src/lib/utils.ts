@@ -1,16 +1,19 @@
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_DAY = 86400;
+const SECONDS_PER_WEEK = 604800;
+
 /**
  * Format a timestamp or ISO date string as relative time (e.g., "2h ago", "yesterday")
  */
 export function relativeTime(timestamp: number | string): string {
-  const ms = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-  const seconds = Math.floor((Date.now() - ms) / 1000);
-  
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  
-  return new Date(ms).toLocaleDateString();
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < SECONDS_PER_MINUTE) return 'just now';
+  if (seconds < SECONDS_PER_HOUR) return `${Math.floor(seconds / SECONDS_PER_MINUTE)}m ago`;
+  if (seconds < SECONDS_PER_DAY) return `${Math.floor(seconds / SECONDS_PER_HOUR)}h ago`;
+  if (seconds < SECONDS_PER_WEEK) return `${Math.floor(seconds / SECONDS_PER_DAY)}d ago`;
+  return date.toLocaleDateString();
 }
 
 /**

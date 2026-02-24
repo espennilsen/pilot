@@ -249,22 +249,6 @@ All paths are resolved via `PILOT_APP_DIR` in `services/pilot-paths.ts`.
 
 ---
 
-## Known Issues (see `docs/code-review.md` for full details)
-
-| Severity | Location | Summary |
-|---|---|---|
-| 🔴 Critical | `electron/ipc/sandbox.ts` | `readFileSync` used but not imported — ReferenceError when accepting an edit diff |
-| 🔴 Critical | `main/index.ts` + `pi-session-manager.ts` | Two separate `MemoryManager` instances — UI writes not seen by session prompt injection |
-| 🔴 Critical | `electron/ipc/sandbox.ts` | `SANDBOX_TOGGLE_YOLO` always returns `{ yoloMode: true }` — toggle is a no-op in main |
-| 🔴 Critical | `pi-session-manager.ts` `listAllSessions` | Path decoding replaces all `-` with `/` — breaks hyphenated project names |
-| 🟠 High | `pi-session-manager.ts` | `createSession` / `openSession` are ~80% duplicated |
-| 🟠 High | `electron/ipc/git.ts` | Module-level `currentGitService` breaks multi-project git operations |
-| 🟠 High | `stores/tab-store.ts` `moveTab` | Mutates Zustand state objects in place |
-| 🟠 High | `electron/ipc/agent.ts` | Dynamic `require('electron')` inside handler — use static import |
-| 🟠 High | `electron/ipc/settings.ts` | `settings:set-project-path` never emitted → `SETTINGS_UPDATE` silently no-ops |
-
----
-
 ## Dev Commands
 
 ```bash

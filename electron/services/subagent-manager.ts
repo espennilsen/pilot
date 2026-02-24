@@ -7,8 +7,9 @@ import {
   type AgentSessionEvent,
   type ToolDefinition,
 } from '@mariozechner/pi-coding-agent';
-import { BrowserWindow } from 'electron';
 import { randomUUID } from 'crypto';
+import { extractLastAssistantText } from '../utils/message-utils';
+import { broadcastToRenderer } from '../utils/broadcast';
 import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
 import { loadProjectSettings } from './project-settings';
 import { getPiAgentDir } from './app-settings';
@@ -30,7 +31,7 @@ import type {
 import type { PilotSessionManager } from './pi-session-manager';
 
 interface SubagentInternal extends SubagentRecord {
-  session: AgentSession;
+  session: AgentSession | null;
   unsub: () => void;
 }
 
@@ -61,29 +62,11 @@ export class SubagentManager {
   // File conflict tracking: poolId → Map<filePath, subagentId that wrote first>
   private fileOwnership = new Map<string, Map<string, string>>();
 
+  /** Callbacks waiting for subagent completion — resolved by onSubagentFinished() */
+  private resultResolvers = new Map<string, Array<(result: SubagentResult) => void>>();
+  private poolResolvers = new Map<string, Array<(result: SubagentPoolResult) => void>>();
+
   constructor(private parentSessionManager: PilotSessionManager) {}
-
-  // ─── Settings helpers ──────────────────────────────────────────────
-
-  private getMaxConcurrent(): number {
-    return DEFAULT_MAX_CONCURRENT;
-  }
-
-  private getMaxPerTab(): number {
-    return DEFAULT_MAX_PER_TAB;
-  }
-
-  private getMaxTurns(override?: number): number {
-    return override ?? DEFAULT_MAX_TURNS;
-  }
-
-  private getMaxTokens(): number {
-    return DEFAULT_MAX_TOKENS;
-  }
-
-  private getTimeout(): number {
-    return DEFAULT_TIMEOUT;
-  }
 
   // ─── Spawn single subagent ─────────────────────────────────────────
 
@@ -94,9 +77,9 @@ export class SubagentManager {
   ): Promise<string> {
     // Check per-tab limit
     const tabCount = this.getTabSubagentCount(parentTabId);
-    if (tabCount >= this.getMaxPerTab()) {
+    if (tabCount >= DEFAULT_MAX_PER_TAB) {
       throw new Error(
-        `Maximum subagents per tab (${this.getMaxPerTab()}) reached. Abort some before spawning new ones.`
+        `Maximum subagents per tab (${DEFAULT_MAX_PER_TAB}) reached. Abort some before spawning new ones.`
       );
     }
 
@@ -116,7 +99,7 @@ export class SubagentManager {
       completedAt: null,
       tokenUsage: { input: 0, output: 0 },
       // Placeholders — filled when session starts
-      session: null as any,
+      session: null,
       unsub: () => {},
     };
 
@@ -128,7 +111,7 @@ export class SubagentManager {
       });
     };
 
-    if (this.runningCount < this.getMaxConcurrent()) {
+    if (this.runningCount < DEFAULT_MAX_CONCURRENT) {
       this.runningCount++;
       startFn();
     } else {
@@ -178,61 +161,50 @@ export class SubagentManager {
   // ─── Await result ─────────────────────────────────────────────────
 
   awaitResult(subId: string): Promise<SubagentResult> {
-    return new Promise((resolve) => {
-      const check = () => {
-        const sub = this.subagents.get(subId);
-        if (!sub) {
-          resolve({
-            subId,
-            role: 'unknown',
-            result: null,
-            error: 'Subagent not found',
-            tokenUsage: { input: 0, output: 0 },
-            modifiedFiles: [],
-          });
-          return;
-        }
-        if (sub.status === 'completed' || sub.status === 'failed' || sub.status === 'aborted') {
-          resolve({
-            subId: sub.id,
-            role: sub.role,
-            result: sub.result,
-            error: sub.error,
-            tokenUsage: sub.tokenUsage,
-            modifiedFiles: sub.modifiedFiles,
-          });
-        } else {
-          setTimeout(check, 200);
-        }
-      };
-      check();
+    const sub = this.subagents.get(subId);
+    if (!sub) {
+      return Promise.resolve({
+        subId,
+        role: 'unknown',
+        result: null,
+        error: 'Subagent not found',
+        tokenUsage: { input: 0, output: 0 },
+        modifiedFiles: [],
+      });
+    }
+    // Already finished
+    if (sub.status === 'completed' || sub.status === 'failed' || sub.status === 'aborted') {
+      return Promise.resolve({
+        subId: sub.id,
+        role: sub.role,
+        result: sub.result,
+        error: sub.error,
+        tokenUsage: sub.tokenUsage,
+        modifiedFiles: sub.modifiedFiles,
+      });
+    }
+    // Wait for completion via callback
+    return new Promise(resolve => {
+      const resolvers = this.resultResolvers.get(subId) || [];
+      resolvers.push(resolve);
+      this.resultResolvers.set(subId, resolvers);
     });
   }
 
   awaitPool(poolId: string): Promise<SubagentPoolResult> {
-    return new Promise((resolve) => {
-      const check = () => {
-        const pool = this.pools.get(poolId);
-        if (!pool) {
-          resolve({ poolId, results: [], failures: [] });
-          return;
-        }
-        if (pool.completed >= pool.total) {
-          const results: SubagentResult[] = [];
-          const failures: SubagentResult[] = [];
-          for (const subId of pool.subagentIds) {
-            const r = pool.results.get(subId);
-            if (r) {
-              if (r.error) failures.push(r);
-              else results.push(r);
-            }
-          }
-          resolve({ poolId, results, failures });
-        } else {
-          setTimeout(check, 200);
-        }
-      };
-      check();
+    const pool = this.pools.get(poolId);
+    if (!pool) {
+      return Promise.resolve({ poolId, results: [], failures: [] });
+    }
+    // Already done
+    if (pool.completed >= pool.total) {
+      return Promise.resolve(this.buildPoolResult(pool));
+    }
+    // Wait for completion via callback
+    return new Promise(resolve => {
+      const resolvers = this.poolResolvers.get(poolId) || [];
+      resolvers.push(resolve);
+      this.poolResolvers.set(poolId, resolvers);
     });
   }
 
@@ -319,6 +291,7 @@ export class SubagentManager {
     }
     for (const subId of toRemove) {
       this.subagents.delete(subId);
+      this.resultResolvers.delete(subId);
     }
 
     // Clean up pools for this tab
@@ -341,6 +314,8 @@ export class SubagentManager {
     this.subagents.clear();
     this.pools.clear();
     this.fileOwnership.clear();
+    this.resultResolvers.clear();
+    this.poolResolvers.clear();
     this.queue = [];
     this.runningCount = 0;
   }
@@ -480,29 +455,15 @@ export class SubagentManager {
 
       // Detect completion
       if (event.type === 'agent_end') {
-        const messages = session.state.messages;
-        const lastAssistant = [...messages].reverse().find(
-          (m: any) => m.role === 'assistant'
-        );
-        if (lastAssistant) {
-          let resultText = '';
-          if (Array.isArray((lastAssistant as any).content)) {
-            resultText = (lastAssistant as any).content
-              .filter((b: any) => b.type === 'text')
-              .map((b: any) => b.text)
-              .join('');
-          }
-          this.markCompleted(subId, resultText || '(no output)');
-        } else {
-          this.markCompleted(subId, '(no output)');
-        }
+        const resultText = extractLastAssistantText(session.state.messages);
+        this.markCompleted(subId, resultText || '(no output)');
       }
     });
 
     sub.unsub = unsub;
 
     // Set timeout
-    const timeoutMs = this.getTimeout();
+    const timeoutMs = DEFAULT_TIMEOUT;
     const timeoutTimer = setTimeout(() => {
       if (sub.status === 'running') {
         this.abort(subId).catch(() => {});
@@ -527,19 +488,9 @@ export class SubagentManager {
     // the agent_end event handler above will handle completion.
     // But as a safety net:
     if (sub.status === 'running') {
-      const messages = session.state.messages;
-      const lastAssistant = [...messages].reverse().find(
-        (m: any) => m.role === 'assistant'
-      );
-      if (lastAssistant) {
-        let resultText = '';
-        if (Array.isArray((lastAssistant as any).content)) {
-          resultText = (lastAssistant as any).content
-            .filter((b: any) => b.type === 'text')
-            .map((b: any) => b.text)
-            .join('');
-        }
-        this.markCompleted(subId, resultText || '(no output)');
+      const resultText = extractLastAssistantText(session.state.messages);
+      if (resultText) {
+        this.markCompleted(subId, resultText);
       }
     }
   }
@@ -608,6 +559,21 @@ export class SubagentManager {
   }
 
   private onSubagentFinished(sub: SubagentInternal): void {
+    // Resolve any awaiting promises for this subagent
+    const resolvers = this.resultResolvers.get(sub.id);
+    if (resolvers) {
+      const result: SubagentResult = {
+        subId: sub.id,
+        role: sub.role,
+        result: sub.result,
+        error: sub.error,
+        tokenUsage: sub.tokenUsage,
+        modifiedFiles: sub.modifiedFiles,
+      };
+      for (const resolve of resolvers) resolve(result);
+      this.resultResolvers.delete(sub.id);
+    }
+
     this.runningCount = Math.max(0, this.runningCount - 1);
 
     // Update pool progress
@@ -635,6 +601,16 @@ export class SubagentManager {
           total: pool.total,
           failures: pool.failures,
         });
+
+        // Resolve pool awaiter if all subagents finished
+        if (pool.completed >= pool.total) {
+          const poolResolvers = this.poolResolvers.get(sub.poolId!);
+          if (poolResolvers) {
+            const poolResult = this.buildPoolResult(pool);
+            for (const resolve of poolResolvers) resolve(poolResult);
+            this.poolResolvers.delete(sub.poolId!);
+          }
+        }
       }
     }
 
@@ -648,7 +624,7 @@ export class SubagentManager {
   }
 
   private dequeueNext(): void {
-    while (this.runningCount < this.getMaxConcurrent() && this.queue.length > 0) {
+    while (this.runningCount < DEFAULT_MAX_CONCURRENT && this.queue.length > 0) {
       const next = this.queue.shift();
       if (next) {
         const sub = this.subagents.get(next.subId);
@@ -661,6 +637,19 @@ export class SubagentManager {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────
+
+  private buildPoolResult(pool: PoolInternal): SubagentPoolResult {
+    const results: SubagentResult[] = [];
+    const failures: SubagentResult[] = [];
+    for (const subId of pool.subagentIds) {
+      const r = pool.results.get(subId);
+      if (r) {
+        if (r.error) failures.push(r);
+        else results.push(r);
+      }
+    }
+    return { poolId: pool.id, results, failures };
+  }
 
   private getTabSubagentCount(parentTabId: string): number {
     let count = 0;
@@ -681,13 +670,6 @@ export class SubagentManager {
   }
 
   private sendToRenderer(channel: string, data: unknown): void {
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      win.webContents.send(channel, data);
-    }
-    try {
-      const { companionBridge } = require('./companion-ipc-bridge');
-      companionBridge.forwardEvent(channel, data);
-    } catch { /* not initialized */ }
+    broadcastToRenderer(channel, data);
   }
 }

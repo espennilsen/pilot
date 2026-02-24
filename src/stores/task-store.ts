@@ -1,3 +1,6 @@
+/**
+ * @file Task store — manages task board data, filters, view modes, and CRUD operations.
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import type {
@@ -11,9 +14,14 @@ import type {
   TaskDependencyChain,
 } from '../../shared/types';
 import { invoke } from '../lib/ipc-client';
+import { invokeAndReload } from '../lib/invoke-and-reload';
 
+/** Task board view mode: kanban columns or table rows. */
 export type TaskViewMode = 'kanban' | 'table';
 
+/**
+ * Task filters for search and categorization.
+ */
 export interface TaskFilters {
   status: TaskStatus[];
   priority: TaskPriority[];
@@ -39,6 +47,10 @@ interface TaskStore {
   readyTasks: TaskItem[];
   blockedTasks: TaskItem[];
   epics: TaskItem[];
+
+  // Memoization
+  _lastTaskFilter: string;
+  _lastTaskResult: TaskItem[];
 
   // Actions
   loadBoard: (projectPath: string) => Promise<void>;
@@ -72,6 +84,10 @@ const defaultFilters: TaskFilters = {
   epicId: null,
 };
 
+/**
+ * Task store — manages task board data, filters, view modes, and CRUD operations.
+ * Loads tasks from the main process and provides filtering/sorting in the renderer.
+ */
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasksEnabled: true,
   tasks: [],
@@ -84,6 +100,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   readyTasks: [],
   blockedTasks: [],
   epics: [],
+  _lastTaskFilter: '',
+  _lastTaskResult: [],
 
   loadBoard: async (projectPath: string) => {
     set({ isLoading: true });
@@ -95,56 +113,52 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         blockedTasks: board.blockedTasks,
         epics: board.epics,
         isLoading: false,
+        _lastTaskFilter: '', // Invalidate cache
+        _lastTaskResult: [],
       });
-    } catch {
+    } catch (err) {
+      console.warn('[TaskStore]', err);
       set({ isLoading: false });
     }
   },
 
   createTask: async (projectPath: string, input: Partial<TaskItem>) => {
-    try {
-      const task = (await invoke(IPC.TASKS_CREATE, projectPath, input)) as TaskItem;
-      // Reload board to get updated derived state
-      await get().loadBoard(projectPath);
-      return task;
-    } catch {
-      return null;
-    }
+    return await invokeAndReload<TaskItem>(
+      IPC.TASKS_CREATE,
+      [projectPath, input],
+      () => get().loadBoard(projectPath)
+    );
   },
 
   updateTask: async (projectPath: string, taskId: string, updates: Partial<TaskItem>) => {
-    try {
-      const task = (await invoke(IPC.TASKS_UPDATE, projectPath, taskId, updates)) as TaskItem;
-      await get().loadBoard(projectPath);
-      return task;
-    } catch {
-      return null;
-    }
+    return await invokeAndReload<TaskItem>(
+      IPC.TASKS_UPDATE,
+      [projectPath, taskId, updates],
+      () => get().loadBoard(projectPath)
+    );
   },
 
   deleteTask: async (projectPath: string, taskId: string) => {
-    try {
-      const result = (await invoke(IPC.TASKS_DELETE, projectPath, taskId)) as boolean;
-      if (result) {
+    const result = await invokeAndReload<boolean>(
+      IPC.TASKS_DELETE,
+      [projectPath, taskId],
+      async () => {
         // Close detail if this task was selected
         if (get().selectedTaskId === taskId) {
           set({ selectedTaskId: null });
         }
         await get().loadBoard(projectPath);
       }
-      return result;
-    } catch {
-      return false;
-    }
+    );
+    return result ?? false;
   },
 
   addComment: async (projectPath: string, taskId: string, text: string) => {
-    try {
-      await invoke(IPC.TASKS_COMMENT, projectPath, taskId, text);
-      await get().loadBoard(projectPath);
-    } catch {
-      // silent
-    }
+    await invokeAndReload(
+      IPC.TASKS_COMMENT,
+      [projectPath, taskId, text],
+      () => get().loadBoard(projectPath)
+    );
   },
 
   moveTask: async (projectPath: string, taskId: string, newStatus: TaskStatus) => {
@@ -162,7 +176,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   setTasksEnabled: (enabled) => {
     set({ tasksEnabled: enabled });
-    invoke(IPC.TASKS_SET_ENABLED, enabled).catch(() => {});
+    invoke(IPC.TASKS_SET_ENABLED, enabled).catch((err) => {
+      console.warn('[TaskStore]', err);
+    });
   },
 
   setShowCreateDialog: (show) => set({ showCreateDialog: show, editingTask: show ? get().editingTask : null }),
@@ -170,8 +186,15 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   setEditingTask: (task) => set({ editingTask: task, showCreateDialog: !!task }),
 
   getFilteredTasks: () => {
-    const { tasks, filters } = get();
-    return tasks.filter((task) => {
+    const { tasks, filters, _lastTaskFilter, _lastTaskResult } = get();
+    
+    // Memoization: serialize filters and check if they've changed
+    const currentFilter = JSON.stringify(filters);
+    if (currentFilter === _lastTaskFilter) {
+      return _lastTaskResult;
+    }
+    
+    const result = tasks.filter((task) => {
       if (filters.status.length > 0 && !filters.status.includes(task.status)) return false;
       if (filters.priority.length > 0 && !filters.priority.includes(task.priority)) return false;
       if (filters.type.length > 0 && !filters.type.includes(task.type)) return false;
@@ -190,6 +213,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
       return true;
     });
+    
+    // Cache the result
+    set({ _lastTaskFilter: currentFilter, _lastTaskResult: result });
+    return result;
   },
 
   getTasksByStatus: (status: TaskStatus) => {
@@ -199,7 +226,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   getEpicProgress: async (projectPath, epicId) => {
     try {
       return (await invoke(IPC.TASKS_EPIC_PROGRESS, projectPath, epicId)) as TaskEpicProgress;
-    } catch {
+    } catch (err) {
+      console.warn('[TaskStore]', err);
       return null;
     }
   },
@@ -207,7 +235,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   getDependencies: async (projectPath, taskId) => {
     try {
       return (await invoke(IPC.TASKS_DEPENDENCIES, projectPath, taskId)) as TaskDependencyChain;
-    } catch {
+    } catch (err) {
+      console.warn('[TaskStore]', err);
       return null;
     }
   },

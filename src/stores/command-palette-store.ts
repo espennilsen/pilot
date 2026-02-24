@@ -1,5 +1,11 @@
+/**
+ * @file Command palette store — manages command registration, search, and execution.
+ */
 import { create } from 'zustand';
 
+/**
+ * A single command action in the command palette.
+ */
 export interface CommandAction {
   id: string;
   label: string;
@@ -17,6 +23,8 @@ interface CommandPaletteStore {
   selectedIndex: number;
   commands: CommandAction[];
   recentCommandIds: string[]; // track last 5 used commands
+  _lastFilterQuery: string;
+  _lastFilterResult: CommandAction[];
 
   open: () => void;
   close: () => void;
@@ -29,7 +37,10 @@ interface CommandPaletteStore {
   getFilteredCommands: () => CommandAction[];
 }
 
-// Fuzzy match helper: checks if all characters in query appear in order in target
+/**
+ * Subsequence-based fuzzy matching.
+ * Returns true if all characters in query appear in target in order (case-insensitive).
+ */
 function fuzzyMatch(query: string, target: string): boolean {
   const queryLower = query.toLowerCase();
   const targetLower = target.toLowerCase();
@@ -44,7 +55,9 @@ function fuzzyMatch(query: string, target: string): boolean {
   return queryIndex === queryLower.length;
 }
 
-// Match command against query
+/**
+ * Match command against query (checks label, description, category, and keywords).
+ */
 function matchCommand(command: CommandAction, query: string): boolean {
   if (!query.trim()) return true;
   
@@ -58,12 +71,18 @@ function matchCommand(command: CommandAction, query: string): boolean {
   return searchTargets.some(target => fuzzyMatch(query, target));
 }
 
+/**
+ * Command palette store — manages command registration, fuzzy search, and execution.
+ * Tracks recent commands and provides memoized filtering.
+ */
 export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => ({
   isOpen: false,
   searchQuery: '',
   selectedIndex: 0,
   commands: [],
   recentCommandIds: [],
+  _lastFilterQuery: '',
+  _lastFilterResult: [],
 
   open: () => set({ isOpen: true, searchQuery: '', selectedIndex: 0 }),
   
@@ -90,6 +109,8 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
       
       return {
         commands: [...state.commands, ...commandsToAdd],
+        _lastFilterQuery: '', // Invalidate cache
+        _lastFilterResult: [],
       };
     });
   },
@@ -97,6 +118,8 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
   unregisterCommands: (ids: string[]) => {
     set(state => ({
       commands: state.commands.filter(c => !ids.includes(c.id)),
+      _lastFilterQuery: '', // Invalidate cache
+      _lastFilterResult: [],
     }));
   },
   
@@ -124,10 +147,17 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
   },
   
   getFilteredCommands: () => {
-    const { commands, searchQuery, recentCommandIds } = get();
+    const { commands, searchQuery, recentCommandIds, _lastFilterQuery, _lastFilterResult } = get();
+    
+    // Memoization: return cached result if query hasn't changed
+    if (searchQuery === _lastFilterQuery) {
+      return _lastFilterResult;
+    }
     
     // Filter commands by search query
     const filtered = commands.filter(cmd => matchCommand(cmd, searchQuery));
+    
+    let result: CommandAction[];
     
     if (!searchQuery.trim()) {
       // No search query: show recent commands first
@@ -144,28 +174,32 @@ export const useCommandPaletteStore = create<CommandPaletteStore>((set, get) => 
           return a.label.localeCompare(b.label);
         });
       
-      return [...recentCommands, ...otherCommands];
+      result = [...recentCommands, ...otherCommands];
+    } else {
+      // With search query: sort by relevance (exact matches first, then fuzzy)
+      result = filtered.sort((a, b) => {
+        const queryLower = searchQuery.toLowerCase();
+        const aLabelLower = a.label.toLowerCase();
+        const bLabelLower = b.label.toLowerCase();
+        
+        // Exact prefix matches first
+        const aStartsWith = aLabelLower.startsWith(queryLower);
+        const bStartsWith = bLabelLower.startsWith(queryLower);
+        if (aStartsWith !== bStartsWith) {
+          return aStartsWith ? -1 : 1;
+        }
+        
+        // Then by category
+        const catCompare = (a.category || '').localeCompare(b.category || '');
+        if (catCompare !== 0) return catCompare;
+        
+        // Finally alphabetically
+        return a.label.localeCompare(b.label);
+      });
     }
     
-    // With search query: sort by relevance (exact matches first, then fuzzy)
-    return filtered.sort((a, b) => {
-      const queryLower = searchQuery.toLowerCase();
-      const aLabelLower = a.label.toLowerCase();
-      const bLabelLower = b.label.toLowerCase();
-      
-      // Exact prefix matches first
-      const aStartsWith = aLabelLower.startsWith(queryLower);
-      const bStartsWith = bLabelLower.startsWith(queryLower);
-      if (aStartsWith !== bStartsWith) {
-        return aStartsWith ? -1 : 1;
-      }
-      
-      // Then by category
-      const catCompare = (a.category || '').localeCompare(b.category || '');
-      if (catCompare !== 0) return catCompare;
-      
-      // Finally alphabetically
-      return a.label.localeCompare(b.label);
-    });
+    // Cache the result
+    set({ _lastFilterQuery: searchQuery, _lastFilterResult: result });
+    return result;
   },
 }));

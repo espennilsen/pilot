@@ -1,6 +1,11 @@
+/**
+ * @file UI store — manages sidebar, panels, terminal, scratch pad, settings modal, and layout state.
+ */
 import { create } from 'zustand';
 
-// Load scratch pad content from localStorage
+/**
+ * Load scratch pad content from localStorage.
+ */
 const loadScratchPadContent = (): string => {
   try {
     return localStorage.getItem('scratchPadContent') || '';
@@ -9,7 +14,9 @@ const loadScratchPadContent = (): string => {
   }
 };
 
-// Save scratch pad content to localStorage
+/**
+ * Save scratch pad content to localStorage.
+ */
 const saveScratchPadContent = (content: string) => {
   try {
     localStorage.setItem('scratchPadContent', content);
@@ -18,7 +25,10 @@ const saveScratchPadContent = (content: string) => {
   }
 };
 
+/** Sidebar pane type (left sidebar). */
 export type SidebarPane = 'sessions' | 'memory' | 'tasks';
+
+/** Context panel tab type (right sidebar). */
 export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents';
 
 interface UIStore {
@@ -35,6 +45,7 @@ interface UIStore {
   terminalHeight: number;
   terminalTabs: { id: string; name: string }[];
   activeTerminalId: string | null;
+  terminalCounter: number;
   scratchPadVisible: boolean;
   scratchPadContent: string;
   aboutOpen: boolean;
@@ -61,6 +72,9 @@ interface UIStore {
   closeAbout: () => void;
 }
 
+/**
+ * UI store — manages sidebar, panels, terminal, scratch pad, settings modal, and layout state.
+ */
 export const useUIStore = create<UIStore>((set) => ({
   sidebarVisible: true,
   sidebarPane: 'sessions' as SidebarPane,
@@ -75,6 +89,7 @@ export const useUIStore = create<UIStore>((set) => ({
   terminalHeight: 250,
   terminalTabs: [],
   activeTerminalId: null,
+  terminalCounter: 0,
   scratchPadVisible: false,
   scratchPadContent: loadScratchPadContent(),
   aboutOpen: false,
@@ -100,9 +115,8 @@ export const useUIStore = create<UIStore>((set) => ({
   addTerminalTab: () => {
     let newId = '';
     set((s) => {
-      // Generate sequential name based on existing tabs
-      const count = s.terminalTabs.length;
-      const name = count === 0 ? 'zsh' : `zsh (${count + 1})`;
+      // Generate sequential name based on counter
+      const name = s.terminalCounter === 0 ? 'zsh' : `zsh (${s.terminalCounter + 1})`;
       
       // Generate unique ID
       newId = `term-${Date.now()}`;
@@ -111,6 +125,7 @@ export const useUIStore = create<UIStore>((set) => ({
         terminalTabs: [...s.terminalTabs, { id: newId, name }],
         activeTerminalId: newId,
         terminalVisible: true,
+        terminalCounter: s.terminalCounter + 1,
       };
     });
     return newId;

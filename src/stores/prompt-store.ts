@@ -1,7 +1,11 @@
+/**
+ * @file Prompt store — manages prompt templates, commands, validation, and CRUD operations.
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import type { PromptTemplate, PromptCreateInput, PromptUpdateInput } from '../../shared/types';
 import { invoke } from '../lib/ipc-client';
+import { invokeAndReload } from '../lib/invoke-and-reload';
 
 interface PromptState {
   prompts: PromptTemplate[];
@@ -22,120 +26,121 @@ interface PromptState {
   reload: () => Promise<void>;
 }
 
-export const usePromptStore = create<PromptState>((set) => ({
-  prompts: [],
-  loading: false,
+/**
+ * Prompt store — manages prompt templates, commands, validation, and CRUD operations.
+ */
+export const usePromptStore = create<PromptState>((set, get) => {
+  /**
+   * Helper to reload prompts from the main process.
+   */
+  const reloadPrompts = async () => {
+    const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
+    set({ prompts });
+  };
 
-  loadPrompts: async () => {
-    set({ loading: true });
-    try {
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts, loading: false });
-    } catch {
-      set({ loading: false });
-    }
-  },
+  return {
+    prompts: [],
+    loading: false,
 
-  getById: async (id: string) => {
-    try {
-      return await invoke(IPC.PROMPTS_GET, id) as PromptTemplate | null;
-    } catch {
-      return null;
-    }
-  },
+        loadPrompts: async () => {
+        set({ loading: true });
+        try {
+          await reloadPrompts();
+          set({ loading: false });
+        } catch {
+          set({ loading: false });
+        }
+      },
 
-  getByCommand: async (command: string) => {
-    try {
-      return await invoke(IPC.PROMPTS_GET_BY_COMMAND, command) as PromptTemplate | null;
-    } catch {
-      return null;
-    }
-  },
+      getById: async (id: string) => {
+        try {
+          return await invoke(IPC.PROMPTS_GET, id) as PromptTemplate | null;
+        } catch {
+          return null;
+        }
+      },
 
-  getCommands: async () => {
-    try {
-      return await invoke(IPC.PROMPTS_GET_COMMANDS) as Array<{ command: string; promptId: string; title: string; icon: string; description: string }>;
-    } catch {
-      return [];
-    }
-  },
+      getByCommand: async (command: string) => {
+        try {
+          return await invoke(IPC.PROMPTS_GET_BY_COMMAND, command) as PromptTemplate | null;
+        } catch {
+          return null;
+        }
+      },
 
-  getSystemCommands: async () => {
-    try {
-      return await invoke(IPC.PROMPTS_GET_SYSTEM_COMMANDS) as Array<{ command: string; owner: string; description: string }>;
-    } catch {
-      return [];
-    }
-  },
+      getCommands: async () => {
+        try {
+          return await invoke(IPC.PROMPTS_GET_COMMANDS) as Array<{ command: string; promptId: string; title: string; icon: string; description: string }>;
+        } catch {
+          return [];
+        }
+      },
 
-  validateCommand: async (command: string, excludePromptId?: string) => {
-    try {
-      return await invoke(IPC.PROMPTS_VALIDATE_COMMAND, command, excludePromptId) as { valid: boolean; error?: string };
-    } catch {
-      return { valid: false, error: 'Validation failed' };
-    }
-  },
+      getSystemCommands: async () => {
+        try {
+          return await invoke(IPC.PROMPTS_GET_SYSTEM_COMMANDS) as Array<{ command: string; owner: string; description: string }>;
+        } catch {
+          return [];
+        }
+      },
 
-  createPrompt: async (input: PromptCreateInput, projectPath?: string) => {
-    try {
-      const prompt = await invoke(IPC.PROMPTS_CREATE, input, projectPath) as PromptTemplate;
-      // Reload prompts after creation
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts });
-      return prompt;
-    } catch {
-      return null;
-    }
-  },
+      validateCommand: async (command: string, excludePromptId?: string) => {
+        try {
+          return await invoke(IPC.PROMPTS_VALIDATE_COMMAND, command, excludePromptId) as { valid: boolean; error?: string };
+        } catch {
+          return { valid: false, error: 'Validation failed' };
+        }
+      },
 
-  updatePrompt: async (id: string, updates: PromptUpdateInput) => {
-    try {
-      const prompt = await invoke(IPC.PROMPTS_UPDATE, id, updates) as PromptTemplate | null;
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts });
-      return prompt;
-    } catch {
-      return null;
-    }
-  },
+      createPrompt: async (input: PromptCreateInput, projectPath?: string) => {
+        return await invokeAndReload<PromptTemplate>(
+          IPC.PROMPTS_CREATE,
+          [input, projectPath],
+          reloadPrompts
+        );
+      },
 
-  deletePrompt: async (id: string) => {
-    try {
-      const result = await invoke(IPC.PROMPTS_DELETE, id) as boolean;
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts });
-      return result;
-    } catch {
-      return false;
-    }
-  },
+      updatePrompt: async (id: string, updates: PromptUpdateInput) => {
+        return await invokeAndReload<PromptTemplate>(
+          IPC.PROMPTS_UPDATE,
+          [id, updates],
+          reloadPrompts
+        );
+      },
 
-  unhidePrompt: async (id: string) => {
-    try {
-      const result = await invoke(IPC.PROMPTS_UNHIDE, id) as boolean;
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts });
-      return result;
-    } catch {
-      return false;
-    }
-  },
+      deletePrompt: async (id: string) => {
+        const result = await invokeAndReload<boolean>(
+          IPC.PROMPTS_DELETE,
+          [id],
+          reloadPrompts
+        );
+        return result ?? false;
+      },
 
-  fillTemplate: async (content: string, values: Record<string, string>) => {
-    try {
-      return await invoke(IPC.PROMPTS_FILL, content, values) as string;
-    } catch {
-      return content;
-    }
-  },
+      unhidePrompt: async (id: string) => {
+        const result = await invokeAndReload<boolean>(
+          IPC.PROMPTS_UNHIDE,
+          [id],
+          reloadPrompts
+        );
+        return result ?? false;
+      },
 
-  reload: async () => {
-    try {
-      await invoke(IPC.PROMPTS_RELOAD);
-      const prompts = await invoke(IPC.PROMPTS_GET_ALL) as PromptTemplate[];
-      set({ prompts });
-    } catch {
-      // Silently fail
-    }
-  },
-}));
+      fillTemplate: async (content: string, values: Record<string, string>) => {
+        try {
+          return await invoke(IPC.PROMPTS_FILL, content, values) as string;
+        } catch {
+          return content;
+        }
+      },
+
+      reload: async () => {
+        await invokeAndReload(
+          IPC.PROMPTS_RELOAD,
+          [],
+          reloadPrompts
+        );
+      },
+    };
+}
+);

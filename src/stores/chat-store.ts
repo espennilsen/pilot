@@ -1,5 +1,11 @@
+/**
+ * @file Chat store — manages conversation messages, streaming state, model info, and token usage per tab.
+ */
 import { create } from 'zustand';
 
+/**
+ * A single message in the conversation history.
+ */
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -12,6 +18,9 @@ export interface ChatMessage {
   retryInfo?: { attempt: number; maxAttempts: number; delayMs: number };
 }
 
+/**
+ * Tool call metadata for a single tool invocation within a message.
+ */
 export interface ToolCallInfo {
   id: string;
   toolName: string;
@@ -22,6 +31,9 @@ export interface ToolCallInfo {
   completedAt?: number;
 }
 
+/**
+ * Model metadata returned from the SDK.
+ */
 export interface ModelInfo {
   provider: string;
   id: string;
@@ -31,6 +43,9 @@ export interface ModelInfo {
   reasoning?: boolean;
 }
 
+/**
+ * Token usage breakdown for a session.
+ */
 export interface SessionTokens {
   input: number;
   output: number;
@@ -39,6 +54,9 @@ export interface SessionTokens {
   total: number;
 }
 
+/**
+ * Context window utilization metrics.
+ */
 export interface ContextUsage {
   tokens: number | null;
   contextWindow: number;
@@ -64,6 +82,8 @@ interface ChatState {
   costByTab: Record<string, number>;
   // Queued steering/follow-up messages per tab
   queuedByTab: Record<string, { steering: string[]; followUp: string[] }>;
+  // Streaming index cache per tab (performance optimization)
+  streamingIndexByTab: Record<string, number>;
 
   // Actions
   addMessage: (tabId: string, message: ChatMessage) => void;
@@ -84,6 +104,37 @@ interface ChatState {
   getMessages: (tabId: string) => ChatMessage[];
 }
 
+/**
+ * Get the index of the last assistant message, using cache for hot path.
+ * @param messages - The message array
+ * @param tabId - Current tab ID (for cache lookup)
+ * @param streamingIndexByTab - Cache map of tab → index
+ * @param requireStreaming - If true, only return messages with `isStreaming: true`
+ */
+function getLastAssistantIndex(
+  messages: ChatMessage[],
+  tabId: string,
+  streamingIndexByTab: Record<string, number>,
+  requireStreaming: boolean
+): number {
+  // Check cache first — valid if index points to correct message type
+  const cached = streamingIndexByTab[tabId];
+  if (cached !== undefined && cached >= 0 && cached < messages.length) {
+    const msg = messages[cached];
+    if (msg.role === 'assistant' && (!requireStreaming || msg.isStreaming)) {
+      return cached;
+    }
+  }
+  // Cache miss — fallback to search
+  return messages.findLastIndex(
+    msg => msg.role === 'assistant' && (!requireStreaming || msg.isStreaming)
+  );
+}
+
+/**
+ * Chat store — manages conversation messages, streaming state, model info, and token usage per tab.
+ * Messages are stored in a per-tab map to support multi-tab sessions.
+ */
 export const useChatStore = create<ChatState>((set, get) => ({
   messagesByTab: {},
   streamingByTab: {},
@@ -94,14 +145,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
   contextUsageByTab: {},
   costByTab: {},
   queuedByTab: {},
+  streamingIndexByTab: {},
 
   addMessage: (tabId, message) => {
-    set(state => ({
-      messagesByTab: {
-        ...state.messagesByTab,
-        [tabId]: [...(state.messagesByTab[tabId] || []), message],
-      },
-    }));
+    set(state => {
+      const updatedMessages = [...(state.messagesByTab[tabId] || []), message];
+      const updates: Partial<ChatState> = {
+        messagesByTab: {
+          ...state.messagesByTab,
+          [tabId]: updatedMessages,
+        },
+      };
+      
+      // Update cache when adding assistant message
+      if (message.role === 'assistant') {
+        updates.streamingIndexByTab = {
+          ...state.streamingIndexByTab,
+          [tabId]: updatedMessages.length - 1,
+        };
+      }
+      
+      return updates;
+    });
   },
 
   updateMessage: (tabId, messageId, updates) => {
@@ -118,12 +183,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  /** Append a text delta to the last streaming assistant message (used during streaming). */
   appendToLastAssistant: (tabId, textDelta) => {
     set(state => {
       const messages = state.messagesByTab[tabId] || [];
-      const lastAssistantIndex = messages.findLastIndex(
-        msg => msg.role === 'assistant' && msg.isStreaming
-      );
+      const lastAssistantIndex = getLastAssistantIndex(messages, tabId, state.streamingIndexByTab, true);
       
       if (lastAssistantIndex === -1) return state;
 
@@ -142,12 +206,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  /** Append a thinking delta to the last streaming assistant message (used during thinking mode). */
   appendThinking: (tabId, thinkingDelta) => {
     set(state => {
       const messages = state.messagesByTab[tabId] || [];
-      const lastAssistantIndex = messages.findLastIndex(
-        msg => msg.role === 'assistant' && msg.isStreaming
-      );
+      const lastAssistantIndex = getLastAssistantIndex(messages, tabId, state.streamingIndexByTab, true);
       
       if (lastAssistantIndex === -1) return state;
 
@@ -167,12 +230,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  /** Add a new tool call to the last assistant message. */
   addToolCall: (tabId, toolCall) => {
     set(state => {
       const messages = state.messagesByTab[tabId] || [];
-      const lastAssistantIndex = messages.findLastIndex(
-        msg => msg.role === 'assistant'
-      );
+      const lastAssistantIndex = getLastAssistantIndex(messages, tabId, state.streamingIndexByTab, false);
       
       if (lastAssistantIndex === -1) return state;
 
@@ -195,9 +257,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   updateToolCall: (tabId, toolCallId, updates) => {
     set(state => {
       const messages = state.messagesByTab[tabId] || [];
-      const lastAssistantIndex = messages.findLastIndex(
-        msg => msg.role === 'assistant'
-      );
+      const lastAssistantIndex = getLastAssistantIndex(messages, tabId, state.streamingIndexByTab, false);
       
       if (lastAssistantIndex === -1) return state;
 
@@ -296,12 +356,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages: (tabId) => {
-    set(state => ({
-      messagesByTab: {
-        ...state.messagesByTab,
-        [tabId]: [],
-      },
-    }));
+    set(state => {
+      const newStreamingIndexByTab = { ...state.streamingIndexByTab };
+      delete newStreamingIndexByTab[tabId];
+      
+      return {
+        messagesByTab: {
+          ...state.messagesByTab,
+          [tabId]: [],
+        },
+        streamingIndexByTab: newStreamingIndexByTab,
+      };
+    });
   },
 
   getMessages: (tabId) => {

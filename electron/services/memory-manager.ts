@@ -5,6 +5,18 @@ import { PILOT_APP_DIR } from './pilot-paths';
 
 const GLOBAL_MEMORY_PATH = path.join(PILOT_APP_DIR, 'MEMORY.md');
 
+/**
+ * Minimum time (in milliseconds) between automatic memory extractions.
+ * Prevents excessive extraction attempts during rapid agent activity.
+ */
+export const EXTRACTION_DEBOUNCE_MS = 30_000;
+
+/**
+ * Maximum memory context size (in bytes) to inject into system prompts.
+ * Limits memory overhead when context windows are constrained.
+ */
+export const MAX_MEMORY_INJECT_SIZE = 50 * 1024; // 50KB
+
 export interface MemoryExtractionResult {
   shouldSave: boolean;
   memories: Array<{
@@ -22,8 +34,6 @@ export interface MemoryFiles {
 export class MemoryManager {
   private lastExtractionTime = 0;
   private _enabled = true;
-  private static EXTRACTION_DEBOUNCE_MS = 30_000;
-  private static MAX_MEMORY_INJECT_SIZE = 50 * 1024; // 50KB
 
   get enabled(): boolean {
     return this._enabled;
@@ -57,18 +67,27 @@ export class MemoryManager {
     let content = sections.join('\n\n');
 
     // Truncate if too large — keep most recent entries
-    if (Buffer.byteLength(content, 'utf-8') > MemoryManager.MAX_MEMORY_INJECT_SIZE) {
+    if (Buffer.byteLength(content, 'utf-8') > MAX_MEMORY_INJECT_SIZE) {
       const lines = content.split('\n');
-      while (Buffer.byteLength(lines.join('\n'), 'utf-8') > MemoryManager.MAX_MEMORY_INJECT_SIZE && lines.length > 10) {
-        // Remove the oldest entry (first bullet after first heading)
-        const firstBulletIdx = lines.findIndex((l, i) => i > 0 && l.startsWith('- '));
-        if (firstBulletIdx > 0) {
-          lines.splice(firstBulletIdx, 1);
-        } else {
-          break;
-        }
+      // Pre-calculate byte sizes to avoid re-joining on every iteration (O(n) vs O(n²))
+      const lineSizes = lines.map(l => Buffer.byteLength(l, 'utf-8'));
+      let totalSize = lineSizes.reduce((a, b) => a + b, 0) + lines.length - 1; // +newlines
+
+      // Collect indices of bullet entries (oldest first) — these are what we trim
+      const bulletIndices: number[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].startsWith('- ')) bulletIndices.push(i);
       }
-      content = lines.join('\n');
+
+      // Remove oldest bullets until under budget
+      const toRemove = new Set<number>();
+      for (const idx of bulletIndices) {
+        if (totalSize <= MAX_MEMORY_INJECT_SIZE || (lines.length - toRemove.size) <= 10) break;
+        totalSize -= lineSizes[idx] + 1; // +1 for newline
+        toRemove.add(idx);
+      }
+
+      content = lines.filter((_, i) => !toRemove.has(i)).join('\n');
     }
 
     return [
@@ -203,7 +222,7 @@ If nothing worth remembering, respond: {"memories": []}`;
    */
   shouldSkipExtraction(): boolean {
     const now = Date.now();
-    if (now - this.lastExtractionTime < MemoryManager.EXTRACTION_DEBOUNCE_MS) {
+    if (now - this.lastExtractionTime < EXTRACTION_DEBOUNCE_MS) {
       return true;
     }
     return false;
@@ -224,17 +243,27 @@ If nothing worth remembering, respond: {"memories": []}`;
     projectPath: string
   ): Promise<MemoryExtractionResult> {
     try {
+      const MAX_MEMORIES_PER_EXTRACTION = 10;
+      const MAX_MEMORY_TEXT_LENGTH = 500;
+      const MAX_CATEGORY_LENGTH = 50;
+
       const parsed = JSON.parse(resultJson);
-      const memories = parsed.memories || [];
+      const rawMemories = Array.isArray(parsed.memories) ? parsed.memories : [];
+      const memories = rawMemories.slice(0, MAX_MEMORIES_PER_EXTRACTION);
 
       if (memories.length > 0) {
         for (const mem of memories) {
           if (mem.text && typeof mem.text === 'string') {
+            const text = mem.text.length > MAX_MEMORY_TEXT_LENGTH
+              ? mem.text.slice(0, MAX_MEMORY_TEXT_LENGTH) + '…'
+              : mem.text;
+            const category = (typeof mem.category === 'string' ? mem.category : 'General')
+              .slice(0, MAX_CATEGORY_LENGTH);
             await this.appendMemory(
-              mem.text,
+              text,
               mem.scope === 'global' ? 'global' : 'project',
               projectPath,
-              mem.category || 'General'
+              category
             );
           }
         }

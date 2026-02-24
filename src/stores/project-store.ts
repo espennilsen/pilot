@@ -1,21 +1,10 @@
+/**
+ * @file Project store — manages project directory, file tree, file preview/editing, and .gitignore prompts.
+ */
 import { create } from 'zustand';
 import type { FileNode } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
-
-/** Prompt user to add .pilot to .gitignore if this is a git repo without it. */
-async function checkGitignore(projectPath: string) {
-  try {
-    const result = await invoke(IPC.PROJECT_CHECK_GITIGNORE, projectPath) as { needsUpdate: boolean };
-    if (result.needsUpdate) {
-      if (confirm('This project is a git repo. Add .pilot to .gitignore to keep Pilot config out of version control?')) {
-        await invoke(IPC.PROJECT_ADD_GITIGNORE, projectPath);
-      }
-    }
-  } catch {
-    // Non-critical — don't block project opening
-  }
-}
 
 interface ProjectStore {
   projectPath: string | null;
@@ -32,6 +21,10 @@ interface ProjectStore {
   isSaving: boolean;
   saveError: string | null;
 
+  // Gitignore prompt state
+  showGitignorePrompt: boolean;
+  gitignoreProjectPath: string | null;
+
   setProjectPath: (path: string) => void;
   loadFileTree: () => Promise<void>;
   selectFile: (path: string) => Promise<void>;
@@ -43,8 +36,15 @@ interface ProjectStore {
   cancelEditing: () => void;
   setEditContent: (content: string) => void;
   saveFile: () => Promise<void>;
+
+  // Gitignore actions
+  confirmGitignore: () => Promise<void>;
+  dismissGitignore: () => void;
 }
 
+/**
+ * Project store — manages project directory, file tree, file preview/editing, and .gitignore prompts.
+ */
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projectPath: null,
   fileTree: [],
@@ -58,6 +58,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   editContent: '',
   isSaving: false,
   saveError: null,
+
+  showGitignorePrompt: false,
+  gitignoreProjectPath: null,
 
   setProjectPath: (path) => {
     set({ projectPath: path });
@@ -90,7 +93,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (result.error) {
         set({ previewError: result.error, isLoadingPreview: false });
       } else {
-        set({ previewContent: result.content ?? null, isLoadingPreview: false });
+        set({ previewContent: result.content ?? null, previewError: null, isLoadingPreview: false });
       }
     } catch (err) {
       set({ previewError: String(err), isLoadingPreview: false });
@@ -128,7 +131,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }
 
       // Check if .pilot should be added to .gitignore
-      checkGitignore(path);
+      try {
+        const result = await invoke(IPC.PROJECT_CHECK_GITIGNORE, path) as { needsUpdate: boolean };
+        if (result.needsUpdate) {
+          set({ showGitignorePrompt: true, gitignoreProjectPath: path });
+        }
+      } catch {
+        // Non-critical — don't block project opening
+      }
     }
   },
 
@@ -169,5 +179,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     } catch (err) {
       set({ isSaving: false, saveError: String(err) });
     }
+  },
+
+  confirmGitignore: async () => {
+    const { gitignoreProjectPath } = get();
+    if (!gitignoreProjectPath) return;
+
+    try {
+      await invoke(IPC.PROJECT_ADD_GITIGNORE, gitignoreProjectPath);
+    } catch (err) {
+      console.error('Failed to add .pilot to .gitignore:', err);
+    } finally {
+      set({ showGitignorePrompt: false, gitignoreProjectPath: null });
+    }
+  },
+
+  dismissGitignore: () => {
+    set({ showGitignorePrompt: false, gitignoreProjectPath: null });
   },
 }));

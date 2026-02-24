@@ -12,6 +12,7 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",
     "build:linux": "npm run build && electron-builder --linux",
+    "lint": "npx eslint . --ext .ts,.tsx,.js,.jsx --format stylish --max-warnings 0 --report-unused-disable-directives --ignore-pattern \"dist/**\" --ignore-pattern \"out/**\" --ignore-pattern \"node_modules/**\" --ignore-pattern \".webpack/**\" --ignore-pattern \"*.config.{js,ts}\"",
     "preview": "electron-vite preview --config electron-vite.config.mjs",
     "postinstall": "node -e \"process.platform==='darwin'&&require('child_process').execSync('chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper',{stdio:'ignore'})\" 2>/dev/null || true"
   },

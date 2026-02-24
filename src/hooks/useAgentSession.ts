@@ -10,6 +10,7 @@ import { useTaskStore } from '../stores/task-store';
 import { useUIStore } from '../stores/ui-store';
 import { invoke, on } from '../lib/ipc-client';
 import { IPC } from '../../shared/ipc';
+import { cleanErrorMessage } from '../lib/error-messages';
 
 interface AgentEventPayload {
   tabId: string;
@@ -37,7 +38,9 @@ function refreshSessionList() {
   useSessionStore.getState().loadSessions(paths);
 }
 
-/** Fetch session stats and context usage from main process and update the store */
+/**
+ * Fetch session stats and context usage from main process and update the store
+ */
 async function refreshSessionStats(tabId: string) {
   const { setTokens, setContextUsage, setCost, setModelInfo } = useChatStore.getState();
 
@@ -60,11 +63,31 @@ async function refreshSessionStats(tabId: string) {
     if (modelInfo) {
       setModelInfo(tabId, modelInfo);
     }
-  } catch {
-    // Ignore — session may not exist yet
+  } catch (err) {
+    console.warn('[useAgentSession] refreshSessionStats', err);
   }
 }
 
+/**
+ * Manages the active agent session lifecycle for a chat tab.
+ * 
+ * Handles sending messages, receiving streaming events, managing session stats,
+ * and coordinating with the sandbox and subagent systems. Listens for agent events
+ * from the main process (message streaming, tool execution, model cycling) and
+ * updates the chat store accordingly.
+ * 
+ * Must be used within a component that has access to the active tab context.
+ * 
+ * @returns Object with methods to control the agent session:
+ *   - sendMessage: Send a user message to the agent
+ *   - steerAgent: Inject a steering message into the agent's context
+ *   - followUpAgent: Queue a follow-up message for the agent
+ *   - abortAgent: Cancel the current agent turn
+ *   - cycleModel: Switch to the next model in the registry
+ *   - selectModel: Choose a specific model by provider and ID
+ *   - cycleThinking: Toggle through thinking/reasoning levels
+ *   - refreshQueued: Refresh the list of queued steering/follow-up messages
+ */
 export function useAgentSession() {
   const activeTabId = useTabStore(s => s.activeTabId);
   const {
@@ -279,12 +302,7 @@ export function useAgentSession() {
       await invoke(IPC.AGENT_PROMPT, activeTabId, text, projectPath, undefined, sessionPath);
       refreshSessionList();
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      let friendly = raw
-        .replace(/^Error:\s*/i, '')
-        .replace(/Error invoking remote method '[^']+':?\s*/i, '')
-        .replace(/^Error:\s*/i, '')
-        .trim();
+      let friendly = cleanErrorMessage(err);
 
       if (/no project selected/i.test(friendly)) {
         friendly = 'No project open. Open a project first, then try again.';
@@ -308,7 +326,9 @@ export function useAgentSession() {
     try {
       const result = await invoke(IPC.AGENT_GET_QUEUED, id) as { steering: string[]; followUp: string[] };
       setQueued(id, result);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[useAgentSession] refreshQueued', err);
+    }
   }, [activeTabId, setQueued]);
 
   const steerAgent = useCallback(async (text: string) => {
@@ -316,7 +336,9 @@ export function useAgentSession() {
     try {
       await invoke(IPC.AGENT_STEER, activeTabId, text);
       await refreshQueued();
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[useAgentSession] steerAgent', err);
+    }
   }, [activeTabId, refreshQueued]);
 
   const followUpAgent = useCallback(async (text: string) => {
@@ -324,7 +346,9 @@ export function useAgentSession() {
     try {
       await invoke(IPC.AGENT_FOLLOW_UP, activeTabId, text);
       await refreshQueued();
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[useAgentSession] followUpAgent', err);
+    }
   }, [activeTabId, refreshQueued]);
 
   const abortAgent = useCallback(async () => {
@@ -333,7 +357,9 @@ export function useAgentSession() {
       await invoke(IPC.AGENT_ABORT, activeTabId);
       // Clear queued messages display on abort
       setQueued(activeTabId, { steering: [], followUp: [] });
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[useAgentSession] abortAgent', err);
+    }
   }, [activeTabId, setQueued]);
 
   const cycleModel = useCallback(async () => {

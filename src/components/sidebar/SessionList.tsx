@@ -4,7 +4,7 @@ import { useTabStore } from '../../stores/tab-store';
 import { useProjectStore } from '../../stores/project-store';
 import { SessionItem } from './SessionItem';
 import { Icon } from '../shared/Icon';
-import { openTabSession, getWiredSessions } from '../../hooks/useWorkspacePersistence';
+import { openTabSession, useWiredSessionsStore } from '../../hooks/useWorkspacePersistence';
 
 export function SessionList() {
   const {
@@ -21,6 +21,7 @@ export function SessionList() {
     unarchiveSession,
     deleteSession,
   } = useSessionStore();
+  const { addWiredSession } = useWiredSessionsStore();
 
   const { activeTabId, tabs, switchTab } = useTabStore();
   const projectPath = useProjectStore(s => s.projectPath);
@@ -56,11 +57,11 @@ export function SessionList() {
 
     try {
       await openTabSession(newTabId, { sessionPath: session.path, projectPath: session.projectPath });
-      getWiredSessions().add(`${newTabId}::${session.projectPath}`);
+      addWiredSession(`${newTabId}::${session.projectPath}`);
     } catch (err) {
       console.error('Failed to open session:', err);
     }
-  }, [tabs, switchTab]);
+  }, [tabs, switchTab, addWiredSession]);
 
   return (
     <div className="flex flex-col h-full">

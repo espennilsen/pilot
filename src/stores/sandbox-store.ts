@@ -1,3 +1,6 @@
+/**
+ * @file Sandbox store — manages staged diffs, yolo mode, jail settings, and auto-accept per tool.
+ */
 import { create } from 'zustand';
 import type { StagedDiff, ProjectSandboxSettings } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
@@ -17,6 +20,7 @@ interface SandboxStore {
 
   // Actions
   addDiff: (tabId: string, diff: StagedDiff) => void;
+  autoAcceptIfEnabled: (tabId: string, diff: StagedDiff) => void;
   updateDiffStatus: (tabId: string, diffId: string, status: StagedDiff['status']) => void;
   getPendingDiffs: (tabId: string) => StagedDiff[];
   clearDiffs: (tabId: string) => void;
@@ -34,6 +38,10 @@ interface SandboxStore {
   toggleYolo: (tabId: string) => Promise<void>;
 }
 
+/**
+ * Sandbox store — manages staged diffs, yolo mode, jail settings, and auto-accept per tool.
+ * Diffs are staged by the main process and accepted/rejected via IPC.
+ */
 export const useSandboxStore = create<SandboxStore>((set, get) => ({
   diffsByTab: {},
   yoloMode: false,
@@ -41,7 +49,28 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
   diffViewMode: 'unified',
   autoAcceptTools: {},
 
+  /**
+   * Add a staged diff to the store.
+   * Pure state mutation — does not trigger side effects.
+   */
   addDiff: (tabId: string, diff: StagedDiff) => {
+    set((state) => ({
+      diffsByTab: {
+        ...state.diffsByTab,
+        [tabId]: [...(state.diffsByTab[tabId] || []), diff],
+      },
+    }));
+
+    // Trigger auto-accept side effect if enabled for this tool
+    get().autoAcceptIfEnabled(tabId, diff);
+  },
+
+  /**
+   * Auto-accept a diff if auto-accept is enabled for its tool type.
+   * Side effect — calls IPC to accept the diff.
+   * Separated from addDiff for testability.
+   */
+  autoAcceptIfEnabled: (tabId: string, diff: StagedDiff) => {
     // Determine which tool produced this diff
     const toolName = diff.operation === 'bash' ? 'bash'
       : diff.operation === 'create' ? 'write'
@@ -49,14 +78,6 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
       : 'write';
 
     const autoAccepted = get().autoAcceptTools[tabId]?.[toolName] ?? false;
-
-    // Always add the diff to the store first
-    set((state) => ({
-      diffsByTab: {
-        ...state.diffsByTab,
-        [tabId]: [...(state.diffsByTab[tabId] || []), diff],
-      },
-    }));
 
     // If auto-accept is on for this tool, immediately accept.
     // Jail enforcement for bash happens in the main process (findEscapingPaths)
@@ -143,6 +164,7 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
     }
   },
 
+  /** Accept all pending diffs for a tab (applies them to disk via IPC). */
   acceptAll: async (tabId: string) => {
     try {
       await invoke(IPC.SANDBOX_ACCEPT_ALL, tabId);
@@ -158,6 +180,7 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
     }
   },
 
+  /** Toggle yolo mode for a tab (auto-accept all diffs without review). */
   toggleYolo: async (tabId: string) => {
     try {
       const result = await invoke(IPC.SANDBOX_TOGGLE_YOLO, tabId);

@@ -8,7 +8,7 @@ import type { CompanionRemote } from '../services/companion-remote';
 import { setActivationCallback, setTunnelOutputCallback } from '../services/companion-remote';
 import { regenerateTLSCert } from '../services/companion-tls';
 import { PILOT_APP_DIR } from '../services/pilot-paths';
-import { loadAppSettings } from '../services/app-settings';
+import { loadAppSettings, saveAppSettings } from '../services/app-settings';
 
 interface CompanionDeps {
   auth: CompanionAuth;
@@ -84,6 +84,7 @@ export function registerCompanionIpc(deps: CompanionDeps) {
       remoteType: remoteInfo.type,
       lanAddress,
       lanAddresses: allAddresses,
+      autoStart: appSettings.companionAutoStart ?? false,
     };
   });
 
@@ -126,6 +127,14 @@ export function registerCompanionIpc(deps: CompanionDeps) {
       enabled: false,
       running: false,
     };
+  });
+
+  /**
+   * Toggle whether the companion server auto-starts on app launch
+   */
+  ipcMain.handle(IPC.COMPANION_SET_AUTO_START, async (_event, autoStart: boolean) => {
+    saveAppSettings({ companionAutoStart: autoStart });
+    return { autoStart };
   });
 
   /**
@@ -277,14 +286,14 @@ export function registerCompanionIpc(deps: CompanionDeps) {
     let tailscale = false;
     let tailscaleOnline = false;
     let cloudflared = false;
-    try { execSync(`${whichCmd} tailscale`, { stdio: 'ignore' }); tailscale = true; } catch {}
-    try { execSync(`${whichCmd} cloudflared`, { stdio: 'ignore' }); cloudflared = true; } catch {}
+    try { execSync(`${whichCmd} tailscale`, { stdio: 'ignore' }); tailscale = true; } catch { /* Expected: tool not installed */ }
+    try { execSync(`${whichCmd} cloudflared`, { stdio: 'ignore' }); cloudflared = true; } catch { /* Expected: tool not installed */ }
     if (tailscale) {
       try {
         const out = execSync('tailscale status --json', { encoding: 'utf-8' });
         const status = JSON.parse(out);
         tailscaleOnline = !!status.Self?.Online;
-      } catch {}
+      } catch { /* Expected: tailscale not running or not authenticated */ }
     }
     return { tailscale, tailscaleOnline, cloudflared };
   });
@@ -293,6 +302,16 @@ export function registerCompanionIpc(deps: CompanionDeps) {
    * Open a tunnel URL in the default browser (or specified browser)
    */
   ipcMain.handle(IPC.COMPANION_OPEN_TUNNEL, async (_event, url: string) => {
+    // Only allow http/https URLs to prevent protocol injection (file:, javascript:, etc.)
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { opened: false, error: 'Only http and https URLs are allowed' };
+      }
+    } catch {
+      /* Expected: URL parsing may fail for malformed input */
+      return { opened: false, error: 'Invalid URL' };
+    }
     await shell.openExternal(url);
     return { opened: true };
   });

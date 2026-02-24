@@ -60,7 +60,8 @@ export function registerModelIpc(sessionManager: PilotSessionManager) {
     if (!session) return null;
     try {
       return session.getSessionStats();
-    } catch {
+    } catch (err) {
+      console.warn('[IPC:model] Failed to get session stats:', err);
       return null;
     }
   });
@@ -71,7 +72,8 @@ export function registerModelIpc(sessionManager: PilotSessionManager) {
     if (!session) return null;
     try {
       return session.getContextUsage();
-    } catch {
+    } catch (err) {
+      console.warn('[IPC:model] Failed to get context usage:', err);
       return null;
     }
   });

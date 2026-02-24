@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID, randomInt } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
@@ -81,7 +81,7 @@ export class CompanionAuth {
    * @returns 6-digit PIN string (e.g., "123456")
    */
   generatePIN(): string {
-    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const pin = randomInt(100000, 1000000).toString();
     const now = Date.now();
     this.activePairing = {
       pin,

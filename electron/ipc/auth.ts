@@ -100,7 +100,7 @@ export function registerAuthIpc(sessionManager: PilotSessionManager) {
       // Forward to companion clients
       try {
         companionBridge.forwardEvent(IPC.AUTH_LOGIN_OAUTH_EVENT, payload);
-      } catch { /* not initialized */ }
+      } catch { /* Expected: companion bridge not initialized yet during startup */ }
     };
 
     try {

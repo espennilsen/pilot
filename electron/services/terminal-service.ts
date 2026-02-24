@@ -2,6 +2,7 @@ import * as pty from 'node-pty';
 import { BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { expandHome } from '../utils/paths';
+import { broadcastToRenderer } from '../utils/broadcast';
 
 export class TerminalService {
   private terminals: Map<string, pty.IPty> = new Map();
@@ -22,7 +23,7 @@ export class TerminalService {
     const defaultShell = shell ||
       (process.platform === 'win32'
         ? 'powershell.exe'
-        : process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash'));
+        : process.env.SHELL || '/bin/sh');
 
     // Spawn PTY
     const term = pty.spawn(defaultShell, [], {
@@ -40,36 +41,18 @@ export class TerminalService {
 
     // Forward PTY output to renderer (tagged with terminal ID)
     term.onData((data) => {
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send(IPC.TERMINAL_OUTPUT, { id, data });
-      }
-      // Forward to companion clients
-      try {
-        const { companionBridge } = require('./companion-ipc-bridge');
-        companionBridge.forwardEvent(IPC.TERMINAL_OUTPUT, { id, data });
-      } catch { /* not initialized */ }
+      broadcastToRenderer(IPC.TERMINAL_OUTPUT, { id, data });
     });
 
     // Handle PTY exit
     term.onExit(({ exitCode, signal }) => {
       console.log(`Terminal ${id} exited with code ${exitCode}, signal ${signal}`);
       this.terminals.delete(id);
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send(IPC.TERMINAL_OUTPUT, {
-          id,
-          data: `\r\n\x1b[33mTerminal process exited with code ${exitCode}\x1b[0m\r\n`,
-        });
-        this.mainWindow.webContents.send(IPC.TERMINAL_EXITED, id);
-      }
-      // Forward to companion clients
-      try {
-        const { companionBridge } = require('./companion-ipc-bridge');
-        companionBridge.forwardEvent(IPC.TERMINAL_OUTPUT, {
-          id,
-          data: `\r\n\x1b[33mTerminal process exited with code ${exitCode}\x1b[0m\r\n`,
-        });
-        companionBridge.forwardEvent(IPC.TERMINAL_EXITED, id);
-      } catch { /* not initialized */ }
+      broadcastToRenderer(IPC.TERMINAL_OUTPUT, {
+        id,
+        data: `\r\n\x1b[33mTerminal process exited with code ${exitCode}\x1b[0m\r\n`,
+      });
+      broadcastToRenderer(IPC.TERMINAL_EXITED, id);
     });
 
     console.log(`Terminal ${id} created: shell=${defaultShell}, cwd=${cwd}`);

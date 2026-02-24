@@ -42,6 +42,7 @@ function whichSync(cmd: string): string | null {
     // `where` on Windows may return multiple lines — take the first
     return result.split(/\r?\n/)[0] || null;
   } catch {
+    /* Expected: command not found in PATH */
     return null;
   }
 }
@@ -78,7 +79,7 @@ function detectEditors(): DetectedEditor[] {
           found.push({ id: def.id, name: def.name, cli: `open -b ${def.bundleId}` });
         }
       } catch {
-        // skip
+        /* Expected: editor not installed or mdfind failed */
       }
     }
   } else if (process.platform === 'win32') {
@@ -166,7 +167,7 @@ function detectTerminals(): DetectedTerminal[] {
           found.push({ id: def.id, name: def.name, app: def.app });
         }
       } catch {
-        // skip
+        /* Expected: terminal not installed or mdfind failed */
       }
     }
     // Terminal.app is always available on macOS

@@ -74,6 +74,6 @@ export function registerPromptsIpc(promptLibrary: PromptLibrary) {
     }
     try {
       companionBridge.forwardEvent(IPC.PROMPTS_CHANGED, undefined);
-    } catch { /* not initialized */ }
+    } catch { /* Expected: companion bridge not initialized yet during startup */ }
   });
 }

@@ -2,8 +2,11 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import { createServer as createHttpsServer, Server as HTTPSServer } from 'https';
 import { createServer as createHttpServer, Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { join, extname } from 'path';
+import { join, extname, resolve, normalize } from 'path';
 import { existsSync } from 'fs';
+
+/** Default port for the companion HTTPS + WebSocket server */
+export const DEFAULT_COMPANION_PORT = 18088;
 
 /**
  * Minimal interface for the CompanionIPCBridge
@@ -27,7 +30,7 @@ interface CompanionAuth {
  * Configuration for the CompanionServer
  */
 interface CompanionServerConfig {
-  /** Port to listen on (default: 18088) */
+  /** Port to listen on (default: DEFAULT_COMPANION_PORT) */
   port?: number;
   /** Path to the built React renderer bundle */
   reactBundlePath?: string;
@@ -93,7 +96,7 @@ export class CompanionServer {
 
   constructor(config: CompanionServerConfig) {
     this.config = {
-      port: config.port ?? 18088,
+      port: config.port ?? DEFAULT_COMPANION_PORT,
       reactBundlePath: config.reactBundlePath ?? join(__dirname, '../renderer'),
       protocol: config.protocol ?? 'https',
       tlsCert: config.tlsCert,
@@ -110,6 +113,15 @@ export class CompanionServer {
    * Set up Express routes
    */
   private setupRoutes(): void {
+    // CORS headers - restrict to same-origin; companion clients connect via WebSocket, not CORS
+    this.app.use((_req: Request, res: Response, next: NextFunction) => {
+      res.setHeader('Access-Control-Allow-Origin', 'null');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      if (_req.method === 'OPTIONS') { res.status(204).end(); return; }
+      next();
+    });
+
     // JSON middleware for API routes
     this.app.use(express.json());
 
@@ -134,15 +146,42 @@ export class CompanionServer {
     // Validates the path is inside a .pilot/attachments directory.
     this.app.get('/api/attachments', (req: Request, res: Response) => {
       const filePath = req.query.path as string | undefined;
-      if (!filePath || !filePath.includes('.pilot/attachments/')) {
+      if (!filePath) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
-      if (!existsSync(filePath)) {
+
+      // Canonicalize and normalize the path
+      const normalizedPath = normalize(resolve(filePath));
+
+      // Reject paths containing .. segments after normalization
+      if (normalizedPath.includes('..')) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+
+      // Verify path contains /.pilot/attachments/ as a real directory component
+      const attachmentsPattern = /[\/\\]\.pilot[\/\\]attachments[\/\\]/;
+      if (!attachmentsPattern.test(normalizedPath)) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+
+      // Only allow image extensions
+      const ext = extname(normalizedPath).toLowerCase();
+      const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+      if (!allowedExtensions.includes(ext)) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+
+      // Verify file exists
+      if (!existsSync(normalizedPath)) {
         res.status(404).json({ error: 'Not found' });
         return;
       }
-      const ext = extname(filePath).toLowerCase();
+
+      // Serve the file with proper content type
       const mimeTypes: Record<string, string> = {
         '.png': 'image/png',
         '.jpg': 'image/jpeg',
@@ -151,7 +190,7 @@ export class CompanionServer {
         '.webp': 'image/webp',
       };
       res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-      res.sendFile(filePath);
+      res.sendFile(normalizedPath);
     });
 
     // Serve static files from the React bundle directory
@@ -224,7 +263,10 @@ export class CompanionServer {
     }
 
     // Create WebSocket server attached to the HTTP(S) server
-    this.wss = new WebSocketServer({ server: this.httpServer });
+    this.wss = new WebSocketServer({ 
+      server: this.httpServer,
+      maxPayload: 1 * 1024 * 1024  // 1MB limit
+    });
 
     // Set up WebSocket connection handling
     this.wss.on('connection', (ws: WebSocket) => {

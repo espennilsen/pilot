@@ -1,7 +1,14 @@
+/**
+ * @file Auth store — manages provider authentication, OAuth flow, API keys, and error handling.
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
+import { cleanErrorMessage } from '../lib/error-messages';
 
+/**
+ * Authentication info for a single provider.
+ */
 export interface ProviderAuthInfo {
   provider: string;
   hasAuth: boolean;
@@ -29,6 +36,9 @@ interface AuthStore {
   clearError: () => void;
 }
 
+/**
+ * Convert raw auth error into a user-friendly message.
+ */
 function friendlyAuthError(raw: unknown): string {
   const msg = String(raw);
 
@@ -49,14 +59,13 @@ function friendlyAuthError(raw: unknown): string {
     return 'That API key was rejected. Double-check you copied the full key and try again.';
   }
 
-  // Strip the noisy "Error: Error invoking remote method '...': Error:" wrapper
-  return msg
-    .replace(/^Error:\s*/i, '')
-    .replace(/Error invoking remote method '[^']+':?\s*/i, '')
-    .replace(/^Error:\s*/i, '')
-    .trim() || 'Something went wrong. Please try again.';
+  // Strip Electron's verbose IPC error wrapper
+  return cleanErrorMessage(msg) || 'Something went wrong. Please try again.';
 }
 
+/**
+ * Auth store — manages provider authentication, OAuth flow, API keys, and error handling.
+ */
 export const useAuthStore = create<AuthStore>((set, get) => ({
   providers: [],
   hasAnyAuth: false,

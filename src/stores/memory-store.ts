@@ -1,7 +1,13 @@
+/**
+ * @file Memory store — manages memory files, count badges, auto-extraction notifications, and settings.
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
+/**
+ * Memory entry counts for status bar display.
+ */
 export interface MemoryCount {
   global: number;
   project: number;
@@ -35,6 +41,9 @@ interface MemoryState {
   setAutoExtractEnabled: (enabled: boolean) => void;
 }
 
+/**
+ * Memory store — manages memory files, count badges, auto-extraction notifications, and settings.
+ */
 export const useMemoryStore = create<MemoryState>((set) => ({
   globalMemory: null,
   projectSharedMemory: null,
@@ -54,8 +63,8 @@ export const useMemoryStore = create<MemoryState>((set) => ({
         globalMemory: files.global,
         projectSharedMemory: files.projectShared,
       });
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.warn('[MemoryStore]', err);
     }
   },
 
@@ -63,24 +72,24 @@ export const useMemoryStore = create<MemoryState>((set) => ({
     try {
       const count = await invoke(IPC.MEMORY_GET_COUNT, projectPath) as MemoryCount;
       set({ memoryCount: count });
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.warn('[MemoryStore]', err);
     }
   },
 
   saveMemory: async (scope: string, projectPath: string, content: string) => {
     try {
       await invoke(IPC.MEMORY_SAVE_FILE, scope, projectPath, content);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.warn('[MemoryStore]', err);
     }
   },
 
   clearMemory: async (scope: string, projectPath: string) => {
     try {
       await invoke(IPC.MEMORY_CLEAR, scope, projectPath);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.warn('[MemoryStore]', err);
     }
   },
 
@@ -101,7 +110,9 @@ export const useMemoryStore = create<MemoryState>((set) => ({
 
   setMemoryEnabled: (enabled) => {
     set({ memoryEnabled: enabled });
-    invoke(IPC.MEMORY_SET_ENABLED, enabled).catch(() => {});
+    invoke(IPC.MEMORY_SET_ENABLED, enabled).catch((err) => {
+      console.warn('[MemoryStore]', err);
+    });
   },
   setAutoExtractEnabled: (enabled) => set({ autoExtractEnabled: enabled }),
 }));

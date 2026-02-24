@@ -77,6 +77,7 @@ function isWithinProject(projectRoot: string, filePath: string, allowedPaths: st
  * system resources that agents routinely reference in commands.
  */
 const SYSTEM_SAFE_PREFIXES = [
+  // Unix/macOS
   '/dev/',       // Device files (/dev/null, /dev/urandom, etc.)
   '/proc/',      // Linux procfs
   '/sys/',       // Linux sysfs
@@ -87,6 +88,10 @@ const SYSTEM_SAFE_PREFIXES = [
   '/nix/',       // Nix store
   '/etc/',       // System config (read-only in practice)
   '/Library/',   // macOS system library
+  // Windows
+  'C:\\Windows\\',
+  'C:\\Program Files\\',
+  'C:\\Program Files (x86)\\',
 ];
 
 /** Exact system paths allowed (when not covered by prefix). */
@@ -97,8 +102,82 @@ const SYSTEM_SAFE_EXACT = new Set([
 ]);
 
 function isSystemPath(absPath: string): boolean {
-  if (SYSTEM_SAFE_EXACT.has(absPath)) return true;
-  return SYSTEM_SAFE_PREFIXES.some(prefix => absPath.startsWith(prefix));
+  // Normalize to lowercase on Windows for case-insensitive comparison
+  const normalized = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
+  const normalizedPrefixes = process.platform === 'win32'
+    ? SYSTEM_SAFE_PREFIXES.map(p => p.toLowerCase())
+    : SYSTEM_SAFE_PREFIXES;
+  
+  if (SYSTEM_SAFE_EXACT.has(normalized)) return true;
+  return normalizedPrefixes.some(prefix => normalized.startsWith(prefix));
+}
+
+/**
+ * Expand environment variables that commonly resolve to paths.
+ * Replaces $HOME, ${HOME}, $TMPDIR, ${TMPDIR}, and ~/ with their actual values.
+ */
+function extractEnvExpansions(command: string): string {
+  const home = process.env.HOME ?? '';
+  let expanded = command;
+  
+  // Expand $HOME and ${HOME}
+  expanded = expanded.replace(/\$HOME(?=\/|[\s;|&'"`)}]|$)|\$\{HOME\}/g, home);
+  
+  // Expand $TMPDIR and ${TMPDIR}
+  expanded = expanded.replace(
+    /\$TMPDIR(?=\/|[\s;|&'"`)}]|$)|\$\{TMPDIR\}/g,
+    process.env.TMPDIR ?? '/tmp',
+  );
+
+  // Expand ~ to home dir at word boundaries (not ~user)
+  expanded = expanded.replace(/(^|[\s;|&()>=`])~\//g, `$1${home}/`);
+
+  // Strip comments (# to end of line, but not inside quotes — best-effort)
+  expanded = expanded.replace(/(^|[\s;|&])#[^\n]*/g, '$1');
+
+  return expanded;
+}
+
+/**
+ * Extract absolute paths from command string using regex pattern matching.
+ * Captures paths like /foo/bar, /etc/hosts, excluding URL paths (https://).
+ */
+function extractAbsolutePaths(command: string): Set<string> {
+  const candidates = new Set<string>();
+  
+  // Pattern: Absolute paths — /foo/bar preceded by shell delimiter or start
+  // The regex prevents matching URL paths by checking context
+  const absRegex = /(?:^|[\s;|&()>`"'=])(\/{1,2}[\w.\-/+@:,]+)/g;
+  let m: RegExpExecArray | null;
+  
+  while ((m = absRegex.exec(command)) !== null) {
+    const p = m[1].replace(/[,;:'"]+$/, ''); // trim trailing punctuation
+    if (p.length > 1 && p !== '//') {
+      // Skip if this looks like part of a URL (preceded by :)
+      const charBefore = command[m.index] === '/' ? command[m.index - 1] : undefined;
+      if (charBefore !== ':') candidates.add(p);
+    }
+  }
+
+  return candidates;
+}
+
+/**
+ * Extract relative escape paths from command string (e.g., ../, ../../foo).
+ * These paths attempt to navigate outside the current directory.
+ */
+function extractRelativeEscapes(command: string): Set<string> {
+  const candidates = new Set<string>();
+  
+  // Pattern: Relative escape paths — ../ or ../../ preceded by delimiter
+  const relRegex = /(?:^|[\s;|&()>`"'=])((?:\.\.\/)+[\w.\-/]*)/g;
+  let m: RegExpExecArray | null;
+  
+  while ((m = relRegex.exec(command)) !== null) {
+    candidates.add(m[1]);
+  }
+
+  return candidates;
 }
 
 /**
@@ -121,45 +200,18 @@ function isSystemPath(absPath: string): boolean {
  * - Regex patterns:        s/foo/bar/g (not word-boundary-preceded)
  */
 function extractPathsFromCommand(command: string): string[] {
-  const home = process.env.HOME ?? '';
+  // Step 1: Expand environment variables
+  const expanded = extractEnvExpansions(command);
 
-  // Step 1: Expand environment variables that commonly resolve to paths
-  let expanded = command;
-  expanded = expanded.replace(/\$HOME(?=\/|[\s;|&'"`)}]|$)|\$\{HOME\}/g, home);
-  expanded = expanded.replace(
-    /\$TMPDIR(?=\/|[\s;|&'"`)}]|$)|\$\{TMPDIR\}/g,
-    process.env.TMPDIR ?? '/tmp',
-  );
+  // Step 2: Extract absolute paths
+  const absolutePaths = extractAbsolutePaths(expanded);
 
-  // Expand ~ to home dir at word boundaries (not ~user which is a different thing)
-  expanded = expanded.replace(/(^|[\s;|&()>=`])~\//g, `$1${home}/`);
+  // Step 3: Extract relative escape paths
+  const relativePaths = extractRelativeEscapes(expanded);
 
-  // Step 2: Strip comments (# to end of line, but not inside quotes — best-effort)
-  expanded = expanded.replace(/(^|[\s;|&])#[^\n]*/g, '$1');
-
-  // Step 3: Extract path-like tokens
-  const candidates = new Set<string>();
-
-  // Pattern A: Absolute paths — /foo/bar preceded by shell delimiter or start
-  // The negative lookbehind for :/ and :// prevents matching URL paths
-  const absRegex = /(?:^|[\s;|&()>`"'=])(\/{1,2}[\w.\-/+@:,]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = absRegex.exec(expanded)) !== null) {
-    const p = m[1].replace(/[,;:'"]+$/, ''); // trim trailing punctuation
-    if (p.length > 1 && p !== '//') {
-      // Skip if this looks like part of a URL (preceded by :)
-      const charBefore = expanded[m.index] === '/' ? expanded[m.index - 1] : undefined;
-      if (charBefore !== ':') candidates.add(p);
-    }
-  }
-
-  // Pattern B: Relative escape paths — ../ or ../../ preceded by delimiter
-  const relRegex = /(?:^|[\s;|&()>`"'=])((?:\.\.\/)+[\w.\-/]*)/g;
-  while ((m = relRegex.exec(expanded)) !== null) {
-    candidates.add(m[1]);
-  }
-
-  return [...candidates];
+  // Merge results and return as array
+  const allPaths = new Set([...absolutePaths, ...relativePaths]);
+  return [...allPaths];
 }
 
 /**
@@ -247,7 +299,7 @@ export function createSandboxedTools(
         if (existsSync(resolvedPath)) {
           originalContent = readFileSync(resolvedPath, 'utf-8');
         }
-      } catch { /* ignore */ }
+      } catch { /* Expected: file may not exist yet or be unreadable */ }
 
       // Compute the proposed file content by applying the edit
       let proposedContent = originalContent ?? '';
@@ -311,7 +363,7 @@ export function createSandboxedTools(
         if (existsSync(resolvedPath)) {
           originalContent = readFileSync(resolvedPath, 'utf-8');
         }
-      } catch { /* ignore */ }
+      } catch { /* Expected: file may not exist yet or be unreadable */ }
 
       // Compute unified diff using pi's diff engine
       const unifiedDiff = generateUnifiedDiff(originalContent ?? '', content);

@@ -26,7 +26,7 @@ export function registerSettingsIpc() {
       if (existsSync(settingsPath)) {
         return JSON.parse(readFileSync(settingsPath, 'utf-8'));
       }
-    } catch { /* ignore */ }
+    } catch { /* Expected: settings file may not exist or be malformed JSON */ }
     return {};
   });
 
@@ -38,7 +38,7 @@ export function registerSettingsIpc() {
       if (existsSync(settingsPath)) {
         current = JSON.parse(readFileSync(settingsPath, 'utf-8'));
       }
-    } catch { /* ignore */ }
+    } catch { /* Expected: settings file may not exist or be malformed JSON */ }
     const merged = { ...current, ...updates };
     if (!existsSync(piAgentDir)) {
       mkdirSync(piAgentDir, { recursive: true });

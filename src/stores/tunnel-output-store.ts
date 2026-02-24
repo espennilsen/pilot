@@ -1,27 +1,31 @@
+/**
+ * @file Tunnel output store — manages Tailscale and Cloudflare tunnel output streams.
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import { on } from '../lib/ipc-client';
 
+/** Tunnel provider type (Tailscale or Cloudflare). */
 export type TunnelProvider = 'tailscale' | 'cloudflare';
 
-/** Virtual command IDs used in the output window system */
+/** Virtual command IDs used in the output window system. */
 export const TUNNEL_IDS = {
   tailscale: '__tunnel:tailscale__',
   cloudflare: '__tunnel:cloudflare__',
 } as const;
 
-/** Labels for display in output window tabs */
+/** Labels for display in output window tabs. */
 export const TUNNEL_LABELS: Record<string, string> = {
   [TUNNEL_IDS.tailscale]: 'Tailscale Funnel',
   [TUNNEL_IDS.cloudflare]: 'Cloudflare Tunnel',
 };
 
-/** Check if a command ID is a tunnel output tab */
+/** Check if a command ID is a tunnel output tab. */
 export function isTunnelId(id: string): boolean {
   return id === TUNNEL_IDS.tailscale || id === TUNNEL_IDS.cloudflare;
 }
 
-/** Get the provider from a tunnel ID */
+/** Get the provider from a tunnel ID. */
 export function tunnelIdToProvider(id: string): TunnelProvider | null {
   if (id === TUNNEL_IDS.tailscale) return 'tailscale';
   if (id === TUNNEL_IDS.cloudflare) return 'cloudflare';
@@ -34,6 +38,9 @@ interface TunnelOutputStore {
   clearOutput: (provider: TunnelProvider) => void;
 }
 
+/**
+ * Tunnel output store — manages Tailscale and Cloudflare tunnel output streams.
+ */
 export const useTunnelOutputStore = create<TunnelOutputStore>((set) => ({
   output: {
     tailscale: '',

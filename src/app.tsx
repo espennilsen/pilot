@@ -21,7 +21,7 @@ import { useDevCommandStore } from './stores/dev-command-store';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcut';
 import { useDefaultCommands } from './hooks/useDefaultCommands';
 import { useSandboxEvents } from './hooks/useSandboxEvents';
-import { useWorkspacePersistence, openTabSession, getWiredSessions } from './hooks/useWorkspacePersistence';
+import { useWorkspacePersistence, openTabSession, useWiredSessionsStore } from './hooks/useWorkspacePersistence';
 import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
@@ -38,6 +38,7 @@ function App() {
   const { openProjectDialog } = useProjectStore();
   const projectPath = useProjectStore(s => s.projectPath);
   const keybindOverrides = useAppSettingsStore(s => s.keybindOverrides);
+  const { wiredSessions, addWiredSession } = useWiredSessionsStore();
 
   // Load app settings (developer mode, keybinds, etc.) from disk on startup
   useEffect(() => {
@@ -49,7 +50,7 @@ function App() {
 
   // Sync project path and open session when active tab changes.
   // On startup, useWorkspacePersistence opens all sessions first and registers them
-  // in getWiredSessions(). This effect only handles subsequent tab switches.
+  // in the wired sessions store. This effect only handles subsequent tab switches.
   useEffect(() => {
     if (!activeTabId) return;
     const tab = tabs.find(t => t.id === activeTabId);
@@ -69,21 +70,21 @@ function App() {
     const sessionKey = `${activeTabId}::${tab.projectPath}`;
 
     // Already wired (by workspace restore or a previous switch) — skip
-    if (getWiredSessions().has(sessionKey)) return;
+    if (wiredSessions.has(sessionKey)) return;
     // Already in flight — skip
     if (inFlightRef.current.has(sessionKey)) return;
     inFlightRef.current.add(sessionKey);
 
     openTabSession(activeTabId, tab)
       .then(() => {
-        getWiredSessions().add(sessionKey);
+        addWiredSession(sessionKey);
         // Refresh sidebar session list
         const paths = [...new Set(tabs.map(t => t.projectPath).filter(Boolean))] as string[];
         useSessionStore.getState().loadSessions(paths);
       })
       .catch(() => { /* session will lazy-init on first message */ })
       .finally(() => { inFlightRef.current.delete(sessionKey); });
-  }, [activeTabId, tabs]);
+  }, [activeTabId, tabs, wiredSessions, addWiredSession]);
 
   // Restore workspace (tabs, UI layout, project) from last session
   // Falls back to creating an empty tab if no saved state exists

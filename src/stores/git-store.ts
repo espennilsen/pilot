@@ -1,3 +1,6 @@
+/**
+ * @file Git store — manages git operations, status, branches, commits, blame, and diffs.
+ */
 import { create } from 'zustand';
 import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
@@ -40,8 +43,12 @@ interface GitStore {
   reset: () => void;
 }
 
+/**
+ * Git store — manages git operations, status, branches, commits, blame, and diffs.
+ * Initializes per-project and provides IPC-based git commands.
+ */
 export const useGitStore = create<GitStore>((set, get) => ({
-  isAvailable: true, // Assume git is available initially
+  isAvailable: false, // Will be set to true after confirming git is on PATH
   isRepo: false,
   status: null,
   branches: [],
@@ -258,7 +265,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
 
   reset: () => {
     set({
-      isAvailable: true,
+      isAvailable: false,
       isRepo: false,
       status: null,
       branches: [],

@@ -1,5 +1,11 @@
+/**
+ * @file Output window store — manages floating output windows with tabs, drag-and-drop, and positioning.
+ */
 import { create } from 'zustand';
 
+/**
+ * A floating output window (can contain multiple command output tabs).
+ */
 export interface OutputWindow {
   id: string;
   commandIds: string[];  // tabs
@@ -11,6 +17,7 @@ export interface OutputWindow {
 interface OutputWindowStore {
   windows: Record<string, OutputWindow>;
   draggedTab: { windowId: string; commandId: string } | null;
+  windowCount: number;
   
   openOutput: (commandId: string) => void;
   closeOutput: (windowId: string, commandId: string) => void;
@@ -26,23 +33,16 @@ interface OutputWindowStore {
   reorderTabs: (windowId: string, commandIds: string[]) => void;
 }
 
-// Helper to calculate next window position (cascade)
-let windowCount = 0;
-function getNextPosition(): { x: number; y: number } {
-  const offset = (windowCount % 10) * 30;
-  windowCount++;
-  return {
-    x: window.innerWidth / 2 - 250 + offset,
-    y: window.innerHeight / 2 - 175 + offset,
-  };
-}
-
+/**
+ * Output window store — manages floating output windows with tabs, drag-and-drop, and positioning.
+ */
 export const useOutputWindowStore = create<OutputWindowStore>((set, get) => ({
   windows: {},
   draggedTab: null,
+  windowCount: 0,
 
   openOutput: (commandId: string) => {
-    const { windows } = get();
+    const { windows, windowCount } = get();
     const windowIds = Object.keys(windows);
 
     // Check if command is already open in any window
@@ -79,7 +79,11 @@ export const useOutputWindowStore = create<OutputWindowStore>((set, get) => ({
 
     // No windows exist, create a new one
     const newId = crypto.randomUUID();
-    const position = getNextPosition();
+    const offset = (windowCount % 10) * 30;
+    const position = {
+      x: window.innerWidth / 2 - 250 + offset,
+      y: window.innerHeight / 2 - 175 + offset,
+    };
     set({
       windows: {
         ...windows,
@@ -91,6 +95,7 @@ export const useOutputWindowStore = create<OutputWindowStore>((set, get) => ({
           size: { width: 500, height: 350 },
         },
       },
+      windowCount: windowCount + 1,
     });
   },
 
@@ -174,7 +179,7 @@ export const useOutputWindowStore = create<OutputWindowStore>((set, get) => ({
   },
 
   detachTab: (windowId: string, commandId: string, position: { x: number; y: number }) => {
-    const { windows } = get();
+    const { windows, windowCount } = get();
     const sourceWin = windows[windowId];
     if (!sourceWin || !sourceWin.commandIds.includes(commandId)) return;
 
@@ -210,7 +215,7 @@ export const useOutputWindowStore = create<OutputWindowStore>((set, get) => ({
       size: { width: 500, height: 350 },
     };
 
-    set({ windows: updatedWindows });
+    set({ windows: updatedWindows, windowCount: windowCount + 1 });
   },
 
   attachTab: (fromWindowId: string, commandId: string, toWindowId: string) => {

@@ -36,6 +36,7 @@ function buildFileTree(dirPath: string, ig: ReturnType<typeof ignore>, depth = 0
         };
       });
   } catch {
+    /* Expected: directory may not exist or be unreadable */
     return [];
   }
 }
@@ -61,7 +62,7 @@ export function registerProjectIpc() {
     // Forward to companion clients
     try {
       companionBridge.forwardEvent(IPC.PROJECT_FS_CHANGED, undefined);
-    } catch { /* not initialized */ }
+    } catch { /* Expected: companion bridge not initialized yet during startup */ }
   }
 
   function startWatching(projectPath: string) {
@@ -243,6 +244,7 @@ export function registerProjectIpc() {
 
       return { needsUpdate: true };
     } catch {
+      /* Expected: .git or .gitignore may not exist, or file read may fail */
       return { needsUpdate: false };
     }
   });

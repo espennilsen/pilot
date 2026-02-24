@@ -932,6 +932,7 @@ interface CompanionStatus {
   remoteType: 'tailscale' | 'cloudflare' | null;
   lanAddress: string | null;
   lanAddresses: Array<{ address: string; name: string }>;
+  autoStart: boolean;
 }
 
 interface PairedDevice {
@@ -967,7 +968,7 @@ function CompanionSettings() {
       setStatus(s);
     } catch {
       // Companion not initialized yet
-      setStatus({ enabled: false, port: 18088, protocol: 'https', running: false, connectedClients: 0, remoteUrl: null, remoteType: null, lanAddress: null, lanAddresses: [] });
+      setStatus({ enabled: false, port: 18088, protocol: 'https', running: false, connectedClients: 0, remoteUrl: null, remoteType: null, lanAddress: null, lanAddresses: [], autoStart: false });
     }
   };
 
@@ -1244,6 +1245,25 @@ function CompanionSettings() {
               max={65535}
             />
           </div>
+        </div>
+        {/* Auto-start on launch toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs text-text-secondary">Start on launch</span>
+            <p className="text-[11px] text-text-tertiary mt-0.5">Automatically start the companion server when Pilot opens</p>
+          </div>
+          <Toggle
+            checked={status?.autoStart ?? false}
+            onChange={async () => {
+              const newValue = !(status?.autoStart ?? false);
+              try {
+                await invoke(IPC.COMPANION_SET_AUTO_START, newValue);
+                if (status) setStatus({ ...status, autoStart: newValue });
+              } catch (err) {
+                console.error('Failed to toggle auto-start:', err);
+              }
+            }}
+          />
         </div>
         {(status?.protocol === 'https') && (
           <div className="flex items-center gap-2">

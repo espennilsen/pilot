@@ -9,6 +9,16 @@ import { useMemoryStore } from '../stores/memory-store';
 import { useTaskStore } from '../stores/task-store';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, comboToSymbol } from '../lib/keybindings';
 
+/**
+ * Registers default command palette commands.
+ * 
+ * Builds and registers all built-in commands (UI toggles, navigation, tabs, memory, tasks)
+ * with the command palette store. Commands include keyboard shortcuts derived from
+ * DEFAULT_KEYBINDINGS and user overrides. Re-registers whenever keybind overrides or
+ * relevant UI state changes.
+ * 
+ * Should be mounted once at the app root level.
+ */
 export function useDefaultCommands() {
   const registerCommands = useCommandPaletteStore(s => s.registerCommands);
   const { toggleSidebar, toggleContextPanel, setContextPanelTab, contextPanelVisible, toggleFocusMode, toggleTerminal, toggleScratchPad, openSettings, setSidebarPane, sidebarVisible } = useUIStore();

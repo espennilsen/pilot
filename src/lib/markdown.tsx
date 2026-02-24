@@ -103,8 +103,11 @@ function renderTextBlock(text: string): React.ReactNode[] {
   }).filter(Boolean);
 }
 
-/** Shared counter object threaded through all inline processing so every
- *  React key is unique within a single renderInline() call. */
+/**
+ * Mutable counter object threaded through render functions to generate
+ * unique React keys without requiring a global counter or index-based keys.
+ * Each call to `kc.n++` produces the next sequential key value.
+ */
 interface KeyCounter {
   value: number;
 }

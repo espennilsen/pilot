@@ -1,3 +1,6 @@
+/**
+ * @file Subagent store — manages subagent records and pool progress for orchestrator mode.
+ */
 import { create } from 'zustand';
 import type { SubagentRecord, SubagentPoolProgress } from '../../shared/types';
 
@@ -21,6 +24,9 @@ interface SubagentState {
   getTotalTokens: (tabId: string) => { input: number; output: number };
 }
 
+/**
+ * Subagent store — tracks active subagents, pool progress, and orchestrator state per tab.
+ */
 export const useSubagentStore = create<SubagentState>((set, get) => ({
   subagentsByTab: {},
   poolProgressByTab: {},

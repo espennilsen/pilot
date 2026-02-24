@@ -156,7 +156,12 @@ const FILENAME_TO_LANG: Record<string, string> = {
   '.env.production': 'bash',
 };
 
-/** Max file size (chars) to attempt highlighting */
+/**
+ * Maximum code size (in characters) for syntax highlighting.
+ * Files above 200KB are returned unhighlighted to avoid blocking the
+ * renderer — highlight.js processes ~100KB in ~50ms; at 200KB the
+ * latency is noticeable and above that it degrades UX on lower-end devices.
+ */
 const MAX_HIGHLIGHT_SIZE = 200_000;
 
 export function getLanguageFromPath(filePath: string): string | null {

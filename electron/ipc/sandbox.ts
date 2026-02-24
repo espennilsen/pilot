@@ -35,6 +35,7 @@ function applyDiff(diff: {
       try {
         current = readFileSync(diff.filePath, 'utf-8');
       } catch {
+        /* Expected: file may not exist yet or be unreadable */
         current = diff.originalContent ?? '';
       }
       if (current.includes(diff.editParams.oldText)) {
@@ -55,6 +56,7 @@ function applyDiff(diff: {
           try {
             current = readFileSync(filePath, 'utf-8');
           } catch {
+            /* Expected: file may not exist yet or be unreadable */
             current = diff.originalContent ?? '';
           }
           if (current.includes(parsed.oldText)) {

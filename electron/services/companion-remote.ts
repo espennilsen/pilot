@@ -57,7 +57,8 @@ export function setTunnelOutputCallback(cb: ((provider: 'tailscale' | 'cloudflar
  */
 function runTailscaleFunnel(port: number): Promise<ChildProcess> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('tailscale', [
+    const tailscaleCmd = process.platform === 'win32' ? 'tailscale.exe' : 'tailscale';
+    const proc = spawn(tailscaleCmd, [
       'funnel', '--https=443', `https+insecure://localhost:${port}`,
     ], { stdio: 'pipe' });
 
@@ -266,7 +267,8 @@ export async function setupCloudflareTunnel(
       // Spawn cloudflared tunnel process.
       // Use https:// origin since the companion server is TLS-only.
       // --no-tls-verify because the origin cert is self-signed.
-      const tunnelProcess = spawn('cloudflared', [
+      const cloudflareddCmd = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+      const tunnelProcess = spawn(cloudflareddCmd, [
         'tunnel',
         '--url',
         `https://localhost:${port}`,

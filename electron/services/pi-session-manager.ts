@@ -15,7 +15,7 @@ import {
 } from '@mariozechner/pi-coding-agent';
 import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { BrowserWindow } from 'electron';
+import { extractLastAssistantText } from '../utils/message-utils';
 import { join } from 'path';
 import { existsSync, readdirSync, mkdirSync } from 'fs';
 import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
@@ -34,15 +34,87 @@ import type { StagedDiff, SessionMetadata, MemoryCommandResult } from '../../sha
 import { getAllSessionMeta, removeSessionMeta } from './session-metadata';
 import { TaskManager } from './task-manager';
 import { createTaskTools } from './task-tools';
-import { companionBridge } from './companion-ipc-bridge';
 import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
+import { broadcastToRenderer } from '../utils/broadcast';
+
+/**
+ * Make a lightweight API call to the cheapest available model for memory extraction.
+ * Each provider uses a slightly different request format.
+ */
+async function callCheapModel(
+  provider: string,
+  apiKey: string,
+  modelId: string,
+  prompt: string,
+  signal: AbortSignal
+): Promise<string | null> {
+  if (provider === 'anthropic') {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal,
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.content?.[0]?.text || null;
+  }
+
+  if (provider === 'openai') {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal,
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || null;
+  }
+
+  if (provider === 'google') {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 500 },
+        }),
+        signal,
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  }
+
+  return null;
+}
 
 /**
  * Encode a path separator as `+` so that hyphens in directory names round-trip safely.
  * Legacy directories used `-` (lossy for hyphenated names); new ones use `+`.
  * Format: --Users+espen+Dev+my-project--
+ * @example getSessionDir('/home/pi', '/Users/espen/Dev/my-project') // → '<piDir>/sessions/--Users+espen+Dev+my-project--'
  */
 function getSessionDir(piAgentDir: string, cwd: string): string {
   const safePath = `--${cwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '+')}--`;
@@ -57,6 +129,7 @@ function getSessionDir(piAgentDir: string, cwd: string): string {
  * Decode a session directory name back to a cwd.
  * Handles both new `+` encoding and legacy `-` encoding.
  * On Windows, reconstructs drive letters properly (e.g., "C/Users/foo" → "C:\Users\foo").
+ * @example decodeDirName('--Users+espen+Dev+my-project--') // → '/Users/espen/Dev/my-project'
  */
 function decodeDirName(dirName: string): string {
   const inner = dirName.replace(/^--/, '').replace(/--$/, '');
@@ -213,20 +286,9 @@ export class PilotSessionManager {
 
       if (event.type === 'agent_end' || event.type === 'turn_end') {
         const messages = session.state.messages;
-        const lastAssistant = [...messages].reverse().find(
-          (m: AgentMessage) => m.role === 'assistant'
-        );
-        if (lastAssistant && lastAssistant.role === 'assistant') {
-          let responseText = '';
-          if (Array.isArray(lastAssistant.content)) {
-            responseText = lastAssistant.content
-              .filter((b): b is TextContent => b.type === 'text')
-              .map((b) => b.text)
-              .join('');
-          }
-          if (responseText) {
-            this.extractMemoriesInBackground(tabId, responseText).catch(() => {});
-          }
+        const responseText = extractLastAssistantText(messages);
+        if (responseText) {
+          this.extractMemoriesInBackground(tabId, responseText).catch(() => {});
         }
       }
     });
@@ -360,66 +422,14 @@ export class PilotSessionManager {
         const timeout = setTimeout(() => controller.abort(), 10_000);
 
         try {
-          if (cheapModel.provider === 'anthropic') {
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-              method: 'POST',
-              headers: {
-                'x-api-key': apiKey,
-                'content-type': 'application/json',
-                'anthropic-version': '2023-06-01',
-              },
-              body: JSON.stringify({
-                model: cheapModel.id,
-                max_tokens: 500,
-                messages: [{ role: 'user', content: extractionPrompt }],
-              }),
-              signal: controller.signal,
-            });
-            if (response.ok) {
-              const data = await response.json();
-              extractionResult = data.content?.[0]?.text || null;
-            }
-          } else if (cheapModel.provider === 'openai') {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: cheapModel.id,
-                max_tokens: 500,
-                messages: [{ role: 'user', content: extractionPrompt }],
-              }),
-              signal: controller.signal,
-            });
-            if (response.ok) {
-              const data = await response.json();
-              extractionResult = data.choices?.[0]?.message?.content || null;
-            }
-          } else if (cheapModel.provider === 'google') {
-            const response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${cheapModel.id}:generateContent?key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: extractionPrompt }] }],
-                  generationConfig: { maxOutputTokens: 500 },
-                }),
-                signal: controller.signal,
-              }
-            );
-            if (response.ok) {
-              const data = await response.json();
-              extractionResult = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-            }
-          }
+          extractionResult = await callCheapModel(
+            cheapModel.provider, apiKey, cheapModel.id, extractionPrompt, controller.signal
+          );
         } finally {
           clearTimeout(timeout);
         }
-      } catch {
-        // Model call failed — skip extraction silently
+      } catch (err) {
+        console.debug('[PilotSession] Memory extraction API call failed:', err);
         return;
       }
 
@@ -437,8 +447,8 @@ export class PilotSessionManager {
           preview: result.memories[0]?.text ?? '',
         });
       }
-    } catch {
-      // Silent failure. Memory extraction must never break anything.
+    } catch (err) {
+      console.debug('[PilotSession] Memory extraction failed:', err);
     }
   }
 
@@ -514,7 +524,7 @@ export class PilotSessionManager {
           source: 'skill',
         });
       }
-    } catch { /* ignore */ }
+    } catch { /* Expected: resource loader may not be ready */ }
 
     // Extension-registered commands
     try {
@@ -532,7 +542,7 @@ export class PilotSessionManager {
           }
         }
       }
-    } catch { /* ignore */ }
+    } catch { /* Expected: extension runner may not be initialized */ }
 
     return commands;
   }
@@ -627,7 +637,8 @@ export class PilotSessionManager {
       }
 
       return history;
-    } catch {
+    } catch (err) {
+      console.warn('[PilotSession] Failed to parse session history:', err);
       return [];
     }
   }
@@ -652,7 +663,8 @@ export class PilotSessionManager {
           modified: s.modified?.getTime() || 0,
         };
       });
-    } catch {
+    } catch (err) {
+      console.warn('[PilotSession] Failed to list sessions:', err);
       return [];
     }
   }
@@ -695,13 +707,9 @@ export class PilotSessionManager {
                   modified: s.modified?.getTime() || 0,
                 });
               }
-            } catch {
-              // Skip unreadable session dirs
-            }
+            } catch { /* Expected: session directory may be unreadable */ }
           }
-        } catch {
-          // sessionsRoot not readable
-        }
+        } catch { /* Expected: session directory may be unreadable */ }
       }
     }
 
@@ -731,16 +739,12 @@ export class PilotSessionManager {
   }
 
   private forwardEventToRenderer(tabId: string, event: AgentSessionEvent): void {
-    const serialized = JSON.parse(JSON.stringify(event));
+    // structuredClone is faster than JSON round-trip for high-frequency events (text_delta)
+    const serialized = structuredClone(event);
     this.sendToRenderer(IPC.AGENT_EVENT, { tabId, event: serialized });
   }
 
   private sendToRenderer(channel: string, data: unknown): void {
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      win.webContents.send(channel, data);
-    }
-    // Forward to companion clients
-    companionBridge.forwardEvent(channel, data);
+    broadcastToRenderer(channel, data);
   }
 }

@@ -5,6 +5,44 @@ import { useSubagentStore } from '../stores/subagent-store';
 import type { SubagentEvent, SubagentPoolProgress, SubagentRecord } from '../../shared/types';
 
 /**
+ * Type guard for SubagentEvent payload.
+ */
+function isSubagentEvent(data: unknown): data is SubagentEvent {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'parentTabId' in data &&
+    'subId' in data &&
+    'event' in data &&
+    typeof (data as SubagentEvent).parentTabId === 'string' &&
+    typeof (data as SubagentEvent).subId === 'string' &&
+    typeof (data as SubagentEvent).event === 'object' &&
+    (data as SubagentEvent).event !== null &&
+    'type' in (data as SubagentEvent).event
+  );
+}
+
+/**
+ * Type guard for SubagentPoolProgress payload.
+ */
+function isSubagentPoolProgress(data: unknown): data is SubagentPoolProgress {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'parentTabId' in data &&
+    'poolId' in data &&
+    'completed' in data &&
+    'total' in data &&
+    'failures' in data &&
+    typeof (data as SubagentPoolProgress).parentTabId === 'string' &&
+    typeof (data as SubagentPoolProgress).poolId === 'string' &&
+    typeof (data as SubagentPoolProgress).completed === 'number' &&
+    typeof (data as SubagentPoolProgress).total === 'number' &&
+    typeof (data as SubagentPoolProgress).failures === 'number'
+  );
+}
+
+/**
  * Hook that listens for subagent events from the main process
  * and updates the subagent store.
  */
@@ -16,8 +54,12 @@ export function useSubagentEvents() {
     const unsubEvent = on(
       IPC.SUBAGENT_EVENT,
       (data: unknown) => {
-        const payload = data as SubagentEvent;
-        const { parentTabId, subId, event } = payload;
+        if (!isSubagentEvent(data)) {
+          console.warn('[useSubagentEvents] Invalid SubagentEvent payload:', data);
+          return;
+        }
+
+        const { parentTabId, subId, event } = data;
 
         if (event.type === 'subagent_start') {
           updateSubagent(parentTabId, subId, {
@@ -52,8 +94,12 @@ export function useSubagentEvents() {
     const unsubPool = on(
       IPC.SUBAGENT_POOL_PROGRESS,
       (data: unknown) => {
-        const payload = data as SubagentPoolProgress;
-        setPoolProgress(payload.parentTabId, payload.poolId, payload);
+        if (!isSubagentPoolProgress(data)) {
+          console.warn('[useSubagentEvents] Invalid SubagentPoolProgress payload:', data);
+          return;
+        }
+
+        setPoolProgress(data.parentTabId, data.poolId, data);
       }
     );
 

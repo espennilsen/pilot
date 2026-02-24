@@ -1,7 +1,10 @@
+/**
+ * @file Extension store — manages extensions and skills (list, toggle, remove, import).
+ */
 import { create } from 'zustand';
 import type { InstalledExtension, InstalledSkill, ImportResult } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
-import { invoke } from '../lib/ipc-client';
+import { invokeAndReload } from '../lib/invoke-and-reload';
 
 interface ExtensionStore {
   extensions: InstalledExtension[];
@@ -17,65 +20,82 @@ interface ExtensionStore {
   importSkillZip: (zipPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
 }
 
+/**
+ * Extension store — manages extensions and skills (list, toggle, remove, import).
+ */
 export const useExtensionStore = create<ExtensionStore>((set, get) => ({
   extensions: [],
   skills: [],
 
   loadExtensions: async () => {
-    const extensions = await invoke(IPC.EXTENSIONS_LIST);
-    set({ extensions });
+    const extensions = await invokeAndReload<InstalledExtension[]>(
+      IPC.EXTENSIONS_LIST,
+      [],
+      async () => {}
+    );
+    if (extensions) set({ extensions });
   },
 
   loadSkills: async () => {
-    const skills = await invoke(IPC.SKILLS_LIST);
-    set({ skills });
+    const skills = await invokeAndReload<InstalledSkill[]>(
+      IPC.SKILLS_LIST,
+      [],
+      async () => {}
+    );
+    if (skills) set({ skills });
   },
 
   toggleExtension: async (extensionId: string) => {
-    const success = await invoke(IPC.EXTENSIONS_TOGGLE, extensionId);
-    if (success) {
-      await get().loadExtensions();
-    }
-    return success;
+    const success = await invokeAndReload<boolean>(
+      IPC.EXTENSIONS_TOGGLE,
+      [extensionId],
+      get().loadExtensions
+    );
+    return success ?? false;
   },
 
   removeExtension: async (extensionId: string) => {
-    const success = await invoke(IPC.EXTENSIONS_REMOVE, extensionId);
-    if (success) {
-      await get().loadExtensions();
-    }
-    return success;
+    const success = await invokeAndReload<boolean>(
+      IPC.EXTENSIONS_REMOVE,
+      [extensionId],
+      get().loadExtensions
+    );
+    return success ?? false;
   },
 
   toggleSkill: async (skillId: string) => {
-    const success = await invoke(IPC.SKILLS_TOGGLE, skillId);
-    if (success) {
-      await get().loadSkills();
-    }
-    return success;
+    const success = await invokeAndReload<boolean>(
+      IPC.SKILLS_TOGGLE,
+      [skillId],
+      get().loadSkills
+    );
+    return success ?? false;
   },
 
   removeSkill: async (skillId: string) => {
-    const success = await invoke(IPC.SKILLS_REMOVE, skillId);
-    if (success) {
-      await get().loadSkills();
-    }
-    return success;
+    const success = await invokeAndReload<boolean>(
+      IPC.SKILLS_REMOVE,
+      [skillId],
+      get().loadSkills
+    );
+    return success ?? false;
   },
 
   importExtensionZip: async (zipPath: string, scope: 'global' | 'project') => {
-    const result = await invoke(IPC.EXTENSIONS_IMPORT_ZIP, zipPath, scope);
-    if (result.success) {
-      await get().loadExtensions();
-    }
-    return result;
+    const result = await invokeAndReload<ImportResult>(
+      IPC.EXTENSIONS_IMPORT_ZIP,
+      [zipPath, scope],
+      get().loadExtensions
+    );
+    return result ?? { success: false, error: 'Import failed' };
   },
 
   importSkillZip: async (zipPath: string, scope: 'global' | 'project') => {
-    const result = await invoke(IPC.SKILLS_IMPORT_ZIP, zipPath, scope);
-    if (result.success) {
-      await get().loadSkills();
-    }
-    return result;
+    const result = await invokeAndReload<ImportResult>(
+      IPC.SKILLS_IMPORT_ZIP,
+      [zipPath, scope],
+      get().loadSkills
+    );
+    return result ?? { success: false, error: 'Import failed' };
   },
 }));

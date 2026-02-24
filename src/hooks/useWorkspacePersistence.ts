@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { create } from 'zustand';
 import { useTabStore, getProjectColor, type TabState } from '../stores/tab-store';
 import { useUIStore } from '../stores/ui-store';
 import { useProjectStore } from '../stores/project-store';
@@ -7,6 +8,26 @@ import { useSessionStore } from '../stores/session-store';
 import { invoke } from '../lib/ipc-client';
 import { IPC } from '../../shared/ipc';
 import type { WorkspaceState, SavedTabState } from '../../shared/types';
+
+/**
+ * Tiny store to track which sessions have been fully wired up (session opened,
+ * history loaded, stats loaded). Shared between useWorkspacePersistence and App.tsx
+ * to prevent redundant session initialization on tab switch.
+ */
+interface WiredSessionsStore {
+  wiredSessions: Set<string>;
+  addWiredSession: (key: string) => void;
+}
+
+export const useWiredSessionsStore = create<WiredSessionsStore>((set) => ({
+  wiredSessions: new Set<string>(),
+  addWiredSession: (key: string) =>
+    set((state) => {
+      const newSet = new Set(state.wiredSessions);
+      newSet.add(key);
+      return { wiredSessions: newSet };
+    }),
+}));
 
 function serializeTab(tab: TabState): SavedTabState {
   return {
@@ -49,9 +70,18 @@ function saveWorkspace() {
 }
 
 /**
- * Open a session on the main process and load history + stats into stores.
+ * Opens a session on the main process and loads its history and stats into stores.
+ * 
  * This is the single canonical way to wire up a tab's session — used by both
- * workspace restore and tab switching.
+ * workspace restore on app startup and tab switching. If the tab already has a
+ * sessionPath, it opens that session file; otherwise it creates a new session
+ * for the project.
+ * 
+ * Loads chat history, session stats (tokens, cost), context usage, and model info
+ * into the chat store. Updates the tab with the session path.
+ * 
+ * @param tabId - ID of the tab to open the session for
+ * @param tab - Tab state with sessionPath and projectPath
  */
 export async function openTabSession(tabId: string, tab: { sessionPath: string | null; projectPath: string | null }): Promise<void> {
   if (!tab.projectPath) return;
@@ -102,20 +132,25 @@ export async function openTabSession(tabId: string, tab: { sessionPath: string |
 }
 
 /**
- * Restores workspace state from disk on app startup,
- * opens sessions for all restored tabs, and auto-saves changes.
- *
- * Returns a ref whose `.current` is the Set of "tabId::projectPath" keys
- * that have been fully wired up. App.tsx uses this to skip re-init on tab switch.
+ * Restores workspace state from disk on app startup and auto-saves changes.
+ * 
+ * On mount, loads the saved workspace state (tabs, active tab, UI panel visibility,
+ * panel widths) from disk and restores it. Opens sessions for all restored chat tabs
+ * (active tab first, then others in parallel) and loads their chat history.
+ * 
+ * After restore completes, sets up auto-save with 500ms debounce that triggers
+ * whenever tab state or UI state changes. Also saves on window beforeunload.
+ * 
+ * Maintains a Set of "tabId::projectPath" keys for tabs that have been fully wired
+ * up with their sessions. This prevents redundant session initialization when
+ * switching tabs.
+ * 
+ * Should be mounted once at the app root level.
  */
 export function useWorkspacePersistence() {
   const startedRef = useRef(false);
   const restoredRef = useRef(false);
-  /** Set of "tabId::projectPath" keys that have been fully wired. Shared with App.tsx. */
-  const wiredRef = useRef<Set<string>>(new Set());
-
-  // Expose on the module so App.tsx can read it
-  _wiredSessionsRef = wiredRef;
+  const { addWiredSession } = useWiredSessionsStore();
 
   // ── Restore on mount (once) ─────────────────────────────
   useEffect(() => {
@@ -192,14 +227,24 @@ export function useWorkspacePersistence() {
         return 0;
       });
 
-      for (const tab of sorted) {
-        const key = `${tab.id}::${tab.projectPath}`;
+      // Load active tab first (await), then parallelize the rest
+      const [firstTab, ...restTabs] = sorted;
+      if (firstTab) {
         try {
-          await openTabSession(tab.id, tab);
-          wiredRef.current.add(key);
+          await openTabSession(firstTab.id, firstTab);
+          addWiredSession(`${firstTab.id}::${firstTab.projectPath}`);
         } catch {
           // Session file may have been deleted — tab will lazy-init on first message
         }
+      }
+
+      if (restTabs.length > 0) {
+        const results = await Promise.allSettled(
+          restTabs.map(async (tab) => {
+            await openTabSession(tab.id, tab);
+            addWiredSession(`${tab.id}::${tab.projectPath}`);
+          })
+        );
       }
 
       // ── 5. Refresh sidebar session list ───────────────────
@@ -238,8 +283,16 @@ export function useWorkspacePersistence() {
   }, []);
 }
 
-// ── Module-level ref so App.tsx can check which sessions are already wired ──
-let _wiredSessionsRef: { current: Set<string> } = { current: new Set() };
+/**
+ * Returns the set of session keys ("tabId::projectPath") that have been fully
+ * wired up by workspace persistence.
+ * 
+ * Used by App.tsx and SessionList.tsx to skip redundant session initialization
+ * when switching tabs. A tab is considered "wired" if its session has been opened
+ * and its chat history, stats, and model info have been loaded into the stores.
+ * 
+ * @returns Set of "tabId::projectPath" keys for wired sessions
+ */
 export function getWiredSessions(): Set<string> {
-  return _wiredSessionsRef.current;
+  return useWiredSessionsStore.getState().wiredSessions;
 }

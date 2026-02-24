@@ -1,5 +1,10 @@
 import { IPC } from '../../shared/ipc';
 
+/** Delay before attempting WebSocket reconnection after disconnect */
+const WS_RECONNECT_DELAY_MS = 2000;
+/** Maximum time to wait for an IPC invoke response before timing out */
+const WS_INVOKE_TIMEOUT_MS = 30_000;
+
 // ─── Universal IPC Transport ───────────────────────────────────────────────
 // Provides the same API whether running in Electron (preload bridge) or
 // in a browser / WKWebView via companion WebSocket.
@@ -143,7 +148,7 @@ class WebSocketIPCClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
-    }, 2000);
+    }, WS_RECONNECT_DELAY_MS);
   }
 
   private generateId(): string {
@@ -168,7 +173,7 @@ class WebSocketIPCClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`IPC invoke timeout: ${channel}`));
-      }, 30_000);
+      }, WS_INVOKE_TIMEOUT_MS);
 
       this.pending.set(id, { resolve, reject, timer });
 
@@ -288,6 +293,8 @@ function detectPlatform(): string {
   if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
   if (/Mac/.test(ua)) return 'darwin';
   if (/Win/.test(ua)) return 'win32';
+  // Default to linux for non-Mac/Win platforms (BSD, ChromeOS, etc.)
+  // This is the closest match for path handling and shell behavior
   return 'linux';
 }
 

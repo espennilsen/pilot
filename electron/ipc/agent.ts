@@ -47,7 +47,7 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
           }
           try {
             companionBridge.forwardEvent(eventChannel, eventPayload);
-          } catch { /* not initialized */ }
+          } catch { /* Expected: companion bridge not initialized yet during startup */ }
         }
         return;
       }
@@ -174,7 +174,7 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
         }
         try {
           companionBridge.forwardEvent(eventChannel, eventPayload);
-        } catch { /* not initialized */ }
+        } catch { /* Expected: companion bridge not initialized yet during startup */ }
         return;
       }
     }

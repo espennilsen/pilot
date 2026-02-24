@@ -62,6 +62,7 @@ export function loadAppSettings(): PilotAppSettings {
       keybindOverrides: parsed.keybindOverrides ?? {},
       companionPort: parsed.companionPort ?? undefined,
       companionProtocol: parsed.companionProtocol ?? undefined,
+      companionAutoStart: parsed.companionAutoStart ?? false,
       hiddenPaths: Array.isArray(parsed.hiddenPaths) ? parsed.hiddenPaths : DEFAULT_HIDDEN_PATHS,
     };
     return cachedSettings;

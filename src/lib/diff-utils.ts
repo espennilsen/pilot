@@ -15,7 +15,8 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
   let newLine = 0;
 
   for (const raw of diff.split('\n')) {
-    // Parse hunk header for line numbers: @@ -oldStart,count +newStart,count @@
+    // Unified diff hunk header format: @@ -oldStart[,oldCount] +newStart[,newCount] @@
+    // Example: @@ -10,7 +10,8 @@ means: old file starts at line 10 (7 lines), new file starts at line 10 (8 lines)
     const hunkMatch = raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
     if (hunkMatch) {
       oldLine = parseInt(hunkMatch[1], 10);
@@ -38,6 +39,15 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
   return lines;
 }
 
+/**
+ * Compute a simple line-by-line diff between old and new content.
+ * Uses a greedy forward-matching algorithm with a configurable lookahead window.
+ * 
+ * Performance: O(n×m) worst case where n and m are the line counts.
+ * The lookahead (default 3) limits how far ahead we search for matching lines,
+ * providing a practical O(n×k) complexity where k is the lookahead size.
+ * For large files, prefer the `diff` package's structured patch instead.
+ */
 export function computeSimpleDiff(oldText: string | null | undefined, newText: string | null | undefined): DiffLine[] {
   const safeOld = oldText ?? null;
   const safeNew = newText ?? '';

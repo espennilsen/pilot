@@ -189,6 +189,7 @@ export const IPC = {
   COMPANION_GET_STATUS: 'companion:get-status',
   COMPANION_ENABLE: 'companion:enable',
   COMPANION_DISABLE: 'companion:disable',
+  COMPANION_SET_AUTO_START: 'companion:set-auto-start',
   COMPANION_GENERATE_PIN: 'companion:generate-pin',
   COMPANION_GENERATE_QR: 'companion:generate-qr',
   COMPANION_GET_DEVICES: 'companion:get-devices',

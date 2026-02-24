@@ -32,6 +32,8 @@ export interface PilotAppSettings {
   companionPort?: number;
   /** Companion server protocol. Default: 'https' */
   companionProtocol?: 'http' | 'https';
+  /** Whether to automatically start the companion server on app launch. Default: false */
+  companionAutoStart?: boolean;
   /** Whether to automatically start persistent dev commands on project launch */
   autoStartDevServer?: boolean;
   /** Glob patterns to hide in the file tree, using .gitignore syntax (e.g. 'node_modules', '*.log', 'dist/'). */
@@ -441,4 +443,18 @@ export interface SubagentPoolProgress {
   completed: number;
   total: number;
   failures: number;
+}
+
+// ─── IPC Payload Types ──────────────────────────────────────────────────
+
+/** OAuth authentication flow event payload */
+export type OAuthEventPayload =
+  | { type: 'success' }
+  | { type: 'prompt'; message?: string }
+  | { type: 'progress'; message: string };
+
+/** Sandbox staged diff event payload */
+export interface SandboxDiffPayload {
+  tabId: string;
+  diff: StagedDiff;
 }

@@ -15,7 +15,7 @@ function getAllIPv4Addresses(): string[] {
         }
       }
     }
-  } catch { /* ignore */ }
+  } catch { /* Expected: network interface enumeration may fail on some systems */ }
   return addresses;
 }
 
@@ -108,6 +108,7 @@ function certCoversCurrentIPs(certPath: string): boolean {
     }
     return true;
   } catch {
+    /* Expected: cert file may not exist or be malformed */
     return false;
   }
 }

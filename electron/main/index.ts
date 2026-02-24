@@ -307,6 +307,18 @@ app.whenReady().then(async () => {
         });
       }
       console.log(`[Companion] Server initialized (${companionSettings.protocol}:${companionSettings.port})`);
+
+      // Auto-start the companion server if the user has enabled it in settings
+      if (loadAppSettings().companionAutoStart && companionServer) {
+        try {
+          await companionServer.start();
+          const computerName = await CompanionDiscovery.getComputerName();
+          await companionDiscovery!.start(companionServer.port, computerName);
+          console.log('[Companion] Auto-started companion server');
+        } catch (autoErr) {
+          console.error('[Companion] Failed to auto-start companion server:', autoErr);
+        }
+      }
     } catch (err) {
       console.error('Failed to initialize companion server:', err);
     }
@@ -419,6 +431,7 @@ app.whenReady().then(async () => {
       const filePath = join(docsDir, `${safePage}.md`);
       return readFileSync(filePath, 'utf-8');
     } catch {
+      /* Expected: documentation file may not exist */
       return null;
     }
   });
@@ -429,6 +442,7 @@ app.whenReady().then(async () => {
         .filter(f => f.endsWith('.md'))
         .map(f => f.replace(/\.md$/, ''));
     } catch {
+      /* Expected: docs directory may not exist or be unreadable */
       return [];
     }
   });

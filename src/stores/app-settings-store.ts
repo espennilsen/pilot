@@ -1,3 +1,6 @@
+/**
+ * @file App settings store — manages app-level configuration (terminal, editor, developer mode, keybindings).
+ */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
 import type { PilotAppSettings } from '../../shared/types';
@@ -28,21 +31,40 @@ interface AppSettingsStore {
   clearKeybindOverride: (id: string) => Promise<void>;
 }
 
+/**
+ * Fallback Pi agent directory path (macOS/Linux).
+ * The real platform-specific path is loaded from the main process via IPC
+ * and replaces this default once the app initializes.
+ */
 const DEFAULT_PI_AGENT_DIR = '~/.config/.pilot';
 
-export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
-  piAgentDir: DEFAULT_PI_AGENT_DIR,
-  terminalApp: null,
-  editorCli: null,
-  onboardingComplete: false,
-  developerMode: false,
-  autoStartDevServer: false,
-  keybindOverrides: {},
-  hiddenPaths: [],
-  isLoading: false,
-  error: null,
+/**
+ * App settings store — manages app-level configuration (terminal, editor, developer mode, keybindings).
+ */
+export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
+  /**
+   * Helper to update settings with optional optimistic update.
+   */
+  const updateSetting = async (updates: Partial<PilotAppSettings>, optimistic = false) => {
+    if (optimistic) {
+      set(updates);
+    }
+    return get().update(updates);
+  };
 
-  load: async () => {
+  return {
+    piAgentDir: DEFAULT_PI_AGENT_DIR,
+    terminalApp: null,
+    editorCli: null,
+    onboardingComplete: false,
+    developerMode: false,
+    autoStartDevServer: false,
+    keybindOverrides: {},
+    hiddenPaths: [],
+    isLoading: false,
+    error: null,
+
+    load: async () => {
     set({ isLoading: true, error: null });
     try {
       const settings = await invoke(IPC.APP_SETTINGS_GET) as PilotAppSettings;
@@ -82,28 +104,20 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => ({
     }
   },
 
-  setPiAgentDir: async (dir: string) => get().update({ piAgentDir: dir }),
-  setTerminalApp: async (app: string | null) => get().update({ terminalApp: app }),
-  setEditorCli: async (cli: string | null) => get().update({ editorCli: cli }),
-  setDeveloperMode: async (enabled: boolean) => {
-    set({ developerMode: enabled }); // optimistic update
-    await get().update({ developerMode: enabled });
-  },
-  setAutoStartDevServer: async (enabled: boolean) => {
-    set({ autoStartDevServer: enabled }); // optimistic update
-    await get().update({ autoStartDevServer: enabled });
-  },
-  setHiddenPaths: async (paths: string[]) => {
-    set({ hiddenPaths: paths });
-    await get().update({ hiddenPaths: paths });
-  },
-  completeOnboarding: async () => get().update({ onboardingComplete: true }),
-  setKeybindOverride: async (id: string, combo: string | null) => {
-    const overrides = { ...get().keybindOverrides, [id]: combo };
-    await get().update({ keybindOverrides: overrides });
-  },
-  clearKeybindOverride: async (id: string) => {
-    const { [id]: _, ...rest } = get().keybindOverrides;
-    await get().update({ keybindOverrides: rest });
-  },
-}));
+    setPiAgentDir: async (dir: string) => updateSetting({ piAgentDir: dir }),
+    setTerminalApp: async (app: string | null) => updateSetting({ terminalApp: app }),
+    setEditorCli: async (cli: string | null) => updateSetting({ editorCli: cli }),
+    setDeveloperMode: async (enabled: boolean) => updateSetting({ developerMode: enabled }, true),
+    setAutoStartDevServer: async (enabled: boolean) => updateSetting({ autoStartDevServer: enabled }, true),
+    setHiddenPaths: async (paths: string[]) => updateSetting({ hiddenPaths: paths }, true),
+    completeOnboarding: async () => updateSetting({ onboardingComplete: true }),
+    setKeybindOverride: async (id: string, combo: string | null) => {
+      const overrides = { ...get().keybindOverrides, [id]: combo };
+      return updateSetting({ keybindOverrides: overrides });
+    },
+    clearKeybindOverride: async (id: string) => {
+      const { [id]: _, ...rest } = get().keybindOverrides;
+      return updateSetting({ keybindOverrides: rest });
+    },
+  };
+});

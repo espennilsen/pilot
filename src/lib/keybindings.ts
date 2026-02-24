@@ -52,14 +52,44 @@ export const DEFAULT_KEYBINDINGS: KeybindingDef[] = [
 
 /** Parse "meta+shift+b" → { key: 'b', modifiers: ['meta', 'shift'] } */
 export function parseCombo(combo: string): { key: string; modifiers: ('meta' | 'ctrl' | 'alt' | 'shift')[] } {
+  if (!combo || combo.trim() === '') {
+    throw new Error('parseCombo: combo string cannot be empty');
+  }
+
   const parts = combo.toLowerCase().split('+');
   const key = parts[parts.length - 1];
-  const modifiers = parts.slice(0, -1) as ('meta' | 'ctrl' | 'alt' | 'shift')[];
-  return { key, modifiers };
+  const modifiers = parts.slice(0, -1);
+
+  // Validate key is non-empty
+  if (!key || key.trim() === '') {
+    throw new Error(`parseCombo: key part is empty in combo "${combo}"`);
+  }
+
+  // Validate modifiers are valid
+  const validModifiers = ['meta', 'ctrl', 'alt', 'shift'];
+  for (const mod of modifiers) {
+    if (!validModifiers.includes(mod)) {
+      throw new Error(`parseCombo: invalid modifier "${mod}" in combo "${combo}". Valid modifiers: ${validModifiers.join(', ')}`);
+    }
+  }
+
+  return { key, modifiers: modifiers as ('meta' | 'ctrl' | 'alt' | 'shift')[] };
 }
 
 /** Format { key: 'b', modifiers: ['meta', 'shift'] } → "meta+shift+b" */
 export function formatCombo(key: string, modifiers: string[]): string {
+  if (!key || key.trim() === '') {
+    throw new Error('formatCombo: key cannot be empty');
+  }
+
+  // Validate modifiers are valid
+  const validModifiers = ['meta', 'ctrl', 'alt', 'shift'];
+  for (const mod of modifiers) {
+    if (!validModifiers.includes(mod.toLowerCase())) {
+      throw new Error(`formatCombo: invalid modifier "${mod}". Valid modifiers: ${validModifiers.join(', ')}`);
+    }
+  }
+
   return [...modifiers, key].join('+');
 }
 

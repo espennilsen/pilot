@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, appendFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { watch, type FSWatcher } from 'chokidar';
@@ -160,6 +161,25 @@ export class TaskManager {
     appendFileSync(filePath, line, 'utf-8');
   }
 
+  /**
+   * Parse a tasks.jsonl file, deduplicating by ID (last occurrence wins).
+   */
+  private async parseTasksFile(filePath: string): Promise<Task[]> {
+    if (!existsSync(filePath)) return [];
+    const content = await readFile(filePath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+    const taskMap = new Map<string, Task>();
+    for (const line of lines) {
+      try {
+        const task = JSON.parse(line) as Task;
+        taskMap.set(task.id, task);
+      } catch (err) {
+        console.error('Failed to parse task line:', line, err);
+      }
+    }
+    return [...taskMap.values()];
+  }
+
   private compactFile(projectPath: string, tasks: Task[]): void {
     this.ensureTaskDir(projectPath);
     const filePath = this.getTaskFilePath(projectPath);
@@ -171,7 +191,7 @@ export class TaskManager {
   // Board Loading & Derived State
   // --------------------------------------------------------------------------
 
-  loadBoard(projectPath: string): TaskBoard {
+  async loadBoard(projectPath: string): Promise<TaskBoard> {
     // Check if already loaded
     const existing = this.boards.get(projectPath);
     if (existing) {
@@ -179,26 +199,7 @@ export class TaskManager {
     }
 
     const filePath = this.getTaskFilePath(projectPath);
-    const tasks: Task[] = [];
-
-    // Read and parse JSONL
-    if (existsSync(filePath)) {
-      const content = readFileSync(filePath, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      // Deduplicate by ID (last occurrence wins)
-      const taskMap = new Map<string, Task>();
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line) as Task;
-          taskMap.set(task.id, task);
-        } catch (err) {
-          console.error('Failed to parse task line:', line, err);
-        }
-      }
-      
-      tasks.push(...taskMap.values());
-    }
+    const tasks = await this.parseTasksFile(filePath);
 
     // Create board with derived state
     const board: TaskBoard = {
@@ -247,39 +248,20 @@ export class TaskManager {
       clearTimeout(existingTimer);
     }
 
-    const timer = setTimeout(() => {
-      this.reloadBoard(projectPath);
+    const timer = setTimeout(async () => {
+      await this.reloadBoard(projectPath);
       this.debounceTimers.delete(projectPath);
     }, 100);
 
     this.debounceTimers.set(projectPath, timer);
   }
 
-  private reloadBoard(projectPath: string): void {
+  private async reloadBoard(projectPath: string): Promise<void> {
     const entry = this.boards.get(projectPath);
     if (!entry) return;
 
     const filePath = this.getTaskFilePath(projectPath);
-    const tasks: Task[] = [];
-
-    if (existsSync(filePath)) {
-      const content = readFileSync(filePath, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      const taskMap = new Map<string, Task>();
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line) as Task;
-          taskMap.set(task.id, task);
-        } catch (err) {
-          console.error('Failed to parse task line:', line, err);
-        }
-      }
-      
-      tasks.push(...taskMap.values());
-    }
-
-    entry.board.tasks = tasks;
+    entry.board.tasks = await this.parseTasksFile(filePath);
     this.computeDerivedState(entry.board);
 
     // Notify listeners
@@ -331,8 +313,8 @@ export class TaskManager {
   // Task CRUD
   // --------------------------------------------------------------------------
 
-  createTask(projectPath: string, input: TaskCreateInput): Task {
-    const board = this.loadBoard(projectPath);
+  async createTask(projectPath: string, input: TaskCreateInput): Promise<Task> {
+    const board = await this.loadBoard(projectPath);
     const now = new Date().toISOString();
 
     const task: Task = {
@@ -372,8 +354,8 @@ export class TaskManager {
     return task;
   }
 
-  updateTask(projectPath: string, taskId: string, updates: TaskUpdateInput): Task {
-    const board = this.loadBoard(projectPath);
+  async updateTask(projectPath: string, taskId: string, updates: TaskUpdateInput): Promise<Task> {
+    const board = await this.loadBoard(projectPath);
     const task = board.tasks.find(t => t.id === taskId);
     
     if (!task) {
@@ -415,7 +397,7 @@ export class TaskManager {
 
     // Check for epic auto-completion
     if (task.parentId) {
-      this.checkEpicAutoCompletion(projectPath, task.parentId);
+      await this.checkEpicAutoCompletion(projectPath, task.parentId);
     }
 
     // Notify listeners
@@ -426,8 +408,8 @@ export class TaskManager {
     return task;
   }
 
-  addComment(projectPath: string, taskId: string, text: string, author: 'human' | 'agent'): Comment {
-    const board = this.loadBoard(projectPath);
+  async addComment(projectPath: string, taskId: string, text: string, author: 'human' | 'agent'): Promise<Comment> {
+    const board = await this.loadBoard(projectPath);
     const task = board.tasks.find(t => t.id === taskId);
     
     if (!task) {
@@ -454,8 +436,8 @@ export class TaskManager {
     return comment;
   }
 
-  deleteTask(projectPath: string, taskId: string): boolean {
-    const board = this.loadBoard(projectPath);
+  async deleteTask(projectPath: string, taskId: string): Promise<boolean> {
+    const board = await this.loadBoard(projectPath);
     const taskIndex = board.tasks.findIndex(t => t.id === taskId);
     
     if (taskIndex === -1) {
@@ -486,8 +468,8 @@ export class TaskManager {
   // Queries
   // --------------------------------------------------------------------------
 
-  queryTasks(projectPath: string, filter: TaskFilter): Task[] {
-    const board = this.loadBoard(projectPath);
+  async queryTasks(projectPath: string, filter: TaskFilter): Promise<Task[]> {
+    const board = await this.loadBoard(projectPath);
     
     return board.tasks.filter(task => {
       // Status filter
@@ -541,13 +523,13 @@ export class TaskManager {
     });
   }
 
-  getReadyTasks(projectPath: string): Task[] {
-    const board = this.loadBoard(projectPath);
+  async getReadyTasks(projectPath: string): Promise<Task[]> {
+    const board = await this.loadBoard(projectPath);
     return board.readyTasks;
   }
 
-  getDependencyChain(projectPath: string, taskId: string): DependencyChain {
-    const board = this.loadBoard(projectPath);
+  async getDependencyChain(projectPath: string, taskId: string): Promise<DependencyChain> {
+    const board = await this.loadBoard(projectPath);
     const taskMap = new Map(board.tasks.map(t => [t.id, t]));
     const task = taskMap.get(taskId);
 
@@ -583,8 +565,8 @@ export class TaskManager {
     return { blockers, dependents };
   }
 
-  getEpicProgress(projectPath: string, epicId: string): EpicProgress {
-    const board = this.loadBoard(projectPath);
+  async getEpicProgress(projectPath: string, epicId: string): Promise<EpicProgress> {
+    const board = await this.loadBoard(projectPath);
     const children = board.tasks.filter(t => t.parentId === epicId);
 
     const progress: EpicProgress = {
@@ -624,8 +606,8 @@ export class TaskManager {
   // Agent Integration
   // --------------------------------------------------------------------------
 
-  getAgentTaskSummary(projectPath: string): string {
-    const board = this.loadBoard(projectPath);
+  async getAgentTaskSummary(projectPath: string): Promise<string> {
+    const board = await this.loadBoard(projectPath);
     
     if (board.tasks.length === 0) {
       return '';
@@ -637,7 +619,7 @@ export class TaskManager {
     // Group by status
     const inProgress = board.tasks.filter(t => t.status === 'in_progress');
     const inReview = board.tasks.filter(t => t.status === 'review');
-    const ready = this.getReadyTasks(projectPath);
+    const ready = await this.getReadyTasks(projectPath);
     const blocked = board.blockedTasks;
     const doneCount = board.tasks.filter(t => t.status === 'done').length;
 
@@ -742,8 +724,8 @@ export class TaskManager {
   // Epic Auto-Completion
   // --------------------------------------------------------------------------
 
-  private checkEpicAutoCompletion(projectPath: string, epicId: string): void {
-    const board = this.loadBoard(projectPath);
+  private async checkEpicAutoCompletion(projectPath: string, epicId: string): Promise<void> {
+    const board = await this.loadBoard(projectPath);
     const epic = board.tasks.find(t => t.id === epicId);
     
     if (!epic || epic.type !== 'epic' || epic.status === 'done') {

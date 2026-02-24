@@ -47,10 +47,36 @@ function matchesShortcut(event: KeyboardEvent, config: ShortcutConfig): boolean 
   return true;
 }
 
+/**
+ * Registers a single keyboard shortcut handler.
+ * 
+ * Convenience wrapper around useKeyboardShortcuts for a single shortcut.
+ * Handles platform-specific modifier keys (Cmd on macOS, Ctrl on Windows/Linux)
+ * and skips shortcuts when focus is in an input field (unless the shortcut uses
+ * modifier keys).
+ * 
+ * @param config - Shortcut configuration with key, modifiers, and action callback
+ */
 export function useKeyboardShortcut(config: ShortcutConfig): void {
   useKeyboardShortcuts([config]);
 }
 
+/**
+ * Registers multiple keyboard shortcut handlers.
+ * 
+ * Attaches a global keydown listener that matches keyboard events against the
+ * provided shortcut configurations. Handles platform-specific modifier keys:
+ * - 'meta' modifier maps to Cmd on macOS, Ctrl on Windows/Linux
+ * - 'ctrl' modifier is explicit Ctrl key on all platforms
+ * 
+ * Shortcuts are suppressed when focus is in input fields (input, textarea,
+ * contentEditable) unless the shortcut includes modifier keys (Cmd/Ctrl).
+ * 
+ * Re-registers listeners whenever the configs array changes. Each shortcut can
+ * be individually disabled via the `enabled` flag.
+ * 
+ * @param configs - Array of shortcut configurations
+ */
 export function useKeyboardShortcuts(configs: ShortcutConfig[]): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
