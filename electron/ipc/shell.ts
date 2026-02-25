@@ -135,13 +135,20 @@ const TERMINAL_DEFS = [
 
 // Map terminal IDs to their working-directory flags (Linux/Windows open-in-terminal)
 const TERMINAL_CWD_FLAGS: Record<string, (dir: string) => string[]> = {
+  // Linux terminals
   'gnome-terminal': (dir) => ['--working-directory=' + dir],
   'konsole':        (dir) => ['--workdir', dir],
   'kitty':          (dir) => ['--directory', dir],
   'alacritty':      (dir) => ['--working-directory', dir],
   'wezterm':        (dir) => ['start', '--cwd', dir],
   'ghostty':        (dir) => ['--working-directory=' + dir],
+  'rio':            (dir) => ['--working-dir', dir],
+  'foot':           (dir) => ['--working-directory=' + dir],
+  'xfce4-terminal': (dir) => ['--working-directory=' + dir],
+  'tilix':          (dir) => ['--working-directory=' + dir],
+  'terminator':     (dir) => ['--working-directory=' + dir],
   'xterm':          (dir) => ['-e', `cd "${dir}" && $SHELL`],
+  'hyper':          (dir) => [dir],
   // Windows terminals
   'wt':             (dir) => ['-d', dir],
   'pwsh':           (dir) => ['-WorkingDirectory', dir],
@@ -198,13 +205,19 @@ function detectTerminals(): DetectedTerminal[] {
   } else {
     // Linux: check for CLI commands
     const linuxTerminals = [
-      { id: 'gnome-terminal', name: 'GNOME Terminal', app: 'gnome-terminal' },
-      { id: 'konsole',        name: 'Konsole',        app: 'konsole' },
-      { id: 'kitty',          name: 'Kitty',          app: 'kitty' },
-      { id: 'alacritty',      name: 'Alacritty',      app: 'alacritty' },
-      { id: 'wezterm',        name: 'WezTerm',        app: 'wezterm' },
-      { id: 'ghostty',        name: 'Ghostty',        app: 'ghostty' },
-      { id: 'xterm',          name: 'XTerm',          app: 'xterm' },
+      { id: 'gnome-terminal', name: 'GNOME Terminal',  app: 'gnome-terminal' },
+      { id: 'konsole',        name: 'Konsole',         app: 'konsole' },
+      { id: 'xfce4-terminal', name: 'Xfce Terminal',   app: 'xfce4-terminal' },
+      { id: 'tilix',          name: 'Tilix',           app: 'tilix' },
+      { id: 'terminator',     name: 'Terminator',      app: 'terminator' },
+      { id: 'kitty',          name: 'Kitty',           app: 'kitty' },
+      { id: 'alacritty',      name: 'Alacritty',       app: 'alacritty' },
+      { id: 'foot',           name: 'Foot',            app: 'foot' },
+      { id: 'wezterm',        name: 'WezTerm',         app: 'wezterm' },
+      { id: 'ghostty',        name: 'Ghostty',         app: 'ghostty' },
+      { id: 'rio',            name: 'Rio',             app: 'rio' },
+      { id: 'hyper',          name: 'Hyper',           app: 'hyper' },
+      { id: 'xterm',          name: 'XTerm',           app: 'xterm' },
     ];
     for (const def of linuxTerminals) {
       if (whichSync(def.app)) {

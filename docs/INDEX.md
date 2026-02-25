@@ -25,6 +25,7 @@ This directory contains both AI-readable reference docs (UPPERCASE files) and de
 | [CONFIGURATION.md](CONFIGURATION.md) | All config files, keys, defaults, and file locations |
 | [PATTERNS.md](PATTERNS.md) | IPC conventions, Zustand rules, error handling, cross-platform |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, build, adding features, debugging, checklist |
+| [ROADMAP.md](ROADMAP.md) | What's in progress, planned post-MVP, and recently completed |
 | [GLOSSARY.md](GLOSSARY.md) | Definitions for all domain-specific and project-specific terms |
 
 ## Developer-Authored Deep-Dives
