@@ -7,30 +7,49 @@ export function WebView() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const url = activeTab?.type === 'web' ? activeTab.filePath : null;
-  const isExternal = url ? /^https?:\/\//.test(url) : false;
 
   // Reset status when URL or refresh key changes
   useEffect(() => {
-    if (!url) return;
-    setStatus('loading');
+    if (url) setStatus('loading');
+  }, [url, refreshKey]);
 
-    // For external URLs, start a timeout — if load doesn't fire, the site likely blocked embedding
-    if (isExternal) {
-      timerRef.current = setTimeout(() => {
-        setStatus(prev => prev === 'loading' ? 'error' : prev);
-      }, 5000);
+  // After load fires, check if the iframe actually has content.
+  // Blocked frames (ERR_BLOCKED_BY_RESPONSE) fire onLoad but render an empty
+  // about:blank document we can detect via contentWindow.length === 0 and
+  // an empty contentDocument (when same-origin) or by checking the location.
+  const handleLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) { setStatus('loaded'); return; }
+
+    try {
+      // If we can access contentDocument (same-origin / pilot-html://),
+      // check whether the body has content
+      const doc = iframe.contentDocument;
+      if (doc) {
+        const bodyHTML = doc.body?.innerHTML ?? '';
+        if (bodyHTML === '' && doc.title === '') {
+          // Empty doc — likely a blocked load that fell back to about:blank
+          setStatus('error');
+          return;
+        }
+      }
+    } catch {
+      // Cross-origin: can't access contentDocument.
+      // For cross-origin frames, try checking if the frame navigated to about:blank
+      // (which happens when the real URL was blocked).
+      try {
+        const loc = iframe.contentWindow?.location?.href;
+        if (loc === 'about:blank') {
+          setStatus('error');
+          return;
+        }
+      } catch {
+        // SecurityError accessing location — means a real cross-origin page loaded. That's good.
+      }
     }
 
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [url, refreshKey, isExternal]);
-
-  const handleLoad = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
     setStatus('loaded');
   }, []);
 
@@ -78,7 +97,7 @@ export function WebView() {
           <Icon name="ShieldAlert" size={32} className="text-text-secondary/50" />
           <div className="text-center space-y-1">
             <div className="text-sm font-medium text-text-primary">This site can&apos;t be displayed in a web tab</div>
-            <div className="text-xs">The site may block embedding via X-Frame-Options or CSP headers.</div>
+            <div className="text-xs">The site blocks embedding via X-Frame-Options or CSP headers.</div>
           </div>
           <button
             onClick={() => window.api.openExternal(url)}
