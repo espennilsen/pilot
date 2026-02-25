@@ -266,6 +266,15 @@ function processItalic(text: string, counter: KeyCounter): React.ReactNode[] {
   return parts;
 }
 
+/** Handle link clicks — external URLs open in system browser, others are suppressed */
+function handleLinkClick(e: React.MouseEvent<HTMLAnchorElement>, href: string): void {
+  e.preventDefault();
+  if (/^https?:\/\//.test(href)) {
+    window.api.openExternal(href);
+  }
+  // Relative paths and anchors (#) are intentionally no-ops in the markdown preview
+}
+
 function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const linkRegex = /\[(.+?)\]\((.+?)\)/g;
@@ -276,13 +285,13 @@ function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
+    const href = match[2];
     parts.push(
       <a
         key={`link-${counter.value++}`}
-        href={match[2]}
-        className="text-accent hover:underline"
-        target="_blank"
-        rel="noopener noreferrer"
+        href={href}
+        className="text-accent hover:underline cursor-pointer"
+        onClick={(e) => handleLinkClick(e, href)}
       >
         {match[1]}
       </a>
