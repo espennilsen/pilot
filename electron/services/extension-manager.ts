@@ -285,6 +285,33 @@ export class ExtensionManager {
     const entries = readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
+      // Direct .md files in the skills directory root (per SDK spec)
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        const mdPath = join(dir, entry.name);
+        const skillName = basename(entry.name, '.md');
+        try {
+          const content = readFileSync(mdPath, 'utf-8');
+          const descMatch = content.match(/description:\s*(.+)/);
+          const description = descMatch ? descMatch[1].trim() : 'No description';
+
+          const registryEntry = registry.skills?.find((s) => s.path === mdPath);
+
+          skills.push({
+            id: skillName,
+            name: skillName,
+            description,
+            scope,
+            path: mdPath,
+            skillMdPath: mdPath,
+            enabled: registryEntry?.enabled ?? true,
+          });
+        } catch (error) {
+          console.error('Failed to read skill .md:', error);
+        }
+        continue;
+      }
+
+      // Subdirectories with SKILL.md
       if (!entry.isDirectory()) continue;
 
       const skillPath = join(dir, entry.name);
