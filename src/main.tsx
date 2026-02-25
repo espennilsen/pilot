@@ -6,6 +6,10 @@ import { initCompanionPolyfill, isCompanionMode, isCompanionConnected } from './
 import { initDevCommandListeners } from './stores/dev-command-store';
 import { initTunnelOutputListeners } from './stores/tunnel-output-store';
 import './styles/globals.css';
+import { applyThemeEarly } from './hooks/useTheme';
+
+// Apply theme before React mounts to prevent a flash of wrong theme
+applyThemeEarly();
 
 // In companion mode (browser / WKWebView), polyfill window.api
 // before any React components try to use IPC

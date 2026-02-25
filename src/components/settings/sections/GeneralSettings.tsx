@@ -7,7 +7,7 @@ import { IPC } from '../../../../shared/ipc';
 import { invoke } from '../../../lib/ipc-client';
 
 export function GeneralSettings() {
-  const { piAgentDir, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig } = useAppSettingsStore();
+  const { piAgentDir, theme, setTheme, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig } = useAppSettingsStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const [dirInput, setDirInput] = useState(piAgentDir);
   const [dirDirty, setDirDirty] = useState(false);
@@ -71,13 +71,19 @@ export function GeneralSettings() {
       </SettingRow>
 
       <SettingRow
-        icon={<Monitor className="w-4 h-4 text-text-secondary" />}
+        icon={<Monitor className="w-4 h-4 text-accent" />}
         label="Theme"
-        description="Pilot currently ships with a dark theme. Light theme coming soon."
+        description="Choose dark, light, or follow your system preference."
       >
-        <span className="text-xs text-text-secondary bg-bg-surface border border-border rounded px-2 py-1">
-          Dark
-        </span>
+        <select
+          value={theme}
+          onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'system')}
+          className="text-xs bg-bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-accent"
+        >
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="system">System</option>
+        </select>
       </SettingRow>
 
       <SettingRow

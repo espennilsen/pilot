@@ -25,6 +25,7 @@ import { useWorkspacePersistence, openTabSession, useWiredSessionsStore } from '
 import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
+import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
 import { useChatStore } from './stores/chat-store';
@@ -105,6 +106,9 @@ function App() {
 
   // Listen for subagent events from main process
   useSubagentEvents();
+
+  // Apply theme (data-theme attribute on <html>, notify main process)
+  useTheme();
 
   // Auto-start persistent dev commands on launch
   const autoStartDevServer = useAppSettingsStore(s => s.autoStartDevServer);

@@ -5,11 +5,13 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useUIStore } from '../../stores/ui-store';
 import { useProjectStore } from '../../stores/project-store';
+import { useAppSettingsStore } from '../../stores/app-settings-store';
+import { resolveTheme } from '../../hooks/useTheme';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on, send } from '../../lib/ipc-client';
 import { X, Plus, Terminal as TerminalIcon } from 'lucide-react';
 
-const XTERM_THEME = {
+const XTERM_THEME_DARK = {
   background: '#1a1b1e',
   foreground: '#e0e0e0',
   cursor: '#4fc3f7',
@@ -31,6 +33,34 @@ const XTERM_THEME = {
   brightCyan: '#64ffda',
   brightWhite: '#ffffff',
 };
+
+const XTERM_THEME_LIGHT = {
+  background: '#ffffff',
+  foreground: '#1a1b1e',
+  cursor: '#0b7dda',
+  selectionBackground: '#0b7dda30',
+  black: '#1a1b1e',
+  red: '#d93025',
+  green: '#1a8d3e',
+  yellow: '#c47a0a',
+  blue: '#0b7dda',
+  magenta: '#a626a4',
+  cyan: '#0e7490',
+  white: '#e8eaed',
+  brightBlack: '#5f6368',
+  brightRed: '#ea4335',
+  brightGreen: '#34a853',
+  brightYellow: '#f9ab00',
+  brightBlue: '#4285f4',
+  brightMagenta: '#af5fcf',
+  brightCyan: '#24a6c7',
+  brightWhite: '#ffffff',
+};
+
+function getXtermTheme(): typeof XTERM_THEME_DARK {
+  const mode = useAppSettingsStore.getState().theme;
+  return resolveTheme(mode) === 'light' ? XTERM_THEME_LIGHT : XTERM_THEME_DARK;
+}
 
 interface TermInstance {
   xterm: XTerm;
@@ -59,7 +89,7 @@ export default function Terminal() {
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Liberation Mono", "Courier New", monospace',
-      theme: XTERM_THEME,
+      theme: getXtermTheme(),
       scrollback: 5000,
       allowProposedApi: true,
     });
@@ -201,6 +231,15 @@ export default function Terminal() {
       } catch { /* ignore */ }
     });
   }, [terminalHeight, terminalVisible, activeTerminalId]);
+
+  // Update xterm theme when app theme changes
+  const theme = useAppSettingsStore((s) => s.theme);
+  useEffect(() => {
+    const xtermTheme = getXtermTheme();
+    for (const [, instance] of instancesRef.current) {
+      instance.xterm.options.theme = xtermTheme;
+    }
+  }, [theme]);
 
   const handleClose = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
