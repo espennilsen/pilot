@@ -16,12 +16,12 @@ export interface SessionMetadata {
   modified: number;  // timestamp
 }
 
-// Pilot app settings (stored in ~/.config/.pilot/app-settings.json)
+// Pilot app settings (stored in ~/.config/pilot/app-settings.json)
 /** Theme mode — 'dark', 'light', or 'system' (follows OS preference). */
 export type ThemeMode = 'dark' | 'light' | 'system';
 
 export interface PilotAppSettings {
-  /** Custom pi agent config directory. Default: ~/.config/.pilot */
+  /** Custom pi agent config directory. Default: ~/.config/pilot */
   piAgentDir: string;
   /** App color theme. Default: 'dark' */
   theme?: ThemeMode;
@@ -266,7 +266,7 @@ export interface ImportResult {
 // Workspace state (saved tab layout and UI state)
 export interface SavedTabState {
   id: string;
-  type: 'chat' | 'file';
+  type: 'chat' | 'file' | 'web';
   filePath: string | null;
   title: string;
   projectPath: string | null;
@@ -509,4 +509,11 @@ export interface EditorOpenFilePayload {
 export interface EditorOpenUrlPayload {
   url: string;
   title?: string;
+}
+
+/** Agent requests opening a URL or local HTML file in a web tab */
+export interface WebTabOpenPayload {
+  url: string;
+  title?: string;
+  projectPath: string | null;
 }

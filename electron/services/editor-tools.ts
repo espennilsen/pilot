@@ -2,7 +2,7 @@ import { Type } from '@sinclair/typebox';
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { IPC } from '../../shared/ipc';
 import { broadcastToRenderer } from '../utils/broadcast';
-import type { EditorOpenFilePayload, EditorOpenUrlPayload } from '../../shared/types';
+import type { EditorOpenFilePayload, EditorOpenUrlPayload, WebTabOpenPayload } from '../../shared/types';
 
 /**
  * Creates agent tools for controlling the Pilot GUI.
@@ -63,5 +63,37 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
     },
   };
 
-  return [showFile, openUrl];
+  // ─── pilot_web ─────────────────────────────────────────────────────
+
+  const webTab: ToolDefinition = {
+    name: 'pilot_web',
+    label: 'Web Tab',
+    description:
+      'Open a URL or local HTML file in a web tab within Pilot. Use for previewing HTML files, viewing documentation, or showing web content to the user without leaving the app.',
+    parameters: Type.Object({
+      url: Type.String({ description: 'URL (https://...) or file path relative to project root (.html file)' }),
+      title: Type.Optional(Type.String({ description: 'Tab title (defaults to hostname or filename)' })),
+    }),
+    execute: async (params) => {
+      let resolvedUrl = params.url;
+
+      // If it looks like a relative path (not a URL), convert to pilot-html:// protocol
+      if (!/^https?:\/\//.test(resolvedUrl) && !/^pilot-html:\/\//.test(resolvedUrl)) {
+        const { resolve, join } = await import('path');
+        const absPath = resolve(join(projectPath, resolvedUrl));
+        resolvedUrl = `pilot-html://localhost${absPath}`;
+      }
+
+      const payload: WebTabOpenPayload = {
+        url: resolvedUrl,
+        title: params.title,
+        projectPath,
+      };
+
+      broadcastToRenderer(IPC.WEB_TAB_OPEN, payload);
+      return `Opened ${params.url} in a web tab.`;
+    },
+  };
+
+  return [showFile, openUrl, webTab];
 }

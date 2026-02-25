@@ -14,6 +14,7 @@ import {
 import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
 import { loadProjectSettings } from './project-settings';
 import { getPiAgentDir, loadAppSettings } from './app-settings';
+import { PILOT_SKILLS_DIR } from './pilot-paths';
 import { ExtensionManager } from './extension-manager';
 import { MemoryManager } from './memory-manager';
 import { TaskManager } from './task-manager';
@@ -32,6 +33,8 @@ export interface SessionConfigResult {
   resourceLoader: DefaultResourceLoader;
   customTools: ToolDefinition[];
   piAgentDir: string;
+  /** Live reference — mutate properties to change sandbox behaviour at runtime. */
+  sandboxOptions: SandboxOptions;
 }
 
 export interface SessionConfigOptions {
@@ -62,10 +65,16 @@ export async function buildSessionConfig(
   const settingsManager = SettingsManager.create(projectPath, piAgentDir);
 
   // Create sandboxed file tools
+  // Always safelist the Pilot skills directory so the agent can read skill files
+  const allowedPaths = [...projectSettings.jail.allowedPaths];
+  if (!allowedPaths.includes(PILOT_SKILLS_DIR)) {
+    allowedPaths.push(PILOT_SKILLS_DIR);
+  }
+
   const sandboxOptions: SandboxOptions = {
     jailEnabled: projectSettings.jail.enabled,
     yoloMode: projectSettings.yoloMode,
-    allowedPaths: projectSettings.jail.allowedPaths,
+    allowedPaths,
     tabId,
     onStagedDiff,
   };
@@ -131,5 +140,5 @@ export async function buildSessionConfig(
     createWebFetchTool(),
   ];
 
-  return { settingsManager, resourceLoader, customTools, piAgentDir };
+  return { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions };
 }

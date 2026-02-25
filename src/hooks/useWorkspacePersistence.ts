@@ -160,6 +160,9 @@ export function useWorkspacePersistence() {
     (async () => {
       const saved = await invoke(IPC.TABS_RESTORE_STATE) as WorkspaceState | null;
       if (!saved || !saved.tabs || saved.tabs.length === 0) {
+        // No saved workspace — try to create a tab (requires a project).
+        // If no project is known yet, the user will see the empty state
+        // and can open a project via the project dialog.
         if (useTabStore.getState().tabs.length === 0) {
           useTabStore.getState().addTab();
         }

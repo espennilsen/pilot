@@ -7,6 +7,7 @@ import FileEditor from '../editor/FileEditor';
 import ContextPanel from '../context/ContextPanel';
 import { TaskBoardView } from '../tasks/TaskBoardView';
 import { DocsViewer } from '../docs/DocsViewer';
+import { WebView } from '../web/WebView';
 
 export default function MainLayout() {
   const { sidebarVisible, contextPanelVisible, setSidebarWidth, setContextPanelWidth } = useUIStore();
@@ -30,6 +31,8 @@ export default function MainLayout() {
         return <TaskBoardView />;
       case 'docs':
         return <DocsViewer />;
+      case 'web':
+        return <WebView />;
       default:
         return <ChatView />;
     }

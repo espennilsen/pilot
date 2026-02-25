@@ -71,6 +71,20 @@ export function registerModelIpc(sessionManager: PilotSessionManager) {
     const session = sessionManager.getSession(tabId);
     if (!session) return null;
     try {
+      // SDK workaround: estimateTokens() iterates message.content without
+      // null-checking for assistant, toolResult, and custom roles.
+      // Error/aborted responses or tool results can have undefined content.
+      // Normalise before calling getContextUsage() to prevent crashes.
+      for (const msg of session.messages) {
+        const m = msg as any;
+        if (m.content === undefined || m.content === null) {
+          if (m.role === 'assistant') {
+            m.content = [];
+          } else if (m.role === 'toolResult' || m.role === 'custom') {
+            m.content = '';
+          }
+        }
+      }
       return session.getContextUsage();
     } catch (err) {
       console.warn('[IPC:model] Failed to get context usage:', err);

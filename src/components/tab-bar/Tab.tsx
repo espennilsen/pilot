@@ -161,7 +161,10 @@ export function Tab({ tabId, isActive, onDragStart, onDragOver, onDrop }: TabPro
       {tab.type === 'file' && tab.filePath && (
         <div className="text-text-secondary">{tab.filePath}</div>
       )}
-      {tab.type !== 'file' && (
+      {tab.type === 'web' && tab.filePath && (
+        <div className="text-text-secondary">{tab.filePath}</div>
+      )}
+      {tab.type !== 'file' && tab.type !== 'web' && (
         <>
           {tab.projectPath && (
             <div className="text-text-secondary">
@@ -206,6 +209,8 @@ export function Tab({ tabId, isActive, onDragStart, onDragOver, onDrop }: TabPro
             <Icon name="ListTodo" size={14} className="flex-shrink-0 text-text-secondary" />
           ) : tab.type === 'docs' ? (
             <Icon name="BookOpen" size={14} className="flex-shrink-0 text-text-secondary" />
+          ) : tab.type === 'web' ? (
+            <Icon name="Globe" size={14} className="flex-shrink-0 text-text-secondary" />
           ) : (
             <div
               className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[chatStatus]} ${

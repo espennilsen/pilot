@@ -2,14 +2,15 @@
  * @file Tab store — manages tabs, project grouping, and tab switching/ordering.
  */
 import { create } from 'zustand';
+import { useProjectStore } from './project-store';
 
 /**
- * Represents a single tab (chat, file, tasks, or docs).
+ * Represents a single tab (chat, file, tasks, docs, or web).
  */
 export interface TabState {
   id: string;
-  type: 'chat' | 'file' | 'tasks' | 'docs';
-  filePath: string | null; // for file tabs
+  type: 'chat' | 'file' | 'tasks' | 'docs' | 'web';
+  filePath: string | null; // for file tabs; URL for web tabs
   title: string;
   projectPath: string | null;
   sessionPath: string | null;
@@ -49,6 +50,7 @@ interface TabStore {
   addFileTab: (filePath: string, projectPath: string | null) => string;
   addTasksTab: (projectPath: string) => string;
   addDocsTab: (page?: string) => string;
+  addWebTab: (url: string, projectPath: string | null, title?: string) => string;
   closeTab: (tabId: string) => void;
   switchTab: (tabId: string) => void;
   switchToTabByIndex: (index: number) => void;
@@ -144,19 +146,31 @@ export const useTabStore = create<TabStore>((set, get) => {
     projectColorMap: new Map<string | null, string>(),
 
     addTab: (projectPath = undefined) => {
-    const newTabId = crypto.randomUUID();
     const tabs = get().tabs;
     const maxOrder = tabs.length > 0 ? Math.max(...tabs.map(t => t.order)) : -1;
 
-    // Inherit project from active tab when no explicit projectPath given
+    // Resolve project: explicit param → active tab → closed tab stack → project store
     let resolvedProject = projectPath ?? null;
-    if (projectPath === undefined) {
+    if (resolvedProject === null) {
       const activeTab = tabs.find(t => t.id === get().activeTabId);
       if (activeTab?.projectPath) {
         resolvedProject = activeTab.projectPath;
       }
     }
-    
+    if (resolvedProject === null) {
+      const lastClosed = get().closedTabStack.find(t => t.projectPath);
+      if (lastClosed?.projectPath) {
+        resolvedProject = lastClosed.projectPath;
+      }
+    }
+    if (resolvedProject === null) {
+      resolvedProject = useProjectStore.getState().projectPath;
+    }
+
+    // Tabs must be bound to a project — don't create orphan tabs
+    if (!resolvedProject) return '';
+
+    const newTabId = crypto.randomUUID();
     const newTab: TabState = {
       id: newTabId,
       type: 'chat',
@@ -278,6 +292,41 @@ export const useTabStore = create<TabStore>((set, get) => {
       }));
 
       return newTabId;
+    },
+
+    addWebTab: (url: string, projectPath: string | null, title?: string) => {
+      // Extract hostname or filename for default title
+      let defaultTitle = 'Web';
+      try {
+        if (url.startsWith('pilot-html://')) {
+          const filename = url.split('/').pop() || 'HTML';
+          defaultTitle = filename.replace(/\.html$/, '');
+        } else if (url.startsWith('http://') || url.startsWith('https://')) {
+          const hostname = new URL(url).hostname;
+          defaultTitle = hostname.replace(/^www\./, '');
+        }
+      } catch { /* Invalid URL — use fallback */ }
+
+      return findOrCreateTab(
+        (t) => t.type === 'web' && t.filePath === url,
+        () => ({
+          type: 'web',
+          filePath: url,
+          title: title || defaultTitle,
+          projectPath,
+          sessionPath: null,
+          projectColor: getProjectColor(projectPath),
+          isPinned: false,
+          scrollPosition: 0,
+          inputDraft: '',
+          panelConfig: {
+            sidebarVisible: true,
+            contextPanelVisible: false,
+            contextPanelTab: 'files',
+          },
+          hasUnread: false,
+        })
+      );
     },
 
   /** Close a tab. If it's the active tab, switches to the nearest remaining tab. Pushes to closed-tab stack. */

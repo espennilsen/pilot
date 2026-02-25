@@ -27,6 +27,7 @@ import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
 import { useEditorEvents } from './hooks/useEditorEvents';
+import { useWebTabEvents } from './hooks/useWebTabEvents';
 import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
@@ -64,6 +65,8 @@ function App() {
     const currentProjectPath = useProjectStore.getState().projectPath;
     if (tab.projectPath && tab.projectPath !== currentProjectPath) {
       useProjectStore.getState().setProjectPath(tab.projectPath);
+      // Load sandbox settings for this project
+      useSandboxStore.getState().loadSettings(tab.projectPath);
     } else if (!tab.projectPath && currentProjectPath) {
       useProjectStore.setState({ projectPath: null, fileTree: [], selectedFilePath: null });
     }
@@ -112,6 +115,9 @@ function App() {
   // Listen for agent-triggered editor events (open file, open URL)
   useEditorEvents();
 
+  // Listen for agent-triggered web tab events
+  useWebTabEvents();
+
   // Apply theme (data-theme attribute on <html>, notify main process)
   useTheme();
 
@@ -153,7 +159,8 @@ function App() {
   // Listen for File menu commands
   useEffect(() => {
     const unsub = on('menu:new-conversation', () => {
-      useTabStore.getState().addTab();
+      const tabId = useTabStore.getState().addTab();
+      if (!tabId) useProjectStore.getState().openProjectDialog();
     });
     return unsub;
   }, []);
@@ -261,10 +268,10 @@ function App() {
         toggleTerminal();
       }
     },
-    'toggle-yolo-mode':     () => { if (activeTabId) toggleYolo(activeTabId); },
+    'toggle-yolo-mode':     () => { if (activeTabId && projectPath) toggleYolo(activeTabId, projectPath); },
     'toggle-git-panel':     () => { setContextPanelTab('git'); if (!contextPanelVisible) toggleContextPanel(); },
-    'new-tab':              () => addTab(),
-    'new-conversation':     () => addTab(),
+    'new-tab':              () => { if (!addTab()) openProjectDialog(); },
+    'new-conversation':     () => { if (!addTab()) openProjectDialog(); },
     'developer-settings':   () => openSettings('developer'),
     'open-project':         openProjectDialog,
     'open-settings':        () => openSettings(),
@@ -280,7 +287,7 @@ function App() {
         useChatStore.getState().setQueued(tabId, { steering: [], followUp: [] });
       }
     },
-  }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
+  }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, projectPath, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
 
   // Build shortcut configs from keybinding defs + overrides
   const shortcuts = useMemo(() => {

@@ -36,7 +36,7 @@ export const IPC = {
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
 
-  // App Settings (Pilot-level, stored in ~/.config/.pilot/)
+  // App Settings (Pilot-level, stored in ~/.config/pilot/)
   APP_SETTINGS_GET: 'app-settings:get',
   APP_SETTINGS_UPDATE: 'app-settings:update',
   APP_THEME_CHANGED: 'app-settings:theme-changed',
@@ -226,4 +226,7 @@ export const IPC = {
   // Editor (agent → renderer)
   EDITOR_OPEN_FILE: 'editor:open-file',     // main → renderer
   EDITOR_OPEN_URL: 'editor:open-url',       // main → renderer
+
+  // Web Tab (agent → renderer)
+  WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
 } as const;

@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CodeBlock from '../components/chat/CodeBlock';
+import { ContextMenu, type MenuEntry } from '../components/shared/ContextMenu';
+import { useTabStore } from '../stores/tab-store';
+import { useProjectStore } from '../stores/project-store';
 
 interface CodeBlockMatch {
   type: 'code';
@@ -275,6 +278,49 @@ function handleLinkClick(e: React.MouseEvent<HTMLAnchorElement>, href: string): 
   // Relative paths and anchors (#) are intentionally no-ops in the markdown preview
 }
 
+function ChatLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (/^https?:\/\//.test(href)) {
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const menuItems: MenuEntry[] = [
+    {
+      label: 'Open in Web Tab',
+      action: () => {
+        const projectPath = useProjectStore.getState().projectPath;
+        useTabStore.getState().addWebTab(href, projectPath);
+      },
+    },
+    {
+      label: 'Copy Link',
+      action: () => {
+        navigator.clipboard.writeText(href);
+      },
+    },
+  ];
+
+  return (
+    <>
+      <a
+        href={href}
+        className="text-accent hover:underline cursor-pointer"
+        onClick={(e) => handleLinkClick(e, href)}
+        onContextMenu={handleContextMenu}
+      >
+        {children}
+      </a>
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />
+      )}
+    </>
+  );
+}
+
 function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const linkRegex = /\[(.+?)\]\((.+?)\)/g;
@@ -287,14 +333,12 @@ function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {
     }
     const href = match[2];
     parts.push(
-      <a
+      <ChatLink
         key={`link-${counter.value++}`}
         href={href}
-        className="text-accent hover:underline cursor-pointer"
-        onClick={(e) => handleLinkClick(e, href)}
       >
         {match[1]}
-      </a>
+      </ChatLink>
     );
     lastIndex = match.index + match[0].length;
   }

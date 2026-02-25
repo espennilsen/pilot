@@ -231,6 +231,7 @@ if (process.platform === 'linux') {
 // Must be called before app.whenReady().
 protocol.registerSchemesAsPrivileged([
   { scheme: 'pilot-attachment', privileges: { bypassCSP: true, supportFetchAPI: true } },
+  { scheme: 'pilot-html', privileges: { bypassCSP: true, supportFetchAPI: true, standard: true, secure: true } },
 ]);
 
 // This method will be called when Electron has finished initialization
@@ -245,6 +246,23 @@ app.whenReady().then(async () => {
     // URL format: pilot-attachment:///absolute/path/to/file.png
     const filePath = decodeURIComponent(new URL(request.url).pathname);
     return net.fetch(`file://${filePath}`);
+  });
+
+  // Handle pilot-html:// URLs → serve local HTML and assets from project directories
+  // URL format: pilot-html://localhost/<absolute-path-to-file>
+  // Uses standard: true so relative asset references (CSS, JS, images) resolve correctly.
+  protocol.handle('pilot-html', (request) => {
+    const url = new URL(request.url);
+    const filePath = decodeURIComponent(url.pathname);
+    const { resolve } = require('path');
+    const { existsSync } = require('fs');
+    const resolved = resolve(filePath);
+
+    if (!existsSync(resolved)) {
+      return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+    }
+
+    return net.fetch(`file://${resolved}`);
   });
   // Create window first (needed by terminal service)
   createWindow();
