@@ -77,6 +77,14 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # Disable hardened runtime + entitlements for ad-hoc signing (no real identity in CI)
+      - name: Patch macOS signing for CI
+        if: runner.os == 'macOS'
+        run: |
+          sed -i '' 's/hardenedRuntime: true/hardenedRuntime: false/' electron-builder.yml
+          sed -i '' '/entitlements:/d' electron-builder.yml
+          sed -i '' '/entitlementsInherit:/d' electron-builder.yml
+
       - name: Build
         run: ${{ matrix.build-cmd }}
         env:
