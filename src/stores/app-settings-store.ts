@@ -76,7 +76,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
-    systemPrompt: '',
+    systemPrompt: 'File edits are staged for user review before being applied to disk.\nThe user has task management tools (pilot_task_*) and can delegate work to subagents (pilot_subagent).\nweb_fetch is available for fetching URLs and API calls.',
     commitMsgModel: '',
     commitMsgMaxTokens: 4096,
     logging: {

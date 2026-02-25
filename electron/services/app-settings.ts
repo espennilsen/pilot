@@ -26,8 +26,13 @@ export const DEFAULT_HIDDEN_PATHS = [
   '*.pyc',
 ];
 
+const DEFAULT_SYSTEM_PROMPT = `File edits are staged for user review before being applied to disk.
+The user has task management tools (pilot_task_*) and can delegate work to subagents (pilot_subagent).
+web_fetch is available for fetching URLs and API calls.`;
+
 const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   piAgentDir: DEFAULT_PI_AGENT_DIR,
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
   terminalApp: null,
   editorCli: null,
   onboardingComplete: false,
