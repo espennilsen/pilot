@@ -40,8 +40,15 @@ function copyWasmPlugin() {
     closeBundle() {
       const wasmSrc = path.resolve(__dirname, 'node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm');
       const wasmDest = path.resolve(__dirname, 'out/main/photon_rs_bg.wasm');
-      if (fs.existsSync(wasmSrc) && !fs.existsSync(wasmDest)) {
-        fs.copyFileSync(wasmSrc, wasmDest);
+      try {
+        if (fs.existsSync(wasmSrc)) {
+          fs.mkdirSync(path.dirname(wasmDest), { recursive: true });
+          fs.copyFileSync(wasmSrc, wasmDest);
+        } else {
+          console.warn('[copy-wasm] photon WASM not found, skipping:', wasmSrc);
+        }
+      } catch (err) {
+        console.warn('[copy-wasm] Failed to copy WASM:', err.message);
       }
     }
   };
