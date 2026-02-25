@@ -39,6 +39,7 @@ export const IPC = {
   // App Settings (Pilot-level, stored in ~/.config/.pilot/)
   APP_SETTINGS_GET: 'app-settings:get',
   APP_SETTINGS_UPDATE: 'app-settings:update',
+  APP_THEME_CHANGED: 'app-settings:theme-changed',
   PI_SETTINGS_GET: 'pi-settings:get',
   PI_SETTINGS_UPDATE: 'pi-settings:update',
 
@@ -126,6 +127,7 @@ export const IPC = {
   EXTENSIONS_REMOVE: 'extensions:remove',
   SKILLS_LIST: 'skills:list',
   SKILLS_IMPORT_ZIP: 'skills:import-zip',
+  SKILLS_IMPORT_MD: 'skills:import-md',
   SKILLS_TOGGLE: 'skills:toggle',
   SKILLS_REMOVE: 'skills:remove',
 

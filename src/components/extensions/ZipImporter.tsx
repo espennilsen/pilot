@@ -11,7 +11,10 @@ interface ZipImporterProps {
 export default function ZipImporter({ type, scope }: ZipImporterProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const { importExtensionZip, importSkillZip } = useExtensionStore();
+  const { importExtensionZip, importSkillZip, importSkillMd } = useExtensionStore();
+
+  const acceptedExtensions = type === 'skill' ? ['.zip', '.md'] : ['.zip'];
+  const acceptAttr = type === 'skill' ? '.zip,.md' : '.zip';
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -28,25 +31,28 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
     setImportResult(null);
 
     const files = Array.from(e.dataTransfer.files);
-    const zipFile = files.find((f) => f.name.endsWith('.zip'));
+    const importFile = files.find((f) => acceptedExtensions.some(ext => f.name.endsWith(ext)));
 
-    if (!zipFile) {
+    if (!importFile) {
       setImportResult({
         success: false,
         id: '',
         name: '',
         type,
         scope,
-        error: 'Please drop a .zip file',
+        error: type === 'skill' ? 'Please drop a .zip or .md file' : 'Please drop a .zip file',
       });
       return;
     }
 
     try {
-      const zipPath = window.api.getFilePath?.(zipFile) ?? (zipFile as any).path;
-      const result = type === 'extension'
-        ? await importExtensionZip(zipPath, scope)
-        : await importSkillZip(zipPath, scope);
+      const filePath = window.api.getFilePath?.(importFile) ?? (importFile as any).path;
+      const isMd = importFile.name.endsWith('.md');
+      const result = isMd
+        ? await importSkillMd(filePath, scope)
+        : type === 'extension'
+          ? await importExtensionZip(filePath, scope)
+          : await importSkillZip(filePath, scope);
 
       setImportResult(result);
     } catch (error) {
@@ -68,9 +74,12 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
 
     try {
       const filePath = window.api.getFilePath?.(file) ?? (file as any).path;
-      const result = type === 'extension'
-        ? await importExtensionZip(filePath, scope)
-        : await importSkillZip(filePath, scope);
+      const isMd = file.name.endsWith('.md');
+      const result = isMd
+        ? await importSkillMd(filePath, scope)
+        : type === 'extension'
+          ? await importExtensionZip(filePath, scope)
+          : await importSkillZip(filePath, scope);
 
       setImportResult(result);
     } catch (error) {
@@ -122,7 +131,7 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
           
           <div className="text-center">
             <p className="text-sm font-medium text-text-primary mb-1">
-              Drop a .zip file here
+              Drop a {type === 'skill' ? '.zip or .md' : '.zip'} file here
             </p>
             <p className="text-xs text-text-secondary">
               or click to browse
@@ -133,7 +142,7 @@ export default function ZipImporter({ type, scope }: ZipImporterProps) {
             Browse Files
             <input
               type="file"
-              accept=".zip"
+              accept={acceptAttr}
               onChange={handleFileSelect}
               className="hidden"
             />

@@ -36,6 +36,13 @@ export function registerExtensionsIpc(extensionManager: ExtensionManager) {
     }
   );
 
+  ipcMain.handle(
+    IPC.SKILLS_IMPORT_MD,
+    async (_, mdPath: string, scope: 'global' | 'project'): Promise<ImportResult> => {
+      return extensionManager.importSkillMd(mdPath, scope);
+    }
+  );
+
   ipcMain.handle(IPC.SKILLS_TOGGLE, async (_, skillId: string): Promise<boolean> => {
     return extensionManager.toggleSkill(skillId);
   });

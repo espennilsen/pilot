@@ -18,6 +18,7 @@ interface ExtensionStore {
   removeSkill: (skillId: string) => Promise<boolean>;
   importExtensionZip: (zipPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
   importSkillZip: (zipPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
+  importSkillMd: (mdPath: string, scope: 'global' | 'project') => Promise<ImportResult>;
 }
 
 /**
@@ -94,6 +95,15 @@ export const useExtensionStore = create<ExtensionStore>((set, get) => ({
     const result = await invokeAndReload<ImportResult>(
       IPC.SKILLS_IMPORT_ZIP,
       [zipPath, scope],
+      get().loadSkills
+    );
+    return result ?? { success: false, error: 'Import failed' };
+  },
+
+  importSkillMd: async (mdPath: string, scope: 'global' | 'project') => {
+    const result = await invokeAndReload<ImportResult>(
+      IPC.SKILLS_IMPORT_MD,
+      [mdPath, scope],
       get().loadSkills
     );
     return result ?? { success: false, error: 'Import failed' };

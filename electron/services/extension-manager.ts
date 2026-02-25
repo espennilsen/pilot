@@ -397,6 +397,55 @@ export class ExtensionManager {
     }
   }
 
+  /**
+   * Import a .md file as a skill. The SDK supports direct .md files in the skills directory root.
+   * The file is copied into the skills dir. The skill name is derived from the filename.
+   */
+  importSkillMd(mdPath: string, scope: 'global' | 'project'): ImportResult {
+    const fileName = basename(mdPath);
+    const skillName = basename(mdPath, '.md');
+    const targetDir = scope === 'global'
+      ? PILOT_SKILLS_DIR
+      : join(this.projectPath || '', '.pilot', 'skills');
+
+    try {
+      mkdirSync(targetDir, { recursive: true });
+
+      const content = readFileSync(mdPath, 'utf-8');
+
+      // Basic validation: check for frontmatter with description
+      if (!content.includes('description:')) {
+        return {
+          success: false,
+          id: skillName,
+          name: skillName,
+          type: 'skill',
+          scope,
+          error: 'Skill .md file must have frontmatter with a description field',
+        };
+      }
+
+      writeFileSync(join(targetDir, fileName), content, 'utf-8');
+
+      return {
+        success: true,
+        id: skillName,
+        name: skillName,
+        type: 'skill',
+        scope,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        id: skillName,
+        name: skillName,
+        type: 'skill',
+        scope,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
   // --- ZIP Extraction ---
 
   private extractZip(zipPath: string, targetDir: string): void {
