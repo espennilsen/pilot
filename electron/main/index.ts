@@ -218,6 +218,12 @@ function createWindow() {
     mainWindow = null;
   });
 
+  // Detect iframe load failures (e.g. X-Frame-Options: DENY) and notify renderer
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDesc, validatedURL, isMainFrame) => {
+    if (isMainFrame) return; // Only care about sub-frames (iframes)
+    mainWindow?.webContents.send(IPC.WEB_TAB_LOAD_FAILED, { url: validatedURL, errorCode });
+  });
+
   // Build application menu
   buildApplicationMenu();
 }

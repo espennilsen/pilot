@@ -229,4 +229,5 @@ export const IPC = {
 
   // Web Tab (agent → renderer)
   WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
+  WEB_TAB_LOAD_FAILED: 'web-tab:load-failed', // main → renderer
 } as const;
