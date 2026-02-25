@@ -2,7 +2,7 @@
 
 Pilot's settings panel lets you configure authentication, models, project behavior, extensions, keybindings, and more. Access settings with `Cmd+,` or through the command palette.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
 
 ---
 
@@ -760,11 +760,11 @@ Follow these conventions:
 
 **Solution (macOS/Linux)**:
 ```bash
-chmod -R u+w ~/.config/.pilot/
+chmod -R u+w ~/.config/pilot/
 ```
 
 **Solution (Windows)**:
-Right-click the `%APPDATA%\.pilot` folder → Properties → Security → ensure your user has "Full control"
+Right-click the `%APPDATA%\pilot` folder → Properties → Security → ensure your user has "Full control"
 
 ### Settings Corrupted
 
@@ -774,7 +774,7 @@ Right-click the `%APPDATA%\.pilot` folder → Properties → Security → ensure
 1. Quit Pilot
 2. Rename the corrupted file (example for macOS/Linux):
    ```bash
-   mv ~/.config/.pilot/app-settings.json ~/.config/.pilot/app-settings.json.backup
+   mv ~/.config/pilot/app-settings.json ~/.config/pilot/app-settings.json.backup
    ```
 3. Relaunch Pilot (creates new default settings)
 4. Restore custom settings manually from the backup

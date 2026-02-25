@@ -2,7 +2,7 @@
 
 Pilot's **memory system** preserves context across sessions, ensuring the AI agent remembers important project details, conventions, decisions, and history. Memory is organized into two tiers: global and project.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
 
 ---
 

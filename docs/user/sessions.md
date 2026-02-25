@@ -6,7 +6,7 @@ Sessions are the core of Pilot's workflow. Each session is an independent conver
 
 ## What is a Session?
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
 
 A **session** is:
 - A persistent chat conversation with the AI agent

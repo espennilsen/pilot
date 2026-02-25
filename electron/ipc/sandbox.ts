@@ -84,13 +84,31 @@ export function registerSandboxIpc(sessionManager: PilotSessionManager) {
     return loadProjectSettings(projectPath);
   });
 
-  ipcMain.handle(IPC.SANDBOX_UPDATE_SETTINGS, async (_event, projectPath: string, overrides: Record<string, unknown>) => {
+  ipcMain.handle(IPC.SANDBOX_UPDATE_SETTINGS, async (_event, projectPath: string, tabId: string, overrides: Record<string, unknown>) => {
     const pilotDir = join(projectPath, '.pilot');
     const settingsPath = join(pilotDir, 'settings.json');
     const current = loadProjectSettings(projectPath);
-    const merged = { ...current, ...overrides };
+
+    // Deep-merge jail overrides
+    const merged = { ...current };
+    if (overrides.yoloMode !== undefined) merged.yoloMode = overrides.yoloMode as boolean;
+    if (overrides.jail !== undefined) {
+      const jailOverrides = overrides.jail as Record<string, unknown>;
+      merged.jail = { ...current.jail };
+      if (jailOverrides.enabled !== undefined) merged.jail.enabled = jailOverrides.enabled as boolean;
+      if (jailOverrides.allowedPaths !== undefined) merged.jail.allowedPaths = jailOverrides.allowedPaths as string[];
+    }
+
     if (!existsSync(pilotDir)) mkdirSync(pilotDir, { recursive: true });
     writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+
+    // Update live sandbox options on active sessions for this project
+    sessionManager.updateSandboxOptions(tabId, {
+      jailEnabled: merged.jail.enabled,
+      yoloMode: merged.yoloMode,
+      allowedPaths: merged.jail.allowedPaths,
+    });
+
     return merged;
   });
 
@@ -103,6 +121,9 @@ export function registerSandboxIpc(sessionManager: PilotSessionManager) {
     const settingsPath = join(pilotDir, 'settings.json');
     if (!existsSync(pilotDir)) mkdirSync(pilotDir, { recursive: true });
     writeFileSync(settingsPath, JSON.stringify({ ...current, yoloMode: newYoloMode }, null, 2), 'utf-8');
+
+    // Update live sandbox options
+    sessionManager.updateSandboxOptions(tabId, { yoloMode: newYoloMode });
     
     return { yoloMode: newYoloMode };
   });

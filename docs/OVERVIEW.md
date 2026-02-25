@@ -52,9 +52,9 @@ Pilot is a **desktop monolith** that strictly follows Electron's three-process m
 
 | Platform | `<PILOT_DIR>` |
 |----------|---------------|
-| macOS | `~/.config/.pilot/` |
-| Windows | `%APPDATA%\.pilot\` |
-| Linux | `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`) |
+| macOS | `~/.config/pilot/` |
+| Windows | `%APPDATA%\pilot\` |
+| Linux | `$XDG_CONFIG_HOME/pilot/` (default: `~/.config/pilot/`) |
 
 ## Changes Log
 

@@ -48,43 +48,61 @@ export function isWithinProject(projectRoot: string, filePath: string, allowedPa
 // ─── Bash Command Path Analysis ───────────────────────────────────────────
 
 /**
- * System path prefixes that are implicitly allowed when jail is enabled.
- * These are standard OS directories containing executables and read-only
- * system resources that agents routinely reference in commands.
+ * Non-binary system prefixes allowed when jail is enabled.
+ * Binary directories are derived from $PATH at runtime (see buildSafePrefixes).
  */
-const SYSTEM_SAFE_PREFIXES = [
-  // Unix/macOS
-  '/dev/',       // Device files (/dev/null, /dev/urandom, etc.)
-  '/proc/',      // Linux procfs
-  '/sys/',       // Linux sysfs
-  '/usr/',       // System executables and libraries
-  '/bin/',       // Essential executables
-  '/sbin/',      // System admin executables
-  '/opt/',       // Third-party packages
-  '/nix/',       // Nix store
-  '/etc/',       // System config (read-only in practice)
-  '/Library/',   // macOS system library
-  // Windows
-  'C:\\Windows\\',
-  'C:\\Program Files\\',
-  'C:\\Program Files (x86)\\',
+const STATIC_SAFE_PREFIXES = [
+  '/proc/',      // Linux procfs (needed by some CLI tools)
+  '/sys/',       // Linux sysfs (kernel/hardware info, used by some CLI tools)
+  '/tmp/',       // Temporary files
 ];
 
-/** Exact system paths allowed (when not covered by prefix). */
+/**
+ * Exact device/pseudo-file paths allowed — needed for basic bash operation.
+ * No directory prefixes here; only specific files.
+ */
 const SYSTEM_SAFE_EXACT = new Set([
   '/dev/null', '/dev/zero', '/dev/urandom', '/dev/random',
   '/dev/stdin', '/dev/stdout', '/dev/stderr', '/dev/tty',
   '/tmp',  // bare /tmp reference (e.g., `ls /tmp`)
 ]);
 
+/**
+ * Build the full set of safe prefixes by combining static entries with
+ * directories from $PATH. Each $PATH entry is a binary directory the
+ * system trusts for executable lookup, so we allow references to them.
+ *
+ * Cached after first call — $PATH doesn't change during the process lifetime.
+ */
+let _cachedSafePrefixes: string[] | null = null;
+
+function buildSafePrefixes(): string[] {
+  if (_cachedSafePrefixes) return _cachedSafePrefixes;
+
+  const separator = process.platform === 'win32' ? ';' : ':';
+  const pathDirs = (process.env.PATH ?? '').split(separator).filter(Boolean);
+
+  // Normalize each $PATH entry to an absolute path with trailing separator
+  const trailingSep = process.platform === 'win32' ? '\\' : '/';
+  const pathPrefixes = pathDirs.map(dir => {
+    const resolved = resolve(dir);
+    return resolved.endsWith(trailingSep) ? resolved : resolved + trailingSep;
+  });
+
+  // Deduplicate
+  const all = new Set([...STATIC_SAFE_PREFIXES, ...pathPrefixes]);
+  _cachedSafePrefixes = [...all];
+  return _cachedSafePrefixes;
+}
+
 export function isSystemPath(absPath: string): boolean {
-  // Normalize to lowercase on Windows for case-insensitive comparison
-  const normalized = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
-  const normalizedPrefixes = process.platform === 'win32'
-    ? SYSTEM_SAFE_PREFIXES.map(p => p.toLowerCase())
-    : SYSTEM_SAFE_PREFIXES;
-  
+  const isWin = process.platform === 'win32';
+  const normalized = isWin ? absPath.toLowerCase() : absPath;
+
   if (SYSTEM_SAFE_EXACT.has(normalized)) return true;
+
+  const prefixes = buildSafePrefixes();
+  const normalizedPrefixes = isWin ? prefixes.map(p => p.toLowerCase()) : prefixes;
   return normalizedPrefixes.some(prefix => normalized.startsWith(prefix));
 }
 

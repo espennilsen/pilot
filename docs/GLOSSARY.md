@@ -24,7 +24,7 @@ Domain-specific and project-specific terms used throughout the Pilot codebase.
 | **IPC** | Inter-Process Communication — the typed message-passing system between the Electron main process and the renderer. | `shared/ipc.ts`, `electron/ipc/*` |
 | **Push Event** | A message sent from the main process to the renderer unprompted (e.g., agent token stream, FS change). Uses `win.webContents.send()`. | `electron/services/*`, `src/hooks/*` |
 | **Request/Response** | A renderer-initiated IPC call via `window.api.invoke()` that returns a Promise. Uses `ipcMain.handle()`. | All IPC invoke channels |
-| **PILOT_DIR** | The platform-specific config directory for all app data. macOS: `~/.config/.pilot/`, Windows: `%APPDATA%\.pilot\`. | `pilot-paths.ts` |
+| **PILOT_DIR** | The platform-specific config directory for all app data. macOS: `~/.config/pilot/`, Windows: `%APPDATA%\pilot\`. | `pilot-paths.ts` |
 | **Workspace State** | The persisted tab layout and UI panel visibility, saved to `<PILOT_DIR>/workspace.json` and restored on launch. | `workspace-state.ts` |
 | **Session Metadata** | Pilot's overlay data on top of SDK sessions (pinned, archived, custom title). Persisted in `session-metadata.json`. | `session-metadata.ts` |
 | **Prompt Template** | A slash-command-triggered reusable message template with optional `{{variable}}` placeholders. Stored as Markdown files. | `prompt-library.ts`, `prompt-store.ts` |

@@ -10,7 +10,7 @@ import { invoke } from '../../lib/ipc-client';
 type MemoryScope = 'global' | 'project';
 
 const SCOPE_TABS: { id: MemoryScope; label: string; description: string }[] = [
-  { id: 'global', label: 'Global', description: 'Applies to all projects and sessions (~/.config/.pilot/MEMORY.md)' },
+  { id: 'global', label: 'Global', description: 'Applies to all projects and sessions (~/.config/pilot/MEMORY.md)' },
   { id: 'project', label: 'Project', description: 'Shared project memory, can be checked into git (.pilot/MEMORY.md)' },
 ];
 

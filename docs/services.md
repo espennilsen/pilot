@@ -2,7 +2,7 @@
 
 Complete reference documentation for all services in `electron/services/`. Each service runs in the Electron main process and provides core functionality to the application.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
 
 ---
 

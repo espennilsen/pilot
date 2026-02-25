@@ -31,15 +31,34 @@ export function WebView() {
     );
   }
 
+  // Extract local file path from pilot-html:// URLs
+  const localFilePath = url?.startsWith('pilot-html://localhost')
+    ? decodeURIComponent(new URL(url).pathname)
+    : null;
+
   const showError = errorUrl && url.startsWith(errorUrl.replace(/\/$/, ''));
+
+  const openInEditor = () => {
+    if (!localFilePath) return;
+    useTabStore.getState().addFileTab(localFilePath, activeTab.projectPath);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* Navigation toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-bg-surface">
         <div className="flex-1 min-w-0 px-2 py-1 text-xs font-mono text-text-secondary bg-bg-base rounded border border-border truncate">
-          {url}
+          {localFilePath || url}
         </div>
+        {localFilePath && (
+          <button
+            onClick={openInEditor}
+            className="p-1 rounded hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
+            title="Edit source"
+          >
+            <Icon name="Pencil" size={14} />
+          </button>
+        )}
         <button
           onClick={() => { setErrorUrl(null); setRefreshKey(k => k + 1); }}
           className="p-1 rounded hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"

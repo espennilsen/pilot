@@ -242,7 +242,7 @@ export default function AuthStep() {
       </div>
 
       <p className="text-[10px] text-text-secondary/40 text-center">
-        Keys are stored locally in ~/.config/.pilot/auth.json
+        Keys are stored locally in ~/.config/pilot/auth.json
       </p>
     </div>
   );

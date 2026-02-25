@@ -1,7 +1,7 @@
 /**
  * PromptLibrary — Service for loading, managing, and querying prompt templates.
  *
- * Two-layer merge: global (~/.config/.pilot/prompts/) + project (<cwd>/.pilot/prompts/).
+ * Two-layer merge: global (~/.config/pilot/prompts/) + project (<cwd>/.pilot/prompts/).
  * Project prompts override global prompts with the same filename.
  * File watching via chokidar for live reload on external edits.
  */

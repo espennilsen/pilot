@@ -2,7 +2,7 @@
 
 Pilot has three layers of settings, each stored in a different location.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
 
 ## Storage Locations
 
@@ -333,7 +333,7 @@ Tracks enabled/disabled state for installed extensions. Extensions not in the re
       "id": "my-extension",
       "name": "My Extension",
       "version": "1.0.0",
-      "path": "/Users/you/.config/.pilot/extensions/my-extension",
+      "path": "/Users/you/.config/pilot/extensions/my-extension",
       "enabled": true,
       "installedAt": 1700000000000
     }

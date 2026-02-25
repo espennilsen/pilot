@@ -122,8 +122,8 @@ Enable `developerMode` in settings to unlock additional debug panels. Use `npm r
 ### Resetting State
 
 ```bash
-rm -rf ~/.config/.pilot   # macOS/Linux
-rmdir /s %APPDATA%\.pilot  # Windows
+rm -rf ~/.config/pilot   # macOS/Linux
+rmdir /s %APPDATA%\pilot  # Windows
 ```
 
 ## Project Configuration Files

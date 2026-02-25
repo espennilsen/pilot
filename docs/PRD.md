@@ -1536,9 +1536,9 @@ pilot/
 ### Pilot Home Directory
 
 > **Platform-specific locations:**
-> - **macOS:** `~/.config/.pilot/`
-> - **Windows:** `%APPDATA%\.pilot\`
-> - **Linux:** `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`)
+> - **macOS:** `~/.config/pilot/`
+> - **Windows:** `%APPDATA%\pilot\`
+> - **Linux:** `$XDG_CONFIG_HOME/pilot/` (default: `~/.config/pilot/`)
 
 ```
 <PILOT_DIR>/

@@ -161,7 +161,7 @@ export function GeneralSettings() {
           <SettingRow
             icon={<ScrollText className="w-4 h-4 text-text-secondary" />}
             label="File Logging"
-            description="Write logs to ~/.config/.pilot/logs/ with automatic rotation."
+            description="Write logs to ~/.config/pilot/logs/ with automatic rotation."
           >
             <Toggle checked={logging.file?.enabled ?? true} onChange={setFileLogging} />
           </SettingRow>

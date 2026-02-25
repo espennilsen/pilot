@@ -54,7 +54,7 @@ export class ExtensionManager {
     const extensions: InstalledExtension[] = [];
     const registry = this.loadRegistry();
 
-    // Global extensions (from ~/.config/.pilot/extensions/)
+    // Global extensions (from ~/.config/pilot/extensions/)
     extensions.push(...this.scanExtensionsDir(PILOT_EXTENSIONS_DIR, 'global', registry));
 
     // Project extensions (from <project>/.pilot/extensions/)
@@ -239,7 +239,7 @@ export class ExtensionManager {
     const skills: InstalledSkill[] = [];
     const registry = this.loadRegistry();
 
-    // Global skills (from ~/.config/.pilot/skills/)
+    // Global skills (from ~/.config/pilot/skills/)
     skills.push(...this.scanSkillsDir(PILOT_SKILLS_DIR, 'global', registry));
 
     // Project skills (from <project>/.pilot/skills/)

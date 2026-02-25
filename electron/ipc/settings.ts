@@ -9,7 +9,7 @@ import type { PilotSessionManager } from '../services/pi-session-manager';
 
 export function registerSettingsIpc(sessionManager?: PilotSessionManager) {
 
-  // ── App Settings (Pilot-level, ~/.config/.pilot/) ──────────────────────
+  // ── App Settings (Pilot-level, ~/.config/pilot/) ──────────────────────
 
   ipcMain.handle(IPC.APP_SETTINGS_GET, async () => {
     return loadAppSettings();

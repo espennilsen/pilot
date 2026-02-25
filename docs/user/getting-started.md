@@ -2,7 +2,7 @@
 
 Welcome to Pilot! This guide will walk you through your first launch, opening a project, and creating your first AI-assisted coding session.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Documentation uses `<PILOT_DIR>` as shorthand.
 
 ---
 

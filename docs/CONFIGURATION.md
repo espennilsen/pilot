@@ -8,9 +8,9 @@ Pilot has no `.env` files. All configuration is stored in JSON files on disk. Th
 
 | Platform | Path |
 |----------|------|
-| macOS | `~/.config/.pilot/` |
-| Windows | `%APPDATA%\.pilot\` |
-| Linux | `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`) |
+| macOS | `~/.config/pilot/` |
+| Windows | `%APPDATA%\pilot\` |
+| Linux | `$XDG_CONFIG_HOME/pilot/` (default: `~/.config/pilot/`) |
 
 Resolved at runtime by `electron/services/pilot-paths.ts`.
 

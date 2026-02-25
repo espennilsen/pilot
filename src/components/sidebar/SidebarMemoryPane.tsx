@@ -9,7 +9,7 @@ import { invoke } from '../../lib/ipc-client';
 type MemoryScope = 'global' | 'project';
 
 const SCOPE_TABS: { id: MemoryScope; label: string; shortDesc: string }[] = [
-  { id: 'global', label: 'Global', shortDesc: '~/.config/.pilot/MEMORY.md' },
+  { id: 'global', label: 'Global', shortDesc: '~/.config/pilot/MEMORY.md' },
   { id: 'project', label: 'Project', shortDesc: '.pilot/MEMORY.md' },
 ];
 

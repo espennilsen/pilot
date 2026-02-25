@@ -2,7 +2,7 @@
 
 Complete reference for all inter-process communication channels in PiLot.
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
 
 ---
 

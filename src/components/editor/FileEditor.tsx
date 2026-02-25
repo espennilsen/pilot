@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Save, Undo2, AlertTriangle, Eye, Pencil } from 'lucide-react';
+import { Save, Undo2, AlertTriangle, Eye, Pencil, Globe } from 'lucide-react';
 import { useHighlight } from '../../hooks/useHighlight';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -29,6 +29,13 @@ function isMarkdownFile(filePath: string | null): boolean {
   if (!filePath) return false;
   const lower = filePath.toLowerCase();
   return lower.endsWith('.md') || lower.endsWith('.mdx');
+}
+
+/** Check if a file path is an HTML file */
+function isHtmlFile(filePath: string | null): boolean {
+  if (!filePath) return false;
+  const lower = filePath.toLowerCase();
+  return lower.endsWith('.html') || lower.endsWith('.htm');
 }
 
 /** Resolve a relative path against a base file path */
@@ -70,6 +77,7 @@ export default function FileEditor() {
   const scrollRatioRef = useRef(0);
 
   const isMarkdown = isMarkdownFile(filePath);
+  const isHtml = isHtmlFile(filePath);
   const highlightedLines = useHighlight(
     state.isPreview ? null : (state.editContent || state.content),
     filePath,
@@ -169,6 +177,14 @@ export default function FileEditor() {
     }
     setState(s => ({ ...s, isPreview: !s.isPreview }));
   }, [state.isPreview]);
+
+  // Open HTML file in a web tab for live preview
+  const openHtmlPreview = useCallback(() => {
+    if (!filePath) return;
+    const url = `pilot-html://localhost${filePath}`;
+    const fileName = filePath.split('/').pop() || 'Preview';
+    useTabStore.getState().addWebTab(url, tab?.projectPath ?? null, fileName);
+  }, [filePath, tab?.projectPath]);
 
   // Save file
   const saveFile = useCallback(async () => {
@@ -382,6 +398,16 @@ export default function FileEditor() {
                 ? <Pencil className="w-4 h-4 text-accent" />
                 : <Eye className="w-4 h-4 text-text-secondary" />
               }
+            </button>
+          )}
+          {/* HTML preview — opens in web tab */}
+          {isHtml && (
+            <button
+              onClick={openHtmlPreview}
+              className="p-1.5 hover:bg-bg-base rounded transition-colors"
+              title="Preview in web tab"
+            >
+              <Globe className="w-4 h-4 text-text-secondary" />
             </button>
           )}
           <button

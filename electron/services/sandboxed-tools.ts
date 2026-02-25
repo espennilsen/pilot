@@ -262,12 +262,81 @@ export function createSandboxedTools(
     },
   } as ToolDefinition;
 
-  // Read-only tools pass through unchanged, converted to ToolDefinition
+  // Read-only tools — apply jail checks when enabled
+  const realRead = createReadTool(cwd);
+  const realGrep = createGrepTool(cwd);
+  const realFind = createFindTool(cwd);
+  const realLs = createLsTool(cwd);
+
+  function jailCheckPath(filePath: string): string | null {
+    if (!options.jailEnabled) return null;
+    if (isWithinProject(cwd, filePath, options.allowedPaths)) return null;
+    return `Error: Path "${filePath}" is outside the project directory. Operation blocked by jail.`;
+  }
+
+  const sandboxedRead: ToolDefinition = {
+    name: realRead.name,
+    label: realRead.label,
+    description: realRead.description,
+    parameters: realRead.parameters,
+    execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
+      const filePath = (params as any).path ?? '';
+      const err = jailCheckPath(filePath);
+      if (err) return { content: [{ type: 'text', text: err }], details: {} };
+      return realRead.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as ToolDefinition;
+
+  const sandboxedGrep: ToolDefinition = {
+    name: realGrep.name,
+    label: realGrep.label,
+    description: realGrep.description,
+    parameters: realGrep.parameters,
+    execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
+      const searchDir = (params as any).path ?? '';
+      if (searchDir) {
+        const err = jailCheckPath(searchDir);
+        if (err) return { content: [{ type: 'text', text: err }], details: {} };
+      }
+      return realGrep.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as ToolDefinition;
+
+  const sandboxedFind: ToolDefinition = {
+    name: realFind.name,
+    label: realFind.label,
+    description: realFind.description,
+    parameters: realFind.parameters,
+    execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
+      const searchDir = (params as any).path ?? '';
+      if (searchDir) {
+        const err = jailCheckPath(searchDir);
+        if (err) return { content: [{ type: 'text', text: err }], details: {} };
+      }
+      return realFind.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as ToolDefinition;
+
+  const sandboxedLs: ToolDefinition = {
+    name: realLs.name,
+    label: realLs.label,
+    description: realLs.description,
+    parameters: realLs.parameters,
+    execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
+      const dirPath = (params as any).path ?? '';
+      if (dirPath) {
+        const err = jailCheckPath(dirPath);
+        if (err) return { content: [{ type: 'text', text: err }], details: {} };
+      }
+      return realLs.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as ToolDefinition;
+
   const readOnlyToolDefs: ToolDefinition[] = [
-    agentToolToDefinition(createReadTool(cwd)),
-    agentToolToDefinition(createGrepTool(cwd)),
-    agentToolToDefinition(createFindTool(cwd)),
-    agentToolToDefinition(createLsTool(cwd)),
+    sandboxedRead,
+    sandboxedGrep,
+    sandboxedFind,
+    sandboxedLs,
   ];
 
   return {

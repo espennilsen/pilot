@@ -1,23 +1,28 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSandboxStore } from '../../stores/sandbox-store';
+import { useTabStore } from '../../stores/tab-store';
 
 export function JailIndicator() {
-  const { jailEnabled, setJailEnabled } = useSandboxStore();
+  const activeTab = useTabStore((s) => s.tabs.find(t => t.id === s.activeTabId));
+  const { jailEnabled, updateSettings } = useSandboxStore();
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleToggle = () => {
+    if (!activeTab?.projectPath) return;
     if (jailEnabled) {
       // Disabling jail requires confirmation
       setShowConfirm(true);
     } else {
       // Enabling jail is safe
-      setJailEnabled(true);
+      updateSettings(activeTab.projectPath, activeTab.id, { jail: { enabled: true } });
     }
   };
 
   const handleConfirmDisable = () => {
-    setJailEnabled(false);
+    if (activeTab?.projectPath) {
+      updateSettings(activeTab.projectPath, activeTab.id, { jail: { enabled: false } });
+    }
     setShowConfirm(false);
   };
 

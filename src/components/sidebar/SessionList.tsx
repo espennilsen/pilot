@@ -53,6 +53,7 @@ export function SessionList() {
     // 2. Open session in a new tab — use the same path as workspace restore
     const { addTab, updateTab } = useTabStore.getState();
     const newTabId = addTab(session.projectPath);
+    if (!newTabId) return;
     updateTab(newTabId, { title: session.title, sessionPath: session.path });
 
     try {

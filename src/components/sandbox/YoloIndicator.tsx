@@ -2,12 +2,12 @@ import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
 
 export function YoloIndicator() {
-  const activeTabId = useTabStore((s) => s.activeTabId);
+  const activeTab = useTabStore((s) => s.tabs.find(t => t.id === s.activeTabId));
   const { yoloMode, toggleYolo } = useSandboxStore();
 
   const handleToggle = async () => {
-    if (!activeTabId) return;
-    await toggleYolo(activeTabId);
+    if (!activeTab?.projectPath) return;
+    await toggleYolo(activeTab.id, activeTab.projectPath);
   };
 
   if (!yoloMode) {

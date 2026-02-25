@@ -9,9 +9,10 @@ import { invoke } from '../lib/ipc-client';
 interface SandboxStore {
   // Per-tab staged diffs
   diffsByTab: Record<string, StagedDiff[]>;
-  // Global settings
+  // Project settings (loaded per-project via IPC)
   yoloMode: boolean;
   jailEnabled: boolean;
+  allowedPaths: string[];
   // Diff view mode
   diffViewMode: 'unified' | 'side-by-side';
   // Per-tab, per-tool auto-accept (session-only, not persisted)
@@ -24,18 +25,18 @@ interface SandboxStore {
   updateDiffStatus: (tabId: string, diffId: string, status: StagedDiff['status']) => void;
   getPendingDiffs: (tabId: string) => StagedDiff[];
   clearDiffs: (tabId: string) => void;
-  setYoloMode: (enabled: boolean) => void;
-  setJailEnabled: (enabled: boolean) => void;
   setDiffViewMode: (mode: 'unified' | 'side-by-side') => void;
   setAutoAcceptTool: (tabId: string, toolName: string, enabled: boolean) => void;
   isAutoAcceptTool: (tabId: string, toolName: string) => boolean;
   getAutoAcceptedTools: (tabId: string) => string[];
 
-  // IPC actions (call main process)
+  // IPC actions — load/save per-project settings
+  loadSettings: (projectPath: string) => Promise<void>;
+  updateSettings: (projectPath: string, tabId: string, overrides: Record<string, unknown>) => Promise<void>;
   acceptDiff: (tabId: string, diffId: string) => Promise<void>;
   rejectDiff: (tabId: string, diffId: string) => Promise<void>;
   acceptAll: (tabId: string) => Promise<void>;
-  toggleYolo: (tabId: string) => Promise<void>;
+  toggleYolo: (tabId: string, projectPath: string) => Promise<void>;
 }
 
 /**
@@ -46,6 +47,7 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
   diffsByTab: {},
   yoloMode: false,
   jailEnabled: true,
+  allowedPaths: [],
   diffViewMode: 'unified',
   autoAcceptTools: {},
 
@@ -111,12 +113,31 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
     });
   },
 
-  setYoloMode: (enabled: boolean) => {
-    set({ yoloMode: enabled });
+  loadSettings: async (projectPath: string) => {
+    try {
+      const settings = await invoke(IPC.SANDBOX_GET_SETTINGS, projectPath) as ProjectSandboxSettings;
+      set({
+        jailEnabled: settings.jail.enabled,
+        yoloMode: settings.yoloMode,
+        allowedPaths: settings.jail.allowedPaths,
+      });
+    } catch {
+      // Default to safe values if settings can't be loaded
+      set({ jailEnabled: true, yoloMode: false, allowedPaths: [] });
+    }
   },
 
-  setJailEnabled: (enabled: boolean) => {
-    set({ jailEnabled: enabled });
+  updateSettings: async (projectPath: string, tabId: string, overrides: Record<string, unknown>) => {
+    try {
+      const updated = await invoke(IPC.SANDBOX_UPDATE_SETTINGS, projectPath, tabId, overrides) as ProjectSandboxSettings;
+      set({
+        jailEnabled: updated.jail.enabled,
+        yoloMode: updated.yoloMode,
+        allowedPaths: updated.jail.allowedPaths,
+      });
+    } catch (error) {
+      console.error('Failed to update sandbox settings:', error);
+    }
   },
 
   setDiffViewMode: (mode: 'unified' | 'side-by-side') => {
@@ -181,9 +202,9 @@ export const useSandboxStore = create<SandboxStore>((set, get) => ({
   },
 
   /** Toggle yolo mode for a tab (auto-accept all diffs without review). */
-  toggleYolo: async (tabId: string) => {
+  toggleYolo: async (tabId: string, projectPath: string) => {
     try {
-      const result = await invoke(IPC.SANDBOX_TOGGLE_YOLO, tabId);
+      const result = await invoke(IPC.SANDBOX_TOGGLE_YOLO, tabId, projectPath) as { yoloMode: boolean };
       set({ yoloMode: result.yoloMode });
     } catch (error) {
       console.error('Failed to toggle yolo mode:', error);

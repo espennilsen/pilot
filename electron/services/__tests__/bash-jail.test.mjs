@@ -29,14 +29,24 @@ function isWithinProject(projectRoot, filePath, allowedPaths) {
   return false;
 }
 
-const SYSTEM_SAFE_PREFIXES = [
-  '/dev/', '/proc/', '/sys/', '/usr/', '/bin/', '/sbin/',
-  '/opt/', '/nix/', '/etc/', '/Library/',
-];
+const STATIC_SAFE_PREFIXES = ['/proc/', '/sys/', '/tmp/'];
 const SYSTEM_SAFE_EXACT = new Set([
   '/dev/null', '/dev/zero', '/dev/urandom', '/dev/random',
   '/dev/stdin', '/dev/stdout', '/dev/stderr', '/dev/tty', '/tmp',
 ]);
+
+// Derive binary-safe prefixes from $PATH (same logic as production code)
+function buildSafePrefixes() {
+  const separator = process.platform === 'win32' ? ';' : ':';
+  const pathDirs = (process.env.PATH ?? '').split(separator).filter(Boolean);
+  const trailingSep = process.platform === 'win32' ? '\\' : '/';
+  const pathPrefixes = pathDirs.map(dir => {
+    const r = resolve(dir);
+    return r.endsWith(trailingSep) ? r : r + trailingSep;
+  });
+  return [...new Set([...STATIC_SAFE_PREFIXES, ...pathPrefixes])];
+}
+const SYSTEM_SAFE_PREFIXES = buildSafePrefixes();
 
 function isSystemPath(absPath) {
   if (SYSTEM_SAFE_EXACT.has(absPath)) return true;
@@ -251,8 +261,8 @@ test('redirect outside project', () => {
   assertBlocked('echo "pwned" > /home/other/file');
 });
 
-test('/tmp write (data exfiltration)', () => {
-  assertBlocked('cp secrets.env /tmp/leak');
+test('/tmp write (allowed)', () => {
+  assertAllowed('cp secrets.env /tmp/leak');
 });
 
 test('tee to outside path', () => {
@@ -325,8 +335,8 @@ test('nested allowed path', () => {
   assertAllowed('cat /home/shared/sub/deep/file.txt', ['/home/shared']);
 });
 
-test('system /etc/hosts read', () => {
-  assertAllowed('cat /etc/hosts');
+test('system /etc/hosts blocked (sensitive)', () => {
+  assertBlocked('cat /etc/hosts');
 });
 
 test('/opt/homebrew executable', () => {

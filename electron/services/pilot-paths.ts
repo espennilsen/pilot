@@ -1,21 +1,51 @@
 import { join } from 'path';
 import { homedir } from 'os';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, renameSync } from 'fs';
 
 // ─── Pilot App Directory ─────────────────────────────────────────────────
 // App-level config that is NOT per-project and NOT related to pi agent settings.
 // Platform-aware:
-//   macOS:   ~/.config/.pilot/              (backward-compatible)
-//   Windows: %APPDATA%\.pilot\              (e.g. C:\Users\<user>\AppData\Roaming\.pilot)
-//   Linux:   $XDG_CONFIG_HOME/.pilot/       (default: ~/.config/.pilot/)
+//   macOS:   ~/.config/pilot/
+//   Windows: %APPDATA%\pilot\              (e.g. C:\Users\<user>\AppData\Roaming\pilot)
+//   Linux:   $XDG_CONFIG_HOME/pilot/       (default: ~/.config/pilot/)
 function resolvePilotAppDir(): string {
+  switch (process.platform) {
+    case 'win32':
+      return join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), 'pilot');
+    case 'linux':
+      return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'pilot');
+    default: // darwin and others
+      return join(homedir(), '.config', 'pilot');
+  }
+}
+
+/** Resolve the legacy .pilot directory path (pre-rename). */
+function resolveLegacyAppDir(): string {
   switch (process.platform) {
     case 'win32':
       return join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), '.pilot');
     case 'linux':
       return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), '.pilot');
-    default: // darwin and others
+    default:
       return join(homedir(), '.config', '.pilot');
+  }
+}
+
+/**
+ * Migrate from legacy ~/.config/.pilot to ~/.config/pilot.
+ * Only runs if the old directory exists and the new one does not.
+ */
+function migrateLegacyDir(): void {
+  const legacyDir = resolveLegacyAppDir();
+  const newDir = resolvePilotAppDir();
+  if (existsSync(legacyDir) && !existsSync(newDir)) {
+    try {
+      renameSync(legacyDir, newDir);
+    } catch {
+      // If rename fails (e.g. cross-device), leave the old dir in place.
+      // ensurePilotAppDirs() will create the new dir and the user keeps
+      // both until they manually clean up.
+    }
   }
 }
 
@@ -53,6 +83,9 @@ export const DEFAULT_PI_AGENT_DIR = PILOT_APP_DIR;
 
 // ─── Ensure directories exist ────────────────────────────────────────────
 export function ensurePilotAppDirs(): void {
+  // Migrate from legacy ~/.config/.pilot → ~/.config/pilot on first run
+  migrateLegacyDir();
+
   const dirs = [
     PILOT_APP_DIR,
     PILOT_EXTENSIONS_DIR,

@@ -199,9 +199,9 @@ Pilot supports a **companion client** (mobile/web) that connects over WebSocket 
 ## Important File Paths (Runtime)
 
 The app config directory (`<PILOT_DIR>`) is platform-dependent:
-- **macOS:** `~/.config/.pilot/`
-- **Windows:** `%APPDATA%\.pilot\`
-- **Linux:** `$XDG_CONFIG_HOME/.pilot/` (default: `~/.config/.pilot/`)
+- **macOS:** `~/.config/pilot/`
+- **Windows:** `%APPDATA%\pilot\`
+- **Linux:** `$XDG_CONFIG_HOME/pilot/` (default: `~/.config/pilot/`)
 
 All paths are resolved via `PILOT_APP_DIR` in `services/pilot-paths.ts`.
 

@@ -8,7 +8,7 @@ Pilot's memory system gives the agent persistent context that survives across se
 
 Memory is stored as Markdown files at two scopes:
 
-> **Config directory** is platform-dependent: `~/.config/.pilot/` (macOS/Linux), `%APPDATA%\.pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
+> **Config directory** is platform-dependent: `~/.config/pilot/` (macOS/Linux), `%APPDATA%\pilot\` (Windows). Paths below use `<PILOT_DIR>` as shorthand.
 
 | Scope | Location | Git-tracked | Purpose |
 |-------|----------|-------------|---------|

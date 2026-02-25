@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useTabStore } from '../../stores/tab-store';
+import { useProjectStore } from '../../stores/project-store';
 import { TabGroup } from './TabGroup';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
@@ -8,6 +9,7 @@ import { shortcutLabel } from '../../lib/keybindings';
 
 export function TabBar() {
   const { addTab, closeTab, nextTab, prevTab, reopenClosedTab, switchToTabByIndex, activeTabId, moveTab, getGroupedTabs } = useTabStore();
+  const { openProjectDialog } = useProjectStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -21,7 +23,7 @@ export function TabBar() {
     {
       key: 't',
       modifiers: ['meta'],
-      action: () => addTab(),
+      action: () => { if (!addTab()) openProjectDialog(); },
     },
     {
       key: 'w',
@@ -176,7 +178,7 @@ export function TabBar() {
       {/* Add tab button */}
       <Tooltip content={`New tab (${shortcutLabel('T')})`} position="bottom">
         <button
-          onClick={() => addTab()}
+          onClick={() => { if (!addTab()) openProjectDialog(); }}
           className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors"
           aria-label="New tab"
         >

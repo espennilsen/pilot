@@ -27,6 +27,7 @@ export default function Sidebar() {
   const { tasksEnabled, setTasksEnabled, setShowCreateDialog } = useTaskStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const { addTab, addTasksTab } = useTabStore();
+  const { openProjectDialog } = useProjectStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,7 +93,7 @@ export default function Sidebar() {
                 className="absolute left-10 top-1 z-50 w-56 bg-bg-elevated border border-border rounded-lg shadow-xl py-1 animate-in fade-in slide-in-from-left-1 duration-100"
               >
                 <MenuSection label="File">
-                  <MenuItem icon="Plus" label="New Conversation" onClick={() => act(() => addTab())} />
+                  <MenuItem icon="Plus" label="New Conversation" onClick={() => act(() => { if (!addTab()) openProjectDialog(); })} />
                   {activeTabId && (
                     <MenuItem icon="X" label="Close Tab" onClick={() => act(() => closeTab(activeTabId))} />
                   )}
@@ -232,7 +233,7 @@ export default function Sidebar() {
           {/* Pane-specific header actions */}
           {sidebarPane === 'sessions' && (
             <button
-              onClick={() => addTab()}
+              onClick={() => { if (!addTab()) openProjectDialog(); }}
               className="p-1 hover:bg-bg-elevated rounded transition-colors"
               title="New session"
             >
