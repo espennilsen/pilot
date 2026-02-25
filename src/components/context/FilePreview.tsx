@@ -34,6 +34,9 @@ export default function FilePreview() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumberRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  /** Scroll ratio (0–1) captured before toggling preview, restored after render */
+  const scrollRatioRef = useRef(0);
 
   const isMarkdown = isMarkdownFile(selectedFilePath);
   const displayContent = isEditing ? editContent : previewContent;
@@ -56,10 +59,23 @@ export default function FilePreview() {
     }
   }, [previewContent, setEditContent]);
 
-  // Toggle markdown preview
+  // Toggle markdown preview — capture scroll ratio before switching
   const togglePreview = useCallback(() => {
+    if (isPreview) {
+      // Preview → Edit: capture preview scroll ratio
+      if (previewRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = previewRef.current;
+        scrollRatioRef.current = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+      }
+    } else {
+      // Edit → Preview: capture textarea scroll ratio
+      if (textareaRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = textareaRef.current;
+        scrollRatioRef.current = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+      }
+    }
     setIsPreview(p => !p);
-  }, []);
+  }, [isPreview]);
 
   // Sync textarea scroll with line numbers and highlight overlay
   const handleScroll = useCallback(() => {
@@ -72,6 +88,27 @@ export default function FilePreview() {
       }
     }
   }, []);
+
+  // Restore scroll position after preview toggle
+  useEffect(() => {
+    if (displayContent == null) return;
+
+    requestAnimationFrame(() => {
+      const ratio = scrollRatioRef.current;
+      if (isPreview) {
+        if (previewRef.current) {
+          const { scrollHeight, clientHeight } = previewRef.current;
+          previewRef.current.scrollTop = ratio * (scrollHeight - clientHeight);
+        }
+      } else {
+        if (textareaRef.current) {
+          const { scrollHeight, clientHeight } = textareaRef.current;
+          textareaRef.current.scrollTop = ratio * (scrollHeight - clientHeight);
+          handleScroll(); // sync line numbers + highlight overlay
+        }
+      }
+    });
+  }, [isPreview, displayContent, handleScroll]);
 
   // Focus textarea when entering edit mode (not preview)
   useEffect(() => {
@@ -203,7 +240,7 @@ export default function FilePreview() {
         ) : displayContent != null ? (
           isPreview ? (
             /* Rendered markdown preview */
-            <div className="h-full overflow-auto px-4 py-3">
+            <div ref={previewRef} className="h-full overflow-auto px-4 py-3">
               <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
                 {renderMarkdown(displayContent)}
               </div>

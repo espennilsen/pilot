@@ -82,8 +82,13 @@ function renderTextBlock(text: string): React.ReactNode[] {
       return <h3 key={index} className="text-lg font-bold mb-2 mt-4">{renderInline(trimmed.slice(4))}</h3>;
     }
     
-    // Check if it's a list
+    // Check if it's a table (lines starting with |, with a separator row like |---|---|)
     const lines = trimmed.split('\n');
+    if (lines.length >= 2 && lines[0].includes('|') && /^\|?\s*[-:]+[-| :]*$/.test(lines[1].trim())) {
+      return renderTable(lines, index);
+    }
+
+    // Check if it's a list
     if (lines.every(line => /^[-*]\s/.test(line.trim()))) {
       return (
         <ul key={index} className="list-disc list-inside mb-4 space-y-1">
@@ -101,6 +106,71 @@ function renderTextBlock(text: string): React.ReactNode[] {
       </p>
     );
   }).filter(Boolean);
+}
+
+/** Parse a pipe-delimited table row into cell strings, trimming outer pipes and whitespace */
+function parseTableRow(row: string): string[] {
+  let trimmed = row.trim();
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+  return trimmed.split('|').map(cell => cell.trim());
+}
+
+/** Parse alignment from the separator row (e.g. |:---|:---:|---:| ) */
+function parseAlignments(separatorRow: string): ('left' | 'center' | 'right' | undefined)[] {
+  return parseTableRow(separatorRow).map(cell => {
+    const trimmed = cell.replace(/\s/g, '');
+    const left = trimmed.startsWith(':');
+    const right = trimmed.endsWith(':');
+    if (left && right) return 'center';
+    if (right) return 'right';
+    if (left) return 'left';
+    return undefined;
+  });
+}
+
+function renderTable(lines: string[], key: number): React.ReactNode {
+  const headerCells = parseTableRow(lines[0]);
+  const alignments = parseAlignments(lines[1]);
+  const bodyRows = lines.slice(2).filter(line => line.trim() && line.includes('|'));
+
+  return (
+    <div key={key} className="mb-4 overflow-x-auto">
+      <table className="min-w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border">
+            {headerCells.map((cell, i) => (
+              <th
+                key={i}
+                className="px-3 py-1.5 text-left text-text-primary font-semibold"
+                style={{ textAlign: alignments[i] }}
+              >
+                {renderInline(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bodyRows.map((row, ri) => {
+            const cells = parseTableRow(row);
+            return (
+              <tr key={ri} className="border-b border-border/50">
+                {headerCells.map((_, ci) => (
+                  <td
+                    key={ci}
+                    className="px-3 py-1.5 text-text-secondary"
+                    style={{ textAlign: alignments[ci] }}
+                  >
+                    {renderInline(cells[ci] ?? '')}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /**
