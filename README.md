@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" />
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-22c55e" />
+  <a href="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml"><img src="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml/badge.svg" alt="Nightly Build" /></a>
 </p>
 
 > [!WARNING]
