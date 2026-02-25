@@ -81,9 +81,15 @@ jobs:
       - name: Patch macOS signing for CI
         if: runner.os == 'macOS'
         run: |
-          sed -i '' 's/hardenedRuntime: true/hardenedRuntime: false/' electron-builder.yml
-          sed -i '' '/entitlements:/d' electron-builder.yml
-          sed -i '' '/entitlementsInherit:/d' electron-builder.yml
+          node -e "
+            const fs = require('fs');
+            let yml = fs.readFileSync('electron-builder.yml', 'utf8');
+            yml = yml.replace(/hardenedRuntime:\s*true/, 'hardenedRuntime: false');
+            yml = yml.replace(/^\s*entitlements:.*$/gm, '');
+            yml = yml.replace(/^\s*entitlementsInherit:.*$/gm, '');
+            fs.writeFileSync('electron-builder.yml', yml);
+            console.log('Patched electron-builder.yml for CI signing');
+          "
 
       - name: Build
         run: ${{ matrix.build-cmd }}

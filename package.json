@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Your cockpit for AI-powered coding",
   "main": "out/main/index.js",
-  "author": "Espen Nornes",
+  "author": "Espen Nilsen <hi@e9n.dev>",
   "license": "MIT",
   "scripts": {
     "dev": "vite build -c vite.companion.mjs && electron-vite dev --config electron-vite.config.mjs",
