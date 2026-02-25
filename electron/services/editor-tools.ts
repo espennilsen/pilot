@@ -22,7 +22,7 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
       start_line: Type.Optional(Type.Number({ description: 'First line to highlight (1-indexed)' })),
       end_line: Type.Optional(Type.Number({ description: 'Last line to highlight (1-indexed). Defaults to start_line if omitted.' })),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       const { resolve, join } = await import('path');
       const filePath = resolve(join(projectPath, params.path));
 
@@ -37,7 +37,7 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
       const lineInfo = params.start_line
         ? ` (lines ${params.start_line}${params.end_line && params.end_line !== params.start_line ? `-${params.end_line}` : ''})`
         : '';
-      return `Opened ${params.path}${lineInfo} in the editor.`;
+      return { content: [{ type: 'text' as const, text: `Opened ${params.path}${lineInfo} in the editor.` }], details: {} };
     },
   };
 
@@ -52,14 +52,14 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
       url: Type.String({ description: 'URL to open' }),
       title: Type.Optional(Type.String({ description: 'Short description of what the link is (shown to user in confirmation)' })),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       const payload: EditorOpenUrlPayload = {
         url: params.url,
         title: params.title,
       };
 
       broadcastToRenderer(IPC.EDITOR_OPEN_URL, payload);
-      return `Asked user to open: ${params.url}`;
+      return { content: [{ type: 'text' as const, text: `Asked user to open: ${params.url}` }], details: {} };
     },
   };
 
@@ -74,7 +74,7 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
       url: Type.String({ description: 'URL (https://...) or file path relative to project root (.html file)' }),
       title: Type.Optional(Type.String({ description: 'Tab title (defaults to hostname or filename)' })),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       let resolvedUrl = params.url;
 
       // If it looks like a relative path (not a URL), convert to pilot-html:// protocol
@@ -91,7 +91,7 @@ export function createEditorTools(projectPath: string): ToolDefinition[] {
       };
 
       broadcastToRenderer(IPC.WEB_TAB_OPEN, payload);
-      return `Opened ${params.url} in a web tab.`;
+      return { content: [{ type: 'text' as const, text: `Opened ${params.url} in a web tab.` }], details: {} };
     },
   };
 
