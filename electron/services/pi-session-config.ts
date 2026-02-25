@@ -21,6 +21,7 @@ import { createTaskTools } from './task-tools';
 import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
+import { createMemoryTools } from './memory-tools';
 import type { StagedDiff } from '../../shared/types';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -113,10 +114,15 @@ export async function buildSessionConfig(
 
   const subagentTools = createSubagentTools(subagentManager, tabId, projectPath);
 
+  const memoryTools = memoryManager.enabled
+    ? createMemoryTools(memoryManager, projectPath)
+    : [];
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
     ...taskTools,
+    ...memoryTools,
     ...subagentTools,
     createWebFetchTool(),
   ];

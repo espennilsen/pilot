@@ -27,8 +27,8 @@ export const DEFAULT_HIDDEN_PATHS = [
 ];
 
 const DEFAULT_SYSTEM_PROMPT = `File edits are staged for user review before being applied to disk.
-The user has task management tools (pilot_task_*) and can delegate work to subagents (pilot_subagent).
-web_fetch is available for fetching URLs and API calls.`;
+Use memory tools (pilot_memory_*) to remember user preferences, project decisions, and conventions across sessions. Check existing memories before adding duplicates.
+Task management (pilot_task_*), subagents (pilot_subagent), and web_fetch are also available.`;
 
 const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   piAgentDir: DEFAULT_PI_AGENT_DIR,
