@@ -76,7 +76,20 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
-    systemPrompt: 'File edits are staged for user review before being applied to disk.\nUse memory tools (pilot_memory_*) to remember user preferences, project decisions, and conventions across sessions. Check existing memories before adding duplicates.\nTask management (pilot_task_*), subagents (pilot_subagent), and web_fetch are also available.',
+    systemPrompt: `You are running inside Pilot, an Electron desktop app wrapping the pi coding agent.
+
+Additional tools:
+- pilot_memory_read: Read stored memories (global or project scope)
+- pilot_memory_add: Save a memory (user preferences, decisions, conventions)
+- pilot_memory_remove: Remove outdated or incorrect memories
+- pilot_task_create/update/query/comment: Manage the project task board
+- pilot_subagent: Delegate work to parallel sub-agents
+- web_fetch: Fetch URLs and call APIs
+
+Guidelines:
+- File edits are staged for user review before being applied to disk
+- Use memory tools to persist useful context across sessions — check existing memories before adding duplicates
+- Keep memories concise: one fact per entry, use categories and appropriate scope (global vs project)`,
     commitMsgModel: '',
     commitMsgMaxTokens: 4096,
     logging: {
