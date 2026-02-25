@@ -1,0 +1,125 @@
+name: Nightly Build
+
+on:
+  schedule:
+    # Run at 03:00 UTC every day
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.check.outputs.has-changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes in last 24h
+        id: check
+        run: |
+          if git log --since="24 hours ago" --oneline | head -1 | grep -q .; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check-changes
+    if: needs.check-changes.outputs.has-changes == 'true' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build-cmd: npm run build:mac
+            artifact-pattern: |
+              release/*.dmg
+              release/*.zip
+          - os: windows-latest
+            build-cmd: npm run build:win
+            artifact-pattern: |
+              release/*-setup.exe
+              release/*-portable.exe
+              release/*.zip
+          - os: ubuntu-latest
+            build-cmd: npm run build:linux
+            artifact-pattern: |
+              release/*.AppImage
+              release/*.deb
+              release/*.tar.gz
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libx11-dev libxkbfile-dev
+
+      - name: Install Windows build tools
+        if: runner.os == 'Windows'
+        run: npm install --global windows-build-tools@5.2.2 || true
+        continue-on-error: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: ${{ matrix.build-cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.os }}
+          path: ${{ matrix.artifact-pattern }}
+          if-no-files-found: warn
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Delete previous nightly release
+        run: gh release delete nightly --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly Build (${{ steps.sha.outputs.short }})"
+          files: '**/*'
+          prerelease: true
+          body: |
+            Automated nightly build from `main` branch.
+            Commit: ${{ github.sha }}
+
+            ⚠️ This is an unstable build — use at your own risk.
