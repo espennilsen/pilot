@@ -18,6 +18,10 @@
   <a href="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml"><img src="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml/badge.svg" alt="Nightly Build" /></a>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/pilot_overview.png" alt="Pilot Screenshot" width="800" />
+</p>
+
 > [!WARNING]
 > **Pilot is in early development.** The app runs on **macOS**, **Windows**, and **Linux**.
 >
