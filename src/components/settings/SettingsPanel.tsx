@@ -2,7 +2,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useEffect } from 'react';
 import {
   X, Settings, FolderCog, Puzzle, BookOpen, Terminal, Keyboard,
-  Shield, FolderOpen, KeyRound, FileText, Smartphone,
+  Shield, FolderOpen, KeyRound, FileText, Smartphone, MessageSquareText,
 } from 'lucide-react';
 import { ReopenWelcomeButton } from './settings-helpers';
 import { GeneralSettings } from './sections/GeneralSettings';
@@ -15,6 +15,7 @@ import { KeybindingsSettings } from './sections/KeybindingsSettings';
 import { ExtensionsSettings } from './sections/ExtensionsSettings';
 import { SkillsSettings } from './sections/SkillsSettings';
 import { DeveloperSettings } from './sections/DeveloperSettings';
+import { SystemPromptSettings } from './sections/SystemPromptSettings';
 
 const TABS = [
   { id: 'general' as const, label: 'General', icon: Settings },
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'project' as const, label: 'Project', icon: FolderCog },
   { id: 'files' as const, label: 'Files', icon: FolderOpen },
   { id: 'companion' as const, label: 'Companion', icon: Smartphone },
+  { id: 'system-prompt' as const, label: 'System Prompt', icon: MessageSquareText },
   { id: 'prompts' as const, label: 'Prompts', icon: FileText },
   { id: 'keybindings' as const, label: 'Keybindings', icon: Keyboard },
   { id: 'extensions' as const, label: 'Extensions', icon: Puzzle },
@@ -103,6 +105,7 @@ export default function SettingsPanel() {
             {settingsTab === 'project' && <ProjectSettings />}
             {settingsTab === 'files' && <FilesSettings />}
             {settingsTab === 'companion' && <CompanionSettings />}
+            {settingsTab === 'system-prompt' && <SystemPromptSettings />}
             {settingsTab === 'prompts' && <PromptsSettings />}
             {settingsTab === 'keybindings' && <KeybindingsSettings />}
             {settingsTab === 'extensions' && <ExtensionsSettings />}

@@ -3,11 +3,12 @@
  */
 import { create } from 'zustand';
 import { IPC } from '../../shared/ipc';
-import type { PilotAppSettings } from '../../shared/types';
+import type { PilotAppSettings, ThemeMode } from '../../shared/types';
 import { invoke } from '../lib/ipc-client';
 
 interface AppSettingsStore {
   piAgentDir: string;
+  theme: ThemeMode;
   terminalApp: string | null;
   editorCli: string | null;
   onboardingComplete: boolean;
@@ -15,6 +16,7 @@ interface AppSettingsStore {
   autoStartDevServer: boolean;
   keybindOverrides: Record<string, string | null>;
   hiddenPaths: string[];
+  systemPrompt: string;
   commitMsgModel: string;
   commitMsgMaxTokens: number;
   logging: {
@@ -28,6 +30,7 @@ interface AppSettingsStore {
   load: () => Promise<void>;
   update: (updates: Partial<PilotAppSettings>) => Promise<void>;
   setPiAgentDir: (dir: string) => Promise<void>;
+  setTheme: (theme: ThemeMode) => Promise<void>;
   setTerminalApp: (app: string | null) => Promise<void>;
   setEditorCli: (cli: string | null) => Promise<void>;
   setDeveloperMode: (enabled: boolean) => Promise<void>;
@@ -38,6 +41,7 @@ interface AppSettingsStore {
   clearKeybindOverride: (id: string) => Promise<void>;
   setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<void>;
   setFileLogging: (enabled: boolean) => Promise<void>;
+  setSystemPrompt: (prompt: string) => Promise<void>;
   setSyslogConfig: (config: Partial<{ enabled: boolean; host: string; port: number }>) => Promise<void>;
 }
 
@@ -64,6 +68,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
 
   return {
     piAgentDir: DEFAULT_PI_AGENT_DIR,
+    theme: (localStorage.getItem('pilot-theme') as ThemeMode) || 'dark',
     terminalApp: null,
     editorCli: null,
     onboardingComplete: false,
@@ -71,6 +76,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
+    systemPrompt: '',
     commitMsgModel: '',
     commitMsgMaxTokens: 4096,
     logging: {
@@ -85,8 +91,11 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     set({ isLoading: true, error: null });
     try {
       const settings = await invoke(IPC.APP_SETTINGS_GET) as PilotAppSettings;
+      const theme = (settings.theme as ThemeMode) || 'dark';
+      localStorage.setItem('pilot-theme', theme);
       set({
         piAgentDir: settings.piAgentDir || DEFAULT_PI_AGENT_DIR,
+        theme,
         terminalApp: settings.terminalApp ?? null,
         editorCli: settings.editorCli ?? null,
         onboardingComplete: settings.onboardingComplete ?? false,
@@ -94,6 +103,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: settings.autoStartDevServer ?? false,
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
+        systemPrompt: settings.systemPrompt ?? '',
         commitMsgModel: settings.commitMsgModel ?? '',
         commitMsgMaxTokens: settings.commitMsgMaxTokens ?? 4096,
         logging: settings.logging ?? {
@@ -112,8 +122,11 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     set({ isLoading: true, error: null });
     try {
       const updated = await invoke(IPC.APP_SETTINGS_UPDATE, updates) as PilotAppSettings;
+      const theme = (updated.theme as ThemeMode) || 'dark';
+      localStorage.setItem('pilot-theme', theme);
       set({
         piAgentDir: updated.piAgentDir || DEFAULT_PI_AGENT_DIR,
+        theme,
         terminalApp: updated.terminalApp ?? null,
         editorCli: updated.editorCli ?? null,
         onboardingComplete: updated.onboardingComplete ?? false,
@@ -121,6 +134,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
         autoStartDevServer: updated.autoStartDevServer ?? false,
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
+        systemPrompt: updated.systemPrompt ?? '',
         commitMsgModel: updated.commitMsgModel ?? '',
         commitMsgMaxTokens: updated.commitMsgMaxTokens ?? 4096,
         logging: updated.logging ?? {
@@ -136,6 +150,10 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
   },
 
     setPiAgentDir: async (dir: string) => updateSetting({ piAgentDir: dir }),
+    setTheme: async (theme: ThemeMode) => {
+      localStorage.setItem('pilot-theme', theme);
+      return updateSetting({ theme }, true);
+    },
     setTerminalApp: async (app: string | null) => updateSetting({ terminalApp: app }),
     setEditorCli: async (cli: string | null) => updateSetting({ editorCli: cli }),
     setDeveloperMode: async (enabled: boolean) => updateSetting({ developerMode: enabled }, true),
@@ -150,6 +168,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
       const { [id]: _, ...rest } = get().keybindOverrides;
       return updateSetting({ keybindOverrides: rest });
     },
+    setSystemPrompt: async (prompt: string) => updateSetting({ systemPrompt: prompt }),
     setLogLevel: async (level) => {
       const current = get().logging;
       return updateSetting({ logging: { ...current, level } }, true);

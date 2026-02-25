@@ -17,9 +17,14 @@ export interface SessionMetadata {
 }
 
 // Pilot app settings (stored in ~/.config/.pilot/app-settings.json)
+/** Theme mode — 'dark', 'light', or 'system' (follows OS preference). */
+export type ThemeMode = 'dark' | 'light' | 'system';
+
 export interface PilotAppSettings {
   /** Custom pi agent config directory. Default: ~/.config/.pilot */
   piAgentDir: string;
+  /** App color theme. Default: 'dark' */
+  theme?: ThemeMode;
   /** Preferred terminal app. null = system default */
   terminalApp: string | null;
   /** Preferred code editor CLI command. null = auto-detect first available */
@@ -44,6 +49,8 @@ export interface PilotAppSettings {
   commitMsgMaxTokens?: number;
   /** Preferred model for AI commit message generation (e.g. "anthropic/claude-haiku-4-5"). Format: "provider/model-id". When unset, auto-selects cheapest available. */
   commitMsgModel?: string;
+  /** Custom system prompt appended to every agent session */
+  systemPrompt?: string;
   /** Logging configuration */
   logging?: {
     /** Minimum log level. Default: 'warn' */

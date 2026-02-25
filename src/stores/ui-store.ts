@@ -40,7 +40,7 @@ interface UIStore {
   sidebarWidth: number;
   contextPanelWidth: number;
   settingsOpen: boolean;
-  settingsTab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion';
+  settingsTab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt';
   terminalVisible: boolean;
   terminalHeight: number;
   terminalTabs: { id: string; name: string }[];
@@ -57,9 +57,9 @@ interface UIStore {
   toggleFocusMode: () => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
-  openSettings: (tab?: 'general' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion') => void;
+  openSettings: (tab?: 'general' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt') => void;
   closeSettings: () => void;
-  setSettingsTab: (tab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion') => void;
+  setSettingsTab: (tab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt') => void;
   toggleTerminal: () => void;
   setTerminalHeight: (height: number) => void;
   addTerminalTab: () => string;

@@ -69,6 +69,7 @@ export function loadAppSettings(): PilotAppSettings {
       companionProtocol: parsed.companionProtocol ?? undefined,
       companionAutoStart: parsed.companionAutoStart ?? false,
       hiddenPaths: Array.isArray(parsed.hiddenPaths) ? parsed.hiddenPaths : DEFAULT_HIDDEN_PATHS,
+      systemPrompt: parsed.systemPrompt ?? undefined,
       logging: parsed.logging ?? DEFAULT_APP_SETTINGS.logging,
     };
     return cachedSettings;
