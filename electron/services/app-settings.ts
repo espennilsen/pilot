@@ -26,7 +26,7 @@ export const DEFAULT_HIDDEN_PATHS = [
   '*.pyc',
 ];
 
-const DEFAULT_SYSTEM_PROMPT = `You are running inside Pilot, an Electron desktop app wrapping the pi coding agent.
+const DEFAULT_SYSTEM_PROMPT = `You are Pilot, an AI agent.
 
 Additional tools:
 - pilot_memory_read: Read stored memories (global or project scope)

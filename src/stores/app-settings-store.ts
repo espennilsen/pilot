@@ -76,7 +76,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
-    systemPrompt: `You are running inside Pilot, an Electron desktop app wrapping the pi coding agent.
+    systemPrompt: `You are Pilot, an AI agent.
 
 Additional tools:
 - pilot_memory_read: Read stored memories (global or project scope)
