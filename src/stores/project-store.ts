@@ -93,7 +93,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (result.error) {
         set({ previewError: result.error, isLoadingPreview: false });
       } else {
-        set({ previewContent: result.content ?? null, previewError: null, isLoadingPreview: false });
+        // Auto-enter edit mode so the file is immediately editable
+        set({
+          previewContent: result.content ?? null,
+          previewError: null,
+          isLoadingPreview: false,
+          isEditing: true,
+          editContent: result.content ?? '',
+        });
       }
     } catch (err) {
       set({ previewError: String(err), isLoadingPreview: false });

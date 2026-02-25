@@ -1,9 +1,17 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { X, ArrowLeft, Pencil, Save, Undo2 } from 'lucide-react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { X, ArrowLeft, Save, Undo2, Eye, Pencil } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useHighlight } from '../../hooks/useHighlight';
+import { renderMarkdown } from '../../lib/markdown';
 import { shortcutLabel } from '../../lib/keybindings';
 import 'highlight.js/styles/tokyo-night-dark.css';
+
+/** Check if a file path is a markdown file */
+function isMarkdownFile(filePath: string | null): boolean {
+  if (!filePath) return false;
+  const lower = filePath.toLowerCase();
+  return lower.endsWith('.md') || lower.endsWith('.mdx');
+}
 
 export default function FilePreview() {
   const {
@@ -16,39 +24,63 @@ export default function FilePreview() {
     editContent,
     isSaving,
     saveError,
-    startEditing,
     cancelEditing,
     setEditContent,
     saveFile,
   } = useProjectStore();
 
+  const [isPreview, setIsPreview] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumberRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLPreElement>(null);
 
-  // Display content: edit buffer when editing, file content otherwise
+  const isMarkdown = isMarkdownFile(selectedFilePath);
   const displayContent = isEditing ? editContent : previewContent;
   const highlightedLines = useHighlight(
-    isEditing ? null : previewContent,
+    isPreview ? null : displayContent,
     selectedFilePath,
   );
 
   const isDirty = isEditing && editContent !== previewContent;
 
-  // Sync textarea scroll with line numbers
+  // Reset preview mode when file changes
+  useEffect(() => {
+    setIsPreview(false);
+  }, [selectedFilePath]);
+
+  // Revert to last saved content
+  const revertChanges = useCallback(() => {
+    if (previewContent != null) {
+      setEditContent(previewContent);
+    }
+  }, [previewContent, setEditContent]);
+
+  // Toggle markdown preview
+  const togglePreview = useCallback(() => {
+    setIsPreview(p => !p);
+  }, []);
+
+  // Sync textarea scroll with line numbers and highlight overlay
   const handleScroll = useCallback(() => {
-    if (textareaRef.current && lineNumberRef.current) {
-      lineNumberRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      if (lineNumberRef.current) lineNumberRef.current.scrollTop = scrollTop;
+      if (highlightRef.current) {
+        highlightRef.current.scrollTop = scrollTop;
+        highlightRef.current.scrollLeft = scrollLeft;
+      }
     }
   }, []);
 
-  // Focus textarea when entering edit mode
+  // Focus textarea when entering edit mode (not preview)
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
+    if (isEditing && !isPreview && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [isEditing]);
+  }, [isEditing, isPreview]);
 
-  // Cmd+S to save, Escape to cancel
+  // Cmd+S to save, Escape to revert
   useEffect(() => {
     if (!isEditing) return;
 
@@ -57,15 +89,15 @@ export default function FilePreview() {
         e.preventDefault();
         saveFile();
       }
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isDirty && !isPreview) {
         e.preventDefault();
-        cancelEditing();
+        revertChanges();
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isEditing, saveFile, cancelEditing]);
+  }, [isEditing, saveFile, revertChanges, isDirty, isPreview]);
 
   if (!selectedFilePath) return null;
 
@@ -92,8 +124,8 @@ export default function FilePreview() {
               {isDirty && (
                 <span className="inline-block w-2 h-2 rounded-full bg-warning flex-shrink-0" title="Unsaved changes" />
               )}
-              {isEditing && (
-                <span className="text-xs text-accent font-normal">editing</span>
+              {isPreview && (
+                <span className="text-xs text-accent font-normal">preview</span>
               )}
             </div>
             <div className="text-xs text-text-secondary truncate">
@@ -104,15 +136,30 @@ export default function FilePreview() {
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {isEditing ? (
+          {isEditing && (
             <>
-              <button
-                onClick={cancelEditing}
-                className="p-1 hover:bg-bg-base rounded transition-colors"
-                title="Cancel (Esc)"
-              >
-                <Undo2 className="w-4 h-4 text-text-secondary" />
-              </button>
+              {isDirty && !isPreview && (
+                <button
+                  onClick={revertChanges}
+                  className="p-1 hover:bg-bg-base rounded transition-colors"
+                  title="Revert changes (Esc)"
+                >
+                  <Undo2 className="w-4 h-4 text-text-secondary" />
+                </button>
+              )}
+              {/* Markdown preview toggle */}
+              {isMarkdown && (
+                <button
+                  onClick={togglePreview}
+                  className={`p-1 hover:bg-bg-base rounded transition-colors ${isPreview ? 'text-accent' : ''}`}
+                  title={isPreview ? 'Edit markdown' : 'Preview markdown'}
+                >
+                  {isPreview
+                    ? <Pencil className="w-4 h-4 text-accent" />
+                    : <Eye className="w-4 h-4 text-text-secondary" />
+                  }
+                </button>
+              )}
               <button
                 onClick={saveFile}
                 disabled={isSaving || !isDirty}
@@ -122,16 +169,6 @@ export default function FilePreview() {
                 <Save className={`w-4 h-4 ${isDirty ? 'text-accent' : 'text-text-secondary'}`} />
               </button>
             </>
-          ) : (
-            previewContent != null && (
-              <button
-                onClick={startEditing}
-                className="p-1 hover:bg-bg-base rounded transition-colors"
-                title="Edit file"
-              >
-                <Pencil className="w-4 h-4 text-text-secondary" />
-              </button>
-            )
           )}
           <button
             onClick={() => { if (isEditing) cancelEditing(); clearPreview(); }}
@@ -151,7 +188,7 @@ export default function FilePreview() {
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {isLoadingPreview ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
@@ -164,54 +201,79 @@ export default function FilePreview() {
             </div>
           </div>
         ) : displayContent != null ? (
-          <div className="flex font-mono text-sm h-full">
-            {/* Line numbers */}
-            <div
-              ref={lineNumberRef}
-              className="bg-bg-surface border-r border-border px-2 py-3 text-text-secondary select-none flex-shrink-0 overflow-hidden"
-            >
-              {Array.from({ length: lineCount }, (_, i) => (
-                <div
-                  key={i}
-                  className="text-right leading-6"
-                  style={{ minWidth: `${maxLineNumberWidth}ch` }}
-                >
-                  {i + 1}
-                </div>
-              ))}
+          isPreview ? (
+            /* Rendered markdown preview */
+            <div className="h-full overflow-auto px-4 py-3">
+              <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
+                {renderMarkdown(displayContent)}
+              </div>
             </div>
+          ) : (
+            /* Code editor with syntax highlighting */
+            <div className="flex font-mono text-sm h-full">
+              {/* Line numbers */}
+              <div
+                ref={lineNumberRef}
+                className="bg-bg-surface border-r border-border px-2 py-3 text-text-secondary select-none flex-shrink-0 overflow-hidden"
+              >
+                {Array.from({ length: lineCount }, (_, i) => (
+                  <div
+                    key={i}
+                    className="text-right leading-6"
+                    style={{ minWidth: `${maxLineNumberWidth}ch` }}
+                  >
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
 
-            {/* Editor or read-only view */}
-            {isEditing ? (
-              <textarea
-                ref={textareaRef}
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                onScroll={handleScroll}
-                spellCheck={false}
-                className="flex-1 px-3 py-3 bg-transparent text-text-primary resize-none outline-none leading-6 overflow-auto"
-                style={{ tabSize: 2 }}
-              />
-            ) : (
-              <pre className="flex-1 px-3 py-3 overflow-x-auto">
-                <code className="hljs">
-                  {highlightedLines
-                    ? highlightedLines.map((html, i) => (
-                        <div
-                          key={i}
-                          className="leading-6"
-                          dangerouslySetInnerHTML={{ __html: html || ' ' }}
-                        />
-                      ))
-                    : lines.map((line, i) => (
-                        <div key={i} className="leading-6 text-text-primary">
-                          {line || ' '}
-                        </div>
-                      ))}
-                </code>
-              </pre>
-            )}
-          </div>
+              {/* Editor with syntax-highlighted overlay */}
+              <div className="relative flex-1 min-w-0">
+                {/* Highlighted underlay — scrolled in sync with textarea */}
+                <pre
+                  ref={highlightRef}
+                  className="absolute inset-0 px-3 py-3 m-0 overflow-hidden pointer-events-none"
+                  aria-hidden="true"
+                  style={{ whiteSpace: 'pre' }}
+                >
+                  <code className="hljs">
+                    {highlightedLines
+                      ? highlightedLines.map((html, i) => (
+                          <div
+                            key={i}
+                            className="leading-6"
+                            dangerouslySetInnerHTML={{ __html: html || ' ' }}
+                          />
+                        ))
+                      : lines.map((line, i) => (
+                          <div key={i} className="leading-6 text-text-primary">
+                            {line || ' '}
+                          </div>
+                        ))}
+                  </code>
+                </pre>
+
+                {/* Transparent textarea on top — captures input, shows caret */}
+                <textarea
+                  ref={textareaRef}
+                  value={isEditing ? editContent : (previewContent ?? '')}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onScroll={handleScroll}
+                  spellCheck={false}
+                  readOnly={!isEditing}
+                  wrap="off"
+                  className="relative w-full h-full px-3 py-3 bg-transparent resize-none outline-none leading-6 overflow-auto z-10"
+                  style={{
+                    tabSize: 2,
+                    color: 'transparent',
+                    caretColor: isEditing ? 'var(--text-primary, #e0e0e0)' : 'transparent',
+                    WebkitTextFillColor: 'transparent',
+                    whiteSpace: 'pre',
+                  }}
+                />
+              </div>
+            </div>
+          )
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-text-secondary">No content</p>

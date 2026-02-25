@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Save, Undo2, AlertTriangle } from 'lucide-react';
+import { Save, Undo2, AlertTriangle, Eye, Pencil } from 'lucide-react';
 import { useHighlight } from '../../hooks/useHighlight';
 import { useTabStore } from '../../stores/tab-store';
+import { renderMarkdown } from '../../lib/markdown';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on } from '../../lib/ipc-client';
 import { shortcutLabel } from '../../lib/keybindings';
@@ -10,7 +11,6 @@ import 'highlight.js/styles/tokyo-night-dark.css';
 interface FileEditorState {
   content: string | null;
   editContent: string;
-  isEditing: boolean;
   isLoading: boolean;
   error: string | null;
   saveError: string | null;
@@ -19,6 +19,15 @@ interface FileEditorState {
   baseContent: string | null;
   /** True when a conflict has been detected (file changed on disk while editing) */
   hasConflict: boolean;
+  /** Markdown preview mode (only for .md/.mdx files) */
+  isPreview: boolean;
+}
+
+/** Check if a file path is a markdown file */
+function isMarkdownFile(filePath: string | null): boolean {
+  if (!filePath) return false;
+  const lower = filePath.toLowerCase();
+  return lower.endsWith('.md') || lower.endsWith('.mdx');
 }
 
 export default function FileEditor() {
@@ -29,31 +38,32 @@ export default function FileEditor() {
   const [state, setState] = useState<FileEditorState>({
     content: null,
     editContent: '',
-    isEditing: false,
     isLoading: true,
     error: null,
     saveError: null,
     isSaving: false,
     baseContent: null,
     hasConflict: false,
+    isPreview: false,
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumberRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLPreElement>(null);
 
-  const displayContent = state.isEditing ? state.editContent : state.content;
+  const isMarkdown = isMarkdownFile(filePath);
   const highlightedLines = useHighlight(
-    state.isEditing ? null : state.content,
+    state.isPreview ? null : (state.editContent || state.content),
     filePath,
   );
-  const isDirty = state.isEditing && state.editContent !== state.content;
+  const isDirty = state.editContent !== (state.content ?? '');
 
-  // Load file content
+  // Load file content — immediately ready for editing
   useEffect(() => {
     if (!filePath) return;
 
     let cancelled = false;
-    setState(s => ({ ...s, isLoading: true, error: null, saveError: null, hasConflict: false }));
+    setState(s => ({ ...s, isLoading: true, error: null, saveError: null, hasConflict: false, isPreview: false }));
 
     (async () => {
       try {
@@ -67,8 +77,7 @@ export default function FileEditor() {
             content: result.content ?? null,
             editContent: result.content ?? '',
             isLoading: false,
-            isEditing: false,
-            baseContent: null,
+            baseContent: result.content ?? null,
             hasConflict: false,
           }));
         }
@@ -84,7 +93,7 @@ export default function FileEditor() {
 
   // Listen for filesystem changes to detect conflicts
   useEffect(() => {
-    if (!filePath || !state.isEditing) return;
+    if (!filePath || state.baseContent == null) return;
 
     const unsub = on(IPC.PROJECT_FS_CHANGED, async () => {
       try {
@@ -92,46 +101,24 @@ export default function FileEditor() {
         if (result.content != null && state.baseContent != null && result.content !== state.baseContent) {
           setState(s => ({ ...s, hasConflict: true, content: result.content! }));
         }
-      } catch { /* Expected: file may have been deleted or moved */
-        // ignore
-      }
+      } catch { /* Expected: file may have been deleted or moved */ }
     });
     return unsub;
-  }, [filePath, state.isEditing, state.baseContent]);
+  }, [filePath, state.baseContent]);
 
-  // Start editing
-  const startEditing = useCallback(() => {
-    setState(s => ({
-      ...s,
-      isEditing: true,
-      editContent: s.content ?? '',
-      baseContent: s.content,
-      hasConflict: false,
-      saveError: null,
-    }));
+  // Revert to last saved content
+  const revertChanges = useCallback(() => {
+    setState(s => ({ ...s, editContent: s.content ?? '', saveError: null }));
   }, []);
 
-  // Cancel editing
-  const cancelEditing = useCallback(() => {
-    setState(s => ({
-      ...s,
-      isEditing: false,
-      editContent: '',
-      baseContent: null,
-      hasConflict: false,
-      saveError: null,
-    }));
+  // Toggle markdown preview
+  const togglePreview = useCallback(() => {
+    setState(s => ({ ...s, isPreview: !s.isPreview }));
   }, []);
 
   // Save file
   const saveFile = useCallback(async () => {
-    if (!filePath || state.isSaving) return;
-
-    // Check for conflict before saving
-    if (state.hasConflict) {
-      // Don't save — user needs to resolve first
-      return;
-    }
+    if (!filePath || state.isSaving || state.hasConflict) return;
 
     setState(s => ({ ...s, isSaving: true, saveError: null }));
     try {
@@ -149,11 +136,9 @@ export default function FileEditor() {
         setState(s => ({
           ...s,
           content: s.editContent,
-          isEditing: false,
-          editContent: '',
           isSaving: false,
           saveError: null,
-          baseContent: null,
+          baseContent: s.editContent,
           hasConflict: false,
         }));
       }
@@ -174,11 +159,9 @@ export default function FileEditor() {
         setState(s => ({
           ...s,
           content: s.editContent,
-          isEditing: false,
-          editContent: '',
           isSaving: false,
           saveError: null,
-          baseContent: null,
+          baseContent: s.editContent,
           hasConflict: false,
         }));
       }
@@ -200,9 +183,8 @@ export default function FileEditor() {
           ...s,
           content: result.content ?? null,
           editContent: result.content ?? '',
-          isEditing: false,
           isLoading: false,
-          baseContent: null,
+          baseContent: result.content ?? null,
           hasConflict: false,
           saveError: null,
         }));
@@ -212,44 +194,41 @@ export default function FileEditor() {
     }
   }, [filePath]);
 
-  // Sync textarea scroll with line numbers
+  // Sync textarea scroll with line numbers and highlight overlay
   const handleScroll = useCallback(() => {
-    if (textareaRef.current && lineNumberRef.current) {
-      lineNumberRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      if (lineNumberRef.current) lineNumberRef.current.scrollTop = scrollTop;
+      if (highlightRef.current) {
+        highlightRef.current.scrollTop = scrollTop;
+        highlightRef.current.scrollLeft = scrollLeft;
+      }
     }
   }, []);
 
-  // Focus textarea when entering edit mode
+  // Focus textarea when content loads (and not in preview)
   useEffect(() => {
-    if (state.isEditing && textareaRef.current) {
+    if (!state.isLoading && !state.error && state.content != null && !state.isPreview && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [state.isEditing]);
+  }, [state.isLoading, state.error, state.content, state.isPreview]);
 
-  // Keyboard shortcuts: Cmd+S to save, Cmd+E to toggle edit, Escape to cancel
+  // Keyboard shortcuts: Cmd+S to save, Escape to revert
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        if (state.isEditing) {
-          saveFile();
-        }
+        saveFile();
       }
-      if (e.key === 'e' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 'Escape' && isDirty && !state.isPreview) {
         e.preventDefault();
-        if (!state.isEditing && state.content != null) {
-          startEditing();
-        }
-      }
-      if (e.key === 'Escape' && state.isEditing) {
-        e.preventDefault();
-        cancelEditing();
+        revertChanges();
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [state.isEditing, state.content, saveFile, startEditing, cancelEditing]);
+  }, [saveFile, revertChanges, isDirty, state.isPreview]);
 
   // Update tab dirty indicator
   useEffect(() => {
@@ -261,7 +240,7 @@ export default function FileEditor() {
   if (!filePath) return null;
 
   const fileName = filePath.split('/').pop() || '';
-  const lines = displayContent?.split('\n') || [];
+  const lines = (state.editContent || state.content || '').split('\n');
   const lineCount = lines.length;
   const maxLineNumberWidth = String(lineCount).length;
 
@@ -276,8 +255,8 @@ export default function FileEditor() {
               {isDirty && (
                 <span className="inline-block w-2 h-2 rounded-full bg-warning flex-shrink-0" title="Unsaved changes" />
               )}
-              {state.isEditing && (
-                <span className="text-xs text-accent font-normal">editing</span>
+              {state.isPreview && (
+                <span className="text-xs text-accent font-normal">preview</span>
               )}
             </div>
           </div>
@@ -286,35 +265,36 @@ export default function FileEditor() {
         {/* Action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <span className="text-xs text-text-secondary truncate max-w-[300px]">{filePath}</span>
-          {state.isEditing ? (
-            <>
-              <button
-                onClick={cancelEditing}
-                className="p-1.5 hover:bg-bg-base rounded transition-colors"
-                title="Cancel (Esc)"
-              >
-                <Undo2 className="w-4 h-4 text-text-secondary" />
-              </button>
-              <button
-                onClick={saveFile}
-                disabled={state.isSaving || !isDirty || state.hasConflict}
-                className="p-1.5 hover:bg-bg-base rounded transition-colors disabled:opacity-40"
-                title={`Save (${shortcutLabel('S')})`}
-              >
-                <Save className={`w-4 h-4 ${isDirty ? 'text-accent' : 'text-text-secondary'}`} />
-              </button>
-            </>
-          ) : (
-            state.content != null && (
-              <button
-                onClick={startEditing}
-                className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-base rounded transition-colors"
-                title={`Edit file (${shortcutLabel('E')})`}
-              >
-                Edit
-              </button>
-            )
+          {isDirty && !state.isPreview && (
+            <button
+              onClick={revertChanges}
+              className="p-1.5 hover:bg-bg-base rounded transition-colors"
+              title="Revert changes (Esc)"
+            >
+              <Undo2 className="w-4 h-4 text-text-secondary" />
+            </button>
           )}
+          {/* Markdown preview toggle */}
+          {isMarkdown && (
+            <button
+              onClick={togglePreview}
+              className={`p-1.5 hover:bg-bg-base rounded transition-colors ${state.isPreview ? 'text-accent' : ''}`}
+              title={state.isPreview ? 'Edit markdown' : 'Preview markdown'}
+            >
+              {state.isPreview
+                ? <Pencil className="w-4 h-4 text-accent" />
+                : <Eye className="w-4 h-4 text-text-secondary" />
+              }
+            </button>
+          )}
+          <button
+            onClick={saveFile}
+            disabled={state.isSaving || !isDirty || state.hasConflict}
+            className="p-1.5 hover:bg-bg-base rounded transition-colors disabled:opacity-40"
+            title={`Save (${shortcutLabel('S')})`}
+          >
+            <Save className={`w-4 h-4 ${isDirty ? 'text-accent' : 'text-text-secondary'}`} />
+          </button>
         </div>
       </div>
 
@@ -351,7 +331,7 @@ export default function FileEditor() {
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {state.isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
@@ -363,58 +343,79 @@ export default function FileEditor() {
               <p className="text-xs text-text-secondary">{state.error}</p>
             </div>
           </div>
-        ) : displayContent != null ? (
-          <div className="flex font-mono text-sm h-full">
-            {/* Line numbers */}
-            <div
-              ref={lineNumberRef}
-              className="bg-bg-surface border-r border-border px-2 py-3 text-text-secondary select-none flex-shrink-0 overflow-hidden"
-            >
-              {Array.from({ length: lineCount }, (_, i) => (
-                <div
-                  key={i}
-                  className="text-right leading-6"
-                  style={{ minWidth: `${maxLineNumberWidth}ch` }}
-                >
-                  {i + 1}
-                </div>
-              ))}
+        ) : state.content != null ? (
+          state.isPreview ? (
+            /* Rendered markdown preview */
+            <div className="h-full overflow-auto px-6 py-4">
+              <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
+                {renderMarkdown(state.editContent || '')}
+              </div>
             </div>
-
-            {/* Editor or read-only view */}
-            {state.isEditing ? (
-              <textarea
-                ref={textareaRef}
-                value={state.editContent}
-                onChange={(e) => setState(s => ({ ...s, editContent: e.target.value }))}
-                onScroll={handleScroll}
-                spellCheck={false}
-                className="flex-1 px-3 py-3 bg-transparent text-text-primary resize-none outline-none leading-6 overflow-auto"
-                style={{ tabSize: 2 }}
-              />
-            ) : (
-              <pre
-                className="flex-1 px-3 py-3 overflow-x-auto cursor-text"
-                onClick={startEditing}
+          ) : (
+            /* Code editor with syntax highlighting */
+            <div className="flex font-mono text-sm h-full">
+              {/* Line numbers */}
+              <div
+                ref={lineNumberRef}
+                className="bg-bg-surface border-r border-border px-2 py-3 text-text-secondary select-none flex-shrink-0 overflow-hidden"
               >
-                <code className="hljs">
-                  {highlightedLines
-                    ? highlightedLines.map((html, i) => (
-                        <div
-                          key={i}
-                          className="leading-6"
-                          dangerouslySetInnerHTML={{ __html: html || ' ' }}
-                        />
-                      ))
-                    : lines.map((line, i) => (
-                        <div key={i} className="leading-6 text-text-primary">
-                          {line || ' '}
-                        </div>
-                      ))}
-                </code>
-              </pre>
-            )}
-          </div>
+                {Array.from({ length: lineCount }, (_, i) => (
+                  <div
+                    key={i}
+                    className="text-right leading-6"
+                    style={{ minWidth: `${maxLineNumberWidth}ch` }}
+                  >
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+
+              {/* Editor with syntax-highlighted overlay */}
+              <div className="relative flex-1 min-w-0">
+                {/* Highlighted underlay — scrolled in sync with textarea */}
+                <pre
+                  ref={highlightRef}
+                  className="absolute inset-0 px-3 py-3 m-0 overflow-hidden pointer-events-none"
+                  aria-hidden="true"
+                  style={{ whiteSpace: 'pre' }}
+                >
+                  <code className="hljs">
+                    {highlightedLines
+                      ? highlightedLines.map((html, i) => (
+                          <div
+                            key={i}
+                            className="leading-6"
+                            dangerouslySetInnerHTML={{ __html: html || ' ' }}
+                          />
+                        ))
+                      : lines.map((line, i) => (
+                          <div key={i} className="leading-6 text-text-primary">
+                            {line || ' '}
+                          </div>
+                        ))}
+                  </code>
+                </pre>
+
+                {/* Transparent textarea on top — captures input, shows caret */}
+                <textarea
+                  ref={textareaRef}
+                  value={state.editContent}
+                  onChange={(e) => setState(s => ({ ...s, editContent: e.target.value }))}
+                  onScroll={handleScroll}
+                  spellCheck={false}
+                  wrap="off"
+                  className="relative w-full h-full px-3 py-3 bg-transparent resize-none outline-none leading-6 overflow-auto z-10"
+                  style={{
+                    tabSize: 2,
+                    color: 'transparent',
+                    caretColor: 'var(--text-primary, #e0e0e0)',
+                    WebkitTextFillColor: 'transparent',
+                    whiteSpace: 'pre',
+                  }}
+                />
+              </div>
+            </div>
+          )
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-text-secondary">No content</p>
