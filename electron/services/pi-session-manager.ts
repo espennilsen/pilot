@@ -3,27 +3,14 @@ import {
   AuthStorage,
   ModelRegistry,
   SessionManager,
-  SettingsManager,
-  DefaultResourceLoader,
   createEventBus,
-  buildSessionContext,
   type AgentSession,
   type AgentSessionEvent,
-  type SessionEntry,
-  type ContextUsage,
-  type SessionStats,
 } from '@mariozechner/pi-coding-agent';
-import type { TextContent, ThinkingContent, Context } from '@mariozechner/pi-ai';
-import { completeSimple } from '@mariozechner/pi-ai';
-import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import { extractLastAssistantText } from '../utils/message-utils';
-import { join } from 'path';
-import { existsSync, readdirSync } from 'fs';
-import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
-import { loadProjectSettings } from './project-settings';
 import { StagedDiffManager } from './staged-diffs';
-import { getPiAgentDir, loadAppSettings } from './app-settings';
-import { ExtensionManager } from './extension-manager';
+import { getPiAgentDir } from './app-settings';
 import { MemoryManager } from './memory-manager';
 import {
   PILOT_AUTH_FILE,
@@ -32,14 +19,19 @@ import {
 } from './pilot-paths';
 import { IPC } from '../../shared/ipc';
 import type { StagedDiff, SessionMetadata, MemoryCommandResult } from '../../shared/types';
-import { getAllSessionMeta, removeSessionMeta } from './session-metadata';
 import { TaskManager } from './task-manager';
-import { createTaskTools } from './task-tools';
 import { SubagentManager } from './subagent-manager';
-import { createSubagentTools } from './subagent-tools';
-import { createWebFetchTool } from './web-fetch-tool';
 import { broadcastToRenderer } from '../utils/broadcast';
-import { callCheapModel, getSessionDir, decodeDirName } from './pi-session-helpers';
+import { getSessionDir } from './pi-session-helpers';
+import { buildSessionConfig } from './pi-session-config';
+import { generateCommitMessage } from './pi-session-commit';
+import { listSessions, listAllSessions, deleteSession } from './pi-session-listing';
+import {
+  getSlashCommands,
+  handlePossibleTaskCommand,
+  handlePossibleMemoryCommand,
+} from './pi-session-commands';
+import { extractMemoriesInBackground } from './pi-session-memory';
 
 export class PilotSessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -90,73 +82,25 @@ export class PilotSessionManager {
   }
 
   /**
-   * Shared session initialization — sets up sandbox, extensions, memory, resource loader,
-   * creates the agent session, subscribes to events, and registers the tab.
+   * Shared session initialization — builds config, creates the agent session,
+   * subscribes to events, and registers the tab.
    */
   private async initSession(
     tabId: string,
     projectPath: string,
     sessionMgr: SessionManager
   ): Promise<void> {
-    const projectSettings = loadProjectSettings(projectPath);
-    const piAgentDir = getPiAgentDir();
-    const settingsManager = SettingsManager.create(projectPath, piAgentDir);
-
-    const sandboxOptions: SandboxOptions = {
-      jailEnabled: projectSettings.jail.enabled,
-      yoloMode: projectSettings.yoloMode,
-      allowedPaths: projectSettings.jail.allowedPaths,
+    const { settingsManager, resourceLoader, customTools, piAgentDir } = await buildSessionConfig({
       tabId,
+      projectPath,
+      memoryManager: this.memoryManager,
+      taskManager: this.taskManager,
+      subagentManager: this.subagentManager,
       onStagedDiff: (diff: StagedDiff) => {
         this.stagedDiffs.addDiff(diff);
         this.sendToRenderer(IPC.SANDBOX_STAGED_DIFF, { tabId, diff });
       },
-    };
-
-    const { tools, readOnlyTools } = createSandboxedTools(projectPath, sandboxOptions);
-
-    // Resolve enabled extensions and skills from Pilot's own directories
-    const extensionManager = new ExtensionManager();
-    extensionManager.setProject(projectPath);
-    const enabledExtensions = extensionManager.listExtensions().filter(e => e.enabled);
-    const enabledSkills = extensionManager.listSkills();
-
-    // Load memory context to inject into the system prompt (skip if memory disabled)
-    const memoryContext = this.memoryManager.enabled
-      ? await this.memoryManager.getMemoryContext(projectPath)
-      : null;
-
-    // Load task summary for system prompt injection (skip if tasks disabled)
-    const taskSummary = this.taskManager.enabled
-      ? this.taskManager.getAgentTaskSummary(projectPath)
-      : null;
-
-    // Combine memory and task context
-    const additionalContext = [memoryContext, taskSummary].filter(Boolean).join('\n\n');
-
-    const resourceLoader = new DefaultResourceLoader({
-      cwd: projectPath,
-      agentDir: piAgentDir,
-      settingsManager,
-      noExtensions: true,
-      noSkills: true,
-      additionalExtensionPaths: enabledExtensions.map(e => e.path),
-      additionalSkillPaths: enabledSkills.map(s => s.skillMdPath),
-      ...(additionalContext ? { appendSystemPrompt: additionalContext } : {}),
     });
-    await resourceLoader.reload();
-
-    // Create task tools for agent integration (skip if tasks disabled)
-    const taskTools = this.taskManager.enabled
-      ? createTaskTools(this.taskManager, projectPath)
-      : [];
-
-    // Create subagent tools so the agent can delegate work
-    const subagentTools = createSubagentTools(
-      this.subagentManager,
-      tabId,
-      projectPath
-    );
 
     const { session } = await createAgentSession({
       cwd: projectPath,
@@ -166,8 +110,8 @@ export class PilotSessionManager {
       modelRegistry: this.modelRegistry,
       settingsManager,
       resourceLoader,
-      tools: [],  // No built-in tools (we provide sandboxed versions)
-      customTools: [...tools, ...readOnlyTools, ...taskTools, ...subagentTools, createWebFetchTool()],
+      tools: [],
+      customTools,
     });
 
     // Subscribe to events and forward to renderer
@@ -179,7 +123,7 @@ export class PilotSessionManager {
         const messages = session.state.messages;
         const responseText = extractLastAssistantText(messages);
         if (responseText) {
-          this.extractMemoriesInBackground(tabId, responseText).catch(() => {});
+          this.triggerMemoryExtraction(tabId, responseText);
         }
       }
     });
@@ -203,45 +147,12 @@ export class PilotSessionManager {
     }
   }
 
-  /**
-   * Handle messages that start with # or /memory.
-   * Returns the result if it was a memory command, or null if not intercepted.
-   */
-  /**
-   * Handle /tasks slash commands.
-   * Returns a result if it was a task command, or null if not intercepted.
-   */
   handlePossibleTaskCommand(
     tabId: string,
     message: string,
     projectPath: string
   ): { action: 'show_panel' | 'show_create' | 'show_ready'; readyText?: string } | null {
-    const trimmed = message.trim().toLowerCase();
-
-    if (trimmed === '/tasks' || trimmed === '/tasks board') {
-      return { action: 'show_panel' };
-    }
-
-    if (trimmed === '/tasks create') {
-      return { action: 'show_create' };
-    }
-
-    if (trimmed === '/tasks ready') {
-      const ready = this.taskManager.getReadyTasks(projectPath);
-      if (ready.length === 0) {
-        return { action: 'show_ready', readyText: '📋 No ready tasks. All tasks are either blocked, in progress, or done.' };
-      }
-      const lines = ready.map(t => {
-        const priorityEmoji = ['🔴', '🟠', '🟡', '🔵', '⚪'][t.priority] || '⚪';
-        return `  ${priorityEmoji} [${t.id}] ${t.title}`;
-      });
-      return {
-        action: 'show_ready',
-        readyText: `📋 Ready tasks (${ready.length}):\n${lines.join('\n')}`,
-      };
-    }
-
-    return null;
+    return handlePossibleTaskCommand(message, projectPath, this.taskManager);
   }
 
   async handlePossibleMemoryCommand(
@@ -249,98 +160,7 @@ export class PilotSessionManager {
     message: string,
     projectPath: string
   ): Promise<MemoryCommandResult | null> {
-    const trimmed = message.trim();
-
-    // Only intercept:
-    // - Messages starting with # as the first character
-    // - Exact /memory command
-    // Don't intercept ## (markdown headings) or # in the middle of text
-    const isHashCommand = trimmed.startsWith('#') && !trimmed.startsWith('##');
-    const isMemorySlashCommand = trimmed.toLowerCase() === '/memory';
-
-    if (!isHashCommand && !isMemorySlashCommand) return null;
-
-    return this.memoryManager.handleManualMemory(message, projectPath);
-  }
-
-  /**
-   * Run memory extraction in background after an agent response.
-   * Must never block the main conversation.
-   */
-  async extractMemoriesInBackground(
-    tabId: string,
-    agentResponseText: string
-  ): Promise<void> {
-    try {
-      const projectPath = this.tabProjectPaths.get(tabId);
-      const userMessage = this.lastUserMessages.get(tabId);
-      if (!projectPath || !userMessage) return;
-
-      // Skip if memory is disabled
-      if (!this.memoryManager.enabled) return;
-
-      // Check debounce
-      if (this.memoryManager.shouldSkipExtraction()) return;
-      this.memoryManager.markExtractionRun();
-
-      const existingMemories = await this.memoryManager.getMemoryContext(projectPath);
-
-      // Build extraction prompt
-      const extractionPrompt = this.memoryManager.buildExtractionPrompt(
-        userMessage,
-        agentResponseText,
-        existingMemories
-      );
-
-      // Use the cheapest available model for extraction
-      // Try to make a lightweight API call using the auth infrastructure
-      let extractionResult: string | null = null;
-      try {
-        const availableModels = this.modelRegistry.getAvailable();
-        // Prefer haiku-class models for cost efficiency
-        const cheapModel = availableModels.find(m =>
-          m.id.includes('haiku') || m.id.includes('gpt-4o-mini') || m.id.includes('flash')
-        ) || availableModels[0];
-
-        if (!cheapModel) return;
-
-        const auth = this.authStorage.get(cheapModel.provider);
-        if (!auth || auth.type !== 'api_key' || !auth.key) return;
-        const apiKey = auth.key;
-
-        // Direct API call with 10s timeout
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-
-        try {
-          extractionResult = await callCheapModel(
-            cheapModel.provider, apiKey, cheapModel.id, extractionPrompt, controller.signal
-          );
-        } finally {
-          clearTimeout(timeout);
-        }
-      } catch (err) {
-        console.debug('[PilotSession] Memory extraction API call failed:', err);
-        return;
-      }
-
-      if (!extractionResult) return;
-
-      const result = await this.memoryManager.processExtractionResult(
-        extractionResult,
-        projectPath
-      );
-
-      if (result.shouldSave) {
-        // Notify renderer that memories were updated
-        this.sendToRenderer(IPC.MEMORY_UPDATED, {
-          count: result.memories.length,
-          preview: result.memories[0]?.text ?? '',
-        });
-      }
-    } catch (err) {
-      console.debug('[PilotSession] Memory extraction failed:', err);
-    }
+    return handlePossibleMemoryCommand(message, projectPath, this.memoryManager);
   }
 
   async steer(tabId: string, text: string): Promise<void> {
@@ -375,67 +195,8 @@ export class PilotSessionManager {
     return this.sessions.get(tabId);
   }
 
-  /**
-   * Get available slash commands for a tab's session.
-   * Combines built-in SDK commands, prompt templates, skills, and extension commands.
-   */
   getSlashCommands(tabId: string): Array<{ name: string; description: string; source: string }> {
-    const session = this.sessions.get(tabId);
-    const commands: Array<{ name: string; description: string; source: string }> = [];
-
-    // Pilot-specific commands (always available, regardless of session)
-    commands.push({ name: 'memory', description: 'Open memory panel', source: 'pilot' });
-    commands.push({ name: 'tasks', description: 'Open task board', source: 'pilot' });
-    commands.push({ name: 'tasks ready', description: 'Show ready tasks', source: 'pilot' });
-    commands.push({ name: 'tasks create', description: 'Create a new task', source: 'pilot' });
-    commands.push({ name: 'orchestrate', description: 'Enter orchestrator mode — coordinate subagents', source: 'pilot' });
-    commands.push({ name: 'spawn', description: 'Quick-spawn a subagent: /spawn [role] [prompt]', source: 'pilot' });
-
-    if (!session) return commands;
-
-    // Prompt templates from the session
-    try {
-      const templates = session.promptTemplates;
-      for (const t of templates) {
-        commands.push({
-          name: t.name,
-          description: t.description || `Prompt template (${t.source})`,
-          source: 'prompt',
-        });
-      }
-    } catch { /* session may not be fully initialized */ }
-
-    // Skills from the resource loader
-    try {
-      const { skills } = session.resourceLoader.getSkills();
-      for (const s of skills) {
-        commands.push({
-          name: `skill:${s.name}`,
-          description: s.description || `Skill (${s.source})`,
-          source: 'skill',
-        });
-      }
-    } catch { /* Expected: resource loader may not be ready */ }
-
-    // Extension-registered commands
-    try {
-      const runner = session.extensionRunner;
-      if (runner) {
-        const extCmds = runner.getRegisteredCommands();
-        for (const c of extCmds) {
-          // Don't duplicate built-ins already handled
-          if (!commands.some(cmd => cmd.name === c.name)) {
-            commands.push({
-              name: c.name,
-              description: c.description || 'Extension command',
-              source: 'extension',
-            });
-          }
-        }
-      }
-    } catch { /* Expected: extension runner may not be initialized */ }
-
-    return commands;
+    return getSlashCommands(this.sessions.get(tabId));
   }
 
   /** Get the session file path for a tab */
@@ -458,6 +219,38 @@ export class PilotSessionManager {
     this.stagedDiffs.clearTab(tabId);
     this.tabProjectPaths.delete(tabId);
     this.lastUserMessages.delete(tabId);
+  }
+
+  /**
+   * Refresh the system prompt on all active sessions.
+   * Called when the user updates the system prompt in settings.
+   * Updates the resource loader's appendSystemPrompt and triggers a session reload.
+   */
+  async refreshSystemPrompt(): Promise<void> {
+    const appSettings = loadAppSettings();
+    const userSystemPrompt = appSettings.systemPrompt?.trim() || null;
+
+    for (const [tabId, session] of this.sessions) {
+      try {
+        const projectPath = this.tabProjectPaths.get(tabId);
+
+        // Rebuild the full additionalContext (user prompt + memory + tasks)
+        const memoryContext = this.memoryManager.enabled && projectPath
+          ? await this.memoryManager.getMemoryContext(projectPath)
+          : null;
+        const taskSummary = this.taskManager.enabled && projectPath
+          ? this.taskManager.getAgentTaskSummary(projectPath)
+          : null;
+        const additionalContext = [userSystemPrompt, memoryContext, taskSummary].filter(Boolean).join('\n\n');
+
+        // Update the resource loader source and reload the session
+        const loader = session.resourceLoader as any;
+        loader.appendSystemPromptSource = additionalContext || undefined;
+        await session.reload();
+      } catch (err) {
+        console.warn(`[SessionManager] Failed to refresh system prompt for tab ${tabId}:`, err);
+      }
+    }
   }
 
   disposeAll(): void {
@@ -534,190 +327,46 @@ export class PilotSessionManager {
     }
   }
 
-  /** List sessions for a specific project (project-scoped) */
+  // ─── Delegated to extracted modules ─────────────────────────────
+
   async listSessions(projectPath: string): Promise<SessionMetadata[]> {
-    try {
-      const piAgentDir = getPiAgentDir();
-      const sessionDir = getSessionDir(piAgentDir, projectPath);
-      const sessions = await SessionManager.list(projectPath, sessionDir);
-      const metaMap = getAllSessionMeta();
-      return sessions.map(s => {
-        const meta = metaMap[s.path] || { isPinned: false, isArchived: false };
-        return {
-          sessionPath: s.path,
-          projectPath: s.cwd || projectPath,
-          isPinned: meta.isPinned,
-          isArchived: meta.isArchived,
-          customTitle: s.name || s.firstMessage || null,
-          messageCount: s.messageCount || 0,
-          created: s.created?.getTime() || 0,
-          modified: s.modified?.getTime() || 0,
-        };
-      });
-    } catch (err) {
-      console.warn('[PilotSession] Failed to list sessions:', err);
-      return [];
-    }
+    return listSessions(projectPath);
   }
 
-  /** List all sessions across known project directories */
   async listAllSessions(projectPaths: string[]): Promise<SessionMetadata[]> {
-    const piAgentDir = getPiAgentDir();
-    const allSessions: SessionMetadata[] = [];
-    const metaMap = getAllSessionMeta();
-
-    if (projectPaths.length > 0) {
-      // Scan sessions for specific projects
-      for (const projectPath of projectPaths) {
-        const sessions = await this.listSessions(projectPath);
-        allSessions.push(...sessions);
-      }
-    } else {
-      // No project paths specified — scan all session directories
-      const sessionsRoot = join(piAgentDir, 'sessions');
-      if (existsSync(sessionsRoot)) {
-        try {
-          const dirs = readdirSync(sessionsRoot, { withFileTypes: true })
-            .filter(d => d.isDirectory())
-            .map(d => d.name);
-          for (const dirName of dirs) {
-            const cwd = decodeDirName(dirName);
-            const sessionDir = join(sessionsRoot, dirName);
-            try {
-              const sessions = await SessionManager.list(cwd, sessionDir);
-              for (const s of sessions) {
-                const meta = metaMap[s.path] || { isPinned: false, isArchived: false };
-                allSessions.push({
-                  sessionPath: s.path,
-                  projectPath: s.cwd || cwd,
-                  isPinned: meta.isPinned,
-                  isArchived: meta.isArchived,
-                  customTitle: s.name || s.firstMessage || null,
-                  messageCount: s.messageCount || 0,
-                  created: s.created?.getTime() || 0,
-                  modified: s.modified?.getTime() || 0,
-                });
-              }
-            } catch { /* Expected: session directory may be unreadable */ }
-          }
-        } catch { /* Expected: session directory may be unreadable */ }
-      }
-    }
-
-    // Sort by most recent first
-    allSessions.sort((a, b) => {
-      // sessionPath includes timestamp, so alphabetical sort works for recency
-      return (b.sessionPath || '').localeCompare(a.sessionPath || '');
-    });
-    return allSessions;
+    return listAllSessions(projectPaths);
   }
 
-  /** Delete a session file from disk and clean up its metadata. */
   async deleteSession(sessionPath: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { unlinkSync } = await import('fs');
-      if (existsSync(sessionPath)) {
-        unlinkSync(sessionPath);
-      }
-      // Clean up persisted metadata (pin/archive flags)
-      removeSessionMeta(sessionPath);
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to delete session:', message);
-      return { success: false, error: message };
-    }
+    return deleteSession(sessionPath);
   }
+
+  async generateCommitMessage(diff: string): Promise<string> {
+    return generateCommitMessage(diff, this.modelRegistry, this.authStorage);
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────
 
   /**
-   * Generate a commit message from a git diff using a cheap/fast model.
-   * Uses the Pi SDK's completeSimple() — handles all providers, auth (API key + OAuth), retries.
+   * Trigger background memory extraction — fire-and-forget.
    */
-  async generateCommitMessage(diff: string): Promise<string> {
-    const settings = loadAppSettings();
-    const availableModels = this.modelRegistry.getAvailable();
+  private triggerMemoryExtraction(tabId: string, agentResponseText: string): void {
+    const projectPath = this.tabProjectPaths.get(tabId);
+    const userMessage = this.lastUserMessages.get(tabId);
+    if (!projectPath || !userMessage) return;
 
-    // User override: "provider/model-id" format
-    let cheapModel = undefined as typeof availableModels[0] | undefined;
-    if (settings.commitMsgModel) {
-      const [provider, ...rest] = settings.commitMsgModel.split('/');
-      const modelId = rest.join('/');
-      cheapModel = availableModels.find(m => m.provider === provider && m.id === modelId);
-      if (!cheapModel) {
-        console.warn(`[commit-msg] Configured model "${settings.commitMsgModel}" not found or not authenticated, falling back to auto-select`);
-      }
-    }
-
-    // Auto-select: prefer cheap/fast models
-    if (!cheapModel) {
-      cheapModel = availableModels.find(m =>
-        m.id.includes('claude-haiku-4') || m.id.includes('gpt-5.1-codex-mini') || m.id.includes('flash')
-      ) || availableModels.find(m =>
-        m.id.includes('haiku') || m.id.includes('mini') || m.id.includes('flash')
-      ) || availableModels[0];
-    }
-
-    if (!cheapModel) throw new Error('No models available');
-    console.log(`[commit-msg] Using model: ${cheapModel.provider}/${cheapModel.id}`);
-
-    const apiKey = await this.authStorage.getApiKey(cheapModel.provider);
-    if (!apiKey) {
-      throw new Error('No API key configured — add an API key or login via OAuth in Settings → Auth');
-    }
-
-    const maxTokens = loadAppSettings().commitMsgMaxTokens ?? 4096;
-
-    const context: Context = {
-      systemPrompt: `You generate concise git commit messages following Conventional Commits format.
-Output ONLY the commit message — no quotes, no markdown fences, no explanation.`,
-      messages: [{
-        role: 'user' as const,
-        content: [{
-          type: 'text' as const,
-          text: `Write a commit message for this diff:
-
-Rules:
-- First line: type(optional scope): short description (max 72 chars)
-- If multiple unrelated changes, use the most significant one for the first line
-- Add a blank line and bullet points for additional changes only if truly needed
-- Be specific about what changed, not why
-
-Diff:
-${diff.slice(0, 50000)}`,
-        }],
-        timestamp: Date.now(),
-      }],
-    };
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
-
-    try {
-      const response = await completeSimple(cheapModel, context, {
-        apiKey,
-        maxTokens,
-        signal: controller.signal,
-      });
-
-      if (response.errorMessage) {
-        throw new Error(`Model error: ${response.errorMessage}`);
-      }
-
-      const text = response.content
-        .filter((c): c is TextContent => c.type === 'text')
-        .map(c => c.text)
-        .join('')
-        .trim();
-
-      if (!text) {
-        throw new Error(
-          `Empty response from ${cheapModel.provider}/${cheapModel.id} (stop: ${response.stopReason}, content types: ${response.content.map(c => c.type).join(',')})`
-        );
-      }
-      return text;
-    } finally {
-      clearTimeout(timeout);
-    }
+    extractMemoriesInBackground({
+      tabId,
+      projectPath,
+      userMessage,
+      agentResponseText,
+      memoryManager: this.memoryManager,
+      modelRegistry: this.modelRegistry,
+      authStorage: this.authStorage,
+      onMemoryUpdated: (count, preview) => {
+        this.sendToRenderer(IPC.MEMORY_UPDATED, { count, preview });
+      },
+    }).catch(() => {});
   }
 
   private forwardEventToRenderer(tabId: string, event: AgentSessionEvent): void {

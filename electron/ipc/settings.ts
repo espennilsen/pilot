@@ -5,8 +5,9 @@ import { loadAppSettings, saveAppSettings, getPiAgentDir } from '../services/app
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLogger } from '../services/logger';
+import type { PilotSessionManager } from '../services/pi-session-manager';
 
-export function registerSettingsIpc() {
+export function registerSettingsIpc(sessionManager?: PilotSessionManager) {
 
   // ── App Settings (Pilot-level, ~/.config/.pilot/) ──────────────────────
 
@@ -15,7 +16,16 @@ export function registerSettingsIpc() {
   });
 
   ipcMain.handle(IPC.APP_SETTINGS_UPDATE, async (_event, updates: Record<string, unknown>) => {
-    return saveAppSettings(updates as any);
+    const result = saveAppSettings(updates as any);
+
+    // Refresh system prompt on all active sessions when it changes
+    if ('systemPrompt' in updates && sessionManager) {
+      sessionManager.refreshSystemPrompt().catch(err => {
+        console.warn('[Settings] Failed to refresh system prompt on active sessions:', err);
+      });
+    }
+
+    return result;
   });
 
   // ── Pi Agent Settings (piAgentDir/settings.json — default model, provider, etc.) ──

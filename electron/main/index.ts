@@ -154,6 +154,12 @@ function buildApplicationMenu() {
 }
 
 function createWindow() {
+  // Read persisted theme to set correct initial window chrome (avoid flash)
+  const settings = loadAppSettings();
+  const isLightTheme = settings.theme === 'light';
+  const windowBg = isLightTheme ? '#ffffff' : '#1a1b1e';
+  const windowFg = isLightTheme ? '#1a1b1e' : '#ffffff';
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -163,13 +169,13 @@ function createWindow() {
     ...(isMac ? { titleBarStyle: 'hiddenInset' as const } : {}),
     ...(isWin ? {
       titleBarOverlay: {
-        color: '#1a1b1e',
-        symbolColor: '#ffffff',
+        color: windowBg,
+        symbolColor: windowFg,
         height: 36,
       },
     } : {}),
     icon: join(__dirname, '../../resources/icon.png'),
-    backgroundColor: '#1a1b1e',
+    backgroundColor: windowBg,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -254,7 +260,7 @@ app.whenReady().then(async () => {
   registerModelIpc(sessionManager);
   registerSandboxIpc(sessionManager);
   registerSessionIpc(sessionManager);
-  registerSettingsIpc();
+  registerSettingsIpc(sessionManager);
   registerAuthIpc(sessionManager);
   registerGitIpc();
   registerProjectIpc();
@@ -461,6 +467,18 @@ app.whenReady().then(async () => {
   ipcMain.on(IPC.TERMINAL_SET_MENU_VISIBLE, (event, visible: boolean) => {
     developerModeEnabled = visible;
     buildApplicationMenu();
+  });
+
+  // Theme changed — update window chrome (background, titlebar overlay)
+  ipcMain.on(IPC.APP_THEME_CHANGED, (_event, resolved: string) => {
+    const bg = resolved === 'light' ? '#ffffff' : '#1a1b1e';
+    const fg = resolved === 'light' ? '#1a1b1e' : '#ffffff';
+    if (mainWindow) {
+      mainWindow.setBackgroundColor(bg);
+      if (isWin) {
+        mainWindow.setTitleBarOverlay({ color: bg, symbolColor: fg });
+      }
+    }
   });
 
   // Set dock icon on macOS (BrowserWindow icon only applies to Windows/Linux)
