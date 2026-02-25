@@ -50,7 +50,7 @@ interface TabStore {
   addFileTab: (filePath: string, projectPath: string | null) => string;
   addTasksTab: (projectPath: string) => string;
   addDocsTab: (page?: string) => string;
-  addWebTab: (url: string, projectPath: string | null, title?: string) => string;
+  addWebTab: (url: string, projectPath: string | null, title?: string, background?: boolean) => string;
   closeTab: (tabId: string) => void;
   switchTab: (tabId: string) => void;
   switchToTabByIndex: (index: number) => void;
@@ -294,7 +294,7 @@ export const useTabStore = create<TabStore>((set, get) => {
       return newTabId;
     },
 
-    addWebTab: (url: string, projectPath: string | null, title?: string) => {
+    addWebTab: (url: string, projectPath: string | null, title?: string, background = false) => {
       // Extract hostname or filename for default title
       let defaultTitle = 'Web';
       try {
@@ -307,26 +307,45 @@ export const useTabStore = create<TabStore>((set, get) => {
         }
       } catch { /* Invalid URL — use fallback */ }
 
-      return findOrCreateTab(
-        (t) => t.type === 'web' && t.filePath === url,
-        () => ({
-          type: 'web',
-          filePath: url,
-          title: title || defaultTitle,
-          projectPath,
-          sessionPath: null,
-          projectColor: getProjectColor(projectPath),
-          isPinned: false,
-          scrollPosition: 0,
-          inputDraft: '',
-          panelConfig: {
-            sidebarVisible: true,
-            contextPanelVisible: false,
-            contextPanelTab: 'files',
-          },
-          hasUnread: false,
-        })
-      );
+      // Deduplicate: if tab with same URL exists, just return its id (switch only if not background)
+      const existing = get().tabs.find((t) => t.type === 'web' && t.filePath === url);
+      if (existing) {
+        if (!background) get().switchTab(existing.id);
+        return existing.id;
+      }
+
+      // Create new tab — in background mode, don't switch to it
+      const newTabId = crypto.randomUUID();
+      const tabs = get().tabs;
+      const maxOrder = tabs.length > 0 ? Math.max(...tabs.map(t => t.order)) : -1;
+
+      const newTab: TabState = {
+        id: newTabId,
+        type: 'web',
+        filePath: url,
+        title: title || defaultTitle,
+        projectPath,
+        sessionPath: null,
+        projectColor: getProjectColor(projectPath),
+        isPinned: false,
+        order: maxOrder + 1,
+        scrollPosition: 0,
+        inputDraft: '',
+        panelConfig: {
+          sidebarVisible: true,
+          contextPanelVisible: false,
+          contextPanelTab: 'files',
+        },
+        lastActiveAt: Date.now(),
+        hasUnread: false,
+      };
+
+      set(state => ({
+        tabs: [...state.tabs, newTab],
+        ...(background ? {} : { activeTabId: newTabId }),
+      }));
+
+      return newTabId;
     },
 
   /** Close a tab. If it's the active tab, switches to the nearest remaining tab. Pushes to closed-tab stack. */

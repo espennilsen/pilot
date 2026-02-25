@@ -38,6 +38,7 @@ export class PilotSessionManager {
   private unsubscribers = new Map<string, () => void>();
   private tabProjectPaths = new Map<string, string>();
   private lastUserMessages = new Map<string, string>();
+  private tabSandboxOptions = new Map<string, import('./sandboxed-tools').SandboxOptions>();
   private authStorage: AuthStorage;
   private modelRegistry: ModelRegistry;
   private eventBus = createEventBus();
@@ -48,7 +49,7 @@ export class PilotSessionManager {
 
   constructor() {
     ensurePilotAppDirs();
-    // Auth & models stored in Pilot app dir (~/.config/.pilot/)
+    // Auth & models stored in Pilot app dir (~/.config/pilot/)
     this.authStorage = AuthStorage.create(PILOT_AUTH_FILE);
     this.modelRegistry = new ModelRegistry(this.authStorage, PILOT_MODELS_FILE);
     this.subagentManager = new SubagentManager(this);
@@ -90,7 +91,7 @@ export class PilotSessionManager {
     projectPath: string,
     sessionMgr: SessionManager
   ): Promise<void> {
-    const { settingsManager, resourceLoader, customTools, piAgentDir } = await buildSessionConfig({
+    const { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions } = await buildSessionConfig({
       tabId,
       projectPath,
       memoryManager: this.memoryManager,
@@ -117,7 +118,11 @@ export class PilotSessionManager {
     // Subscribe to events and forward to renderer
     // Also trigger memory extraction when agent finishes responding
     const unsub = session.subscribe((event: AgentSessionEvent) => {
-      this.forwardEventToRenderer(tabId, event);
+      try {
+        this.forwardEventToRenderer(tabId, event);
+      } catch (err) {
+        console.warn(`[SessionManager] Failed to forward event '${event.type}' to renderer:`, err);
+      }
 
       if (event.type === 'agent_end' || event.type === 'turn_end') {
         const messages = session.state.messages;
@@ -131,6 +136,7 @@ export class PilotSessionManager {
     this.sessions.set(tabId, session);
     this.unsubscribers.set(tabId, unsub);
     this.tabProjectPaths.set(tabId, projectPath);
+    this.tabSandboxOptions.set(tabId, sandboxOptions);
   }
 
   async prompt(tabId: string, text: string): Promise<void> {
@@ -219,6 +225,28 @@ export class PilotSessionManager {
     this.stagedDiffs.clearTab(tabId);
     this.tabProjectPaths.delete(tabId);
     this.lastUserMessages.delete(tabId);
+    this.tabSandboxOptions.delete(tabId);
+  }
+
+  /**
+   * Update the live sandbox options for a tab.
+   * Mutates the object captured by tool closures, so changes take effect immediately.
+   */
+  updateSandboxOptions(tabId: string, updates: { jailEnabled?: boolean; yoloMode?: boolean; allowedPaths?: string[] }): void {
+    const opts = this.tabSandboxOptions.get(tabId);
+    if (!opts) return;
+    if (updates.jailEnabled !== undefined) opts.jailEnabled = updates.jailEnabled;
+    if (updates.yoloMode !== undefined) opts.yoloMode = updates.yoloMode;
+    if (updates.allowedPaths !== undefined) opts.allowedPaths = updates.allowedPaths;
+  }
+
+  /**
+   * Get the live sandbox options for a tab (read-only snapshot).
+   */
+  getSandboxOptions(tabId: string): { jailEnabled: boolean; yoloMode: boolean; allowedPaths: string[] } | null {
+    const opts = this.tabSandboxOptions.get(tabId);
+    if (!opts) return null;
+    return { jailEnabled: opts.jailEnabled, yoloMode: opts.yoloMode, allowedPaths: [...opts.allowedPaths] };
   }
 
   /**

@@ -11,7 +11,8 @@ export function useWebTabEvents() {
   useEffect(() => {
     const unsub = on(IPC.WEB_TAB_OPEN, (payload: WebTabOpenPayload) => {
       const { addWebTab } = useTabStore.getState();
-      addWebTab(payload.url, payload.projectPath, payload.title);
+      // Open in background so the agent's chat tab stays focused
+      addWebTab(payload.url, payload.projectPath, payload.title, true);
     });
 
     return () => {
