@@ -496,3 +496,17 @@ export interface SandboxDiffPayload {
   tabId: string;
   diff: StagedDiff;
 }
+
+/** Agent requests opening a file in the editor */
+export interface EditorOpenFilePayload {
+  filePath: string;
+  projectPath: string;
+  startLine?: number;
+  endLine?: number;
+}
+
+/** Agent requests opening a URL in the browser */
+export interface EditorOpenUrlPayload {
+  url: string;
+  title?: string;
+}

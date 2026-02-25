@@ -70,6 +70,18 @@ interface UIStore {
   setScratchPadContent: (content: string) => void;
   openAbout: () => void;
   closeAbout: () => void;
+
+  // Agent-triggered editor state
+  fileHighlights: Record<string, { startLine: number; endLine: number }>;
+  setFileHighlight: (tabId: string, range: { startLine: number; endLine: number }) => void;
+  clearFileHighlight: (tabId: string) => void;
+
+  // URL confirmation dialog
+  urlConfirmation: { url: string; title?: string } | null;
+  urlAlwaysAllow: boolean;
+  showUrlConfirmation: (url: string, title?: string) => void;
+  dismissUrlConfirmation: () => void;
+  setUrlAlwaysAllow: (allow: boolean) => void;
 }
 
 /**
@@ -168,4 +180,28 @@ export const useUIStore = create<UIStore>((set) => ({
   },
   openAbout: () => set({ aboutOpen: true }),
   closeAbout: () => set({ aboutOpen: false }),
+
+  // Agent-triggered editor state
+  fileHighlights: {},
+  setFileHighlight: (tabId, range) => set((s) => ({
+    fileHighlights: { ...s.fileHighlights, [tabId]: range },
+  })),
+  clearFileHighlight: (tabId) => set((s) => {
+    const { [tabId]: _, ...rest } = s.fileHighlights;
+    return { fileHighlights: rest };
+  }),
+
+  // URL confirmation dialog
+  urlConfirmation: null,
+  urlAlwaysAllow: false,
+  showUrlConfirmation: (url, title) => set((s) => {
+    if (s.urlAlwaysAllow) {
+      // Auto-open without prompting
+      window.api?.openExternal?.(url);
+      return {};
+    }
+    return { urlConfirmation: { url, title } };
+  }),
+  dismissUrlConfirmation: () => set({ urlConfirmation: null }),
+  setUrlAlwaysAllow: (allow) => set({ urlAlwaysAllow: allow }),
 }));

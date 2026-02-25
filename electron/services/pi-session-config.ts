@@ -22,6 +22,7 @@ import { SubagentManager } from './subagent-manager';
 import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
 import { createMemoryTools } from './memory-tools';
+import { createEditorTools } from './editor-tools';
 import type { StagedDiff } from '../../shared/types';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -118,11 +119,14 @@ export async function buildSessionConfig(
     ? createMemoryTools(memoryManager, projectPath)
     : [];
 
+  const editorTools = createEditorTools(projectPath);
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
     ...taskTools,
     ...memoryTools,
+    ...editorTools,
     ...subagentTools,
     createWebFetchTool(),
   ];

@@ -9,6 +9,7 @@ import Terminal from './components/terminal/Terminal';
 import ScratchPad from './components/scratch-pad/ScratchPad';
 import SettingsPanel from './components/settings/SettingsPanel';
 import { AboutDialog } from './components/about/AboutDialog';
+import { UrlConfirmDialog } from './components/dialogs/UrlConfirmDialog';
 import { OutputWindowManager } from './components/command-center/OutputWindowManager';
 import { useTabStore } from './stores/tab-store';
 import { useUIStore } from './stores/ui-store';
@@ -25,6 +26,7 @@ import { useWorkspacePersistence, openTabSession, useWiredSessionsStore } from '
 import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
+import { useEditorEvents } from './hooks/useEditorEvents';
 import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
@@ -106,6 +108,9 @@ function App() {
 
   // Listen for subagent events from main process
   useSubagentEvents();
+
+  // Listen for agent-triggered editor events (open file, open URL)
+  useEditorEvents();
 
   // Apply theme (data-theme attribute on <html>, notify main process)
   useTheme();
@@ -306,6 +311,7 @@ function App() {
       {scratchPadVisible && <ScratchPad />}
       <SettingsPanel />
       <AboutDialog />
+      <UrlConfirmDialog />
       <CommandPalette />
       <OutputWindowManager />
     </div>

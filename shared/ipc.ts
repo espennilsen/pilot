@@ -222,4 +222,8 @@ export const IPC = {
 
   // Logging
   LOG_MESSAGE: 'log:message',  // renderer → main
+
+  // Editor (agent → renderer)
+  EDITOR_OPEN_FILE: 'editor:open-file',     // main → renderer
+  EDITOR_OPEN_URL: 'editor:open-url',       // main → renderer
 } as const;

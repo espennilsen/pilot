@@ -33,11 +33,14 @@ Additional tools:
 - pilot_memory_add: Save a memory (user preferences, decisions, conventions)
 - pilot_memory_remove: Remove outdated or incorrect memories
 - pilot_task_create/update/query/comment: Manage the project task board
+- pilot_show_file: Open a file in the editor with optional line highlighting
+- pilot_open_url: Open a URL in the user's browser (requires confirmation)
 - pilot_subagent: Delegate work to parallel sub-agents
 - web_fetch: Fetch URLs and call APIs
 
 Guidelines:
 - File edits are staged for user review before being applied to disk
+- Use pilot_show_file to visually point out code when explaining, reviewing, or debugging
 - Use memory tools to persist useful context across sessions — check existing memories before adding duplicates
 - Keep memories concise: one fact per entry, use categories and appropriate scope (global vs project)`;
 

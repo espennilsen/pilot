@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { Save, Undo2, AlertTriangle, Eye, Pencil } from 'lucide-react';
 import { useHighlight } from '../../hooks/useHighlight';
 import { useTabStore } from '../../stores/tab-store';
+import { useUIStore } from '../../stores/ui-store';
 import { renderMarkdown } from '../../lib/markdown';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on } from '../../lib/ipc-client';
@@ -74,6 +75,29 @@ export default function FileEditor() {
     filePath,
   );
   const isDirty = state.editContent !== (state.content ?? '');
+
+  // Agent-triggered line highlighting
+  const fileHighlight = useUIStore(s => activeTabId ? s.fileHighlights[activeTabId] : undefined);
+  const clearFileHighlight = useUIStore(s => s.clearFileHighlight);
+
+  // Scroll to highlighted lines when they change
+  useEffect(() => {
+    if (!fileHighlight || !textareaRef.current) return;
+    const lineHeight = 24; // leading-6 = 1.5rem = 24px
+    const targetScroll = (fileHighlight.startLine - 1) * lineHeight - textareaRef.current.clientHeight / 3;
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.scrollTop = Math.max(0, targetScroll);
+        if (lineNumberRef.current) lineNumberRef.current.scrollTop = textareaRef.current.scrollTop;
+        if (highlightRef.current) highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+      }
+    });
+    // Clear highlight after 5 seconds
+    const timer = setTimeout(() => {
+      if (activeTabId) clearFileHighlight(activeTabId);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [fileHighlight, activeTabId, clearFileHighlight]);
 
   // Load file content — immediately ready for editing
   useEffect(() => {
@@ -432,15 +456,21 @@ export default function FileEditor() {
                 ref={lineNumberRef}
                 className="bg-bg-surface border-r border-border px-2 py-3 text-text-secondary select-none flex-shrink-0 overflow-hidden"
               >
-                {Array.from({ length: lineCount }, (_, i) => (
-                  <div
-                    key={i}
-                    className="text-right leading-6"
-                    style={{ minWidth: `${maxLineNumberWidth}ch` }}
-                  >
-                    {i + 1}
-                  </div>
-                ))}
+                {Array.from({ length: lineCount }, (_, i) => {
+                  const lineNum = i + 1;
+                  const isHighlighted = fileHighlight
+                    && lineNum >= fileHighlight.startLine
+                    && lineNum <= fileHighlight.endLine;
+                  return (
+                    <div
+                      key={i}
+                      className={`text-right leading-6 ${isHighlighted ? 'text-accent font-semibold' : ''}`}
+                      style={{ minWidth: `${maxLineNumberWidth}ch` }}
+                    >
+                      {lineNum}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Editor with syntax-highlighted overlay */}
@@ -454,18 +484,28 @@ export default function FileEditor() {
                 >
                   <code className="hljs">
                     {highlightedLines
-                      ? highlightedLines.map((html, i) => (
-                          <div
-                            key={i}
-                            className="leading-6"
-                            dangerouslySetInnerHTML={{ __html: html || ' ' }}
-                          />
-                        ))
-                      : lines.map((line, i) => (
-                          <div key={i} className="leading-6 text-text-primary">
-                            {line || ' '}
-                          </div>
-                        ))}
+                      ? highlightedLines.map((html, i) => {
+                          const isHL = fileHighlight
+                            && (i + 1) >= fileHighlight.startLine
+                            && (i + 1) <= fileHighlight.endLine;
+                          return (
+                            <div
+                              key={i}
+                              className={`leading-6 ${isHL ? 'bg-accent/15 -mx-3 px-3 border-l-2 border-accent' : ''}`}
+                              dangerouslySetInnerHTML={{ __html: html || ' ' }}
+                            />
+                          );
+                        })
+                      : lines.map((line, i) => {
+                          const isHL = fileHighlight
+                            && (i + 1) >= fileHighlight.startLine
+                            && (i + 1) <= fileHighlight.endLine;
+                          return (
+                            <div key={i} className={`leading-6 text-text-primary ${isHL ? 'bg-accent/15 -mx-3 px-3 border-l-2 border-accent' : ''}`}>
+                              {line || ' '}
+                            </div>
+                          );
+                        })}
                   </code>
                 </pre>
 
