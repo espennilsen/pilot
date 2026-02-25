@@ -69,13 +69,14 @@ linux:
   category: Development
   executableName: pilot
   desktop:
-    Name: Pilot
-    Comment: AI-powered coding agent
-    Terminal: false
-    Categories: Development;IDE;
-    Keywords: coding;ai;agent;
-    MimeType: x-scheme-handler/pilot;
-    StartupWMClass: Pilot
+    entry:
+      Name: Pilot
+      Comment: AI-powered coding agent
+      Terminal: "false"
+      Categories: Development;IDE;
+      Keywords: coding;ai;agent;
+      MimeType: x-scheme-handler/pilot;
+      StartupWMClass: Pilot
   target:
     - target: AppImage
     - target: deb
