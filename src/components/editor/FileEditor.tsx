@@ -30,6 +30,20 @@ function isMarkdownFile(filePath: string | null): boolean {
   return lower.endsWith('.md') || lower.endsWith('.mdx');
 }
 
+/** Resolve a relative path against a base file path */
+function resolveRelativePath(basePath: string, relativePath: string): string {
+  const baseDir = basePath.substring(0, basePath.lastIndexOf('/'));
+  const combined = baseDir + '/' + relativePath;
+  const parts = combined.split('/');
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (part === '.') continue;
+    if (part === '..') { resolved.pop(); continue; }
+    if (part !== '') resolved.push(part);
+  }
+  return (combined.startsWith('/') ? '/' : '') + resolved.join('/');
+}
+
 export default function FileEditor() {
   const activeTabId = useTabStore(s => s.activeTabId);
   const tab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
@@ -210,6 +224,27 @@ export default function FileEditor() {
     }
   }, [filePath]);
 
+  // Handle clicks on links inside the markdown preview (event delegation)
+  const handlePreviewClick = useCallback((e: React.MouseEvent) => {
+    const anchor = (e.target as HTMLElement).closest('a');
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (!href) return;
+
+    // External URLs are handled by markdown.tsx's onClick handler
+    if (href.startsWith('http://') || href.startsWith('https://')) return;
+
+    // Anchor-only links (#section) — no-op
+    const cleanHref = href.split('#')[0];
+    if (!cleanHref) return;
+
+    // Relative file link — resolve and open as a file tab
+    if (filePath) {
+      const resolved = resolveRelativePath(filePath, cleanHref);
+      useTabStore.getState().addFileTab(resolved, tab?.projectPath ?? null);
+    }
+  }, [filePath, tab?.projectPath]);
+
   // Sync textarea scroll with line numbers and highlight overlay
   const handleScroll = useCallback(() => {
     if (textareaRef.current) {
@@ -384,7 +419,7 @@ export default function FileEditor() {
         ) : state.content != null ? (
           state.isPreview ? (
             /* Rendered markdown preview */
-            <div ref={previewRef} className="h-full overflow-auto px-6 py-4">
+            <div ref={previewRef} className="h-full overflow-auto px-6 py-4" onClick={handlePreviewClick}>
               <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
                 {renderMarkdown(state.editContent || '')}
               </div>
