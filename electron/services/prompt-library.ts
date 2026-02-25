@@ -7,7 +7,7 @@
  */
 
 import fs from 'fs/promises';
-import { existsSync, readFileSync, mkdirSync } from 'fs';
+import { existsSync } from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import chokidar from 'chokidar';
@@ -15,18 +15,21 @@ import { PILOT_PROMPTS_DIR } from './pilot-paths';
 import { CommandRegistry } from './command-registry';
 import { getLogger } from './logger';
 import {
-  COMMAND_REGEX,
   parsePromptFile,
   computeHash,
   slugify,
   type ParsedPromptFile,
 } from './prompt-parser';
+import { seedBuiltins } from './prompt-seeder';
+import {
+  computeConflicts,
+  validateCommand as validateCommandHelper,
+  fillTemplate as fillTemplateHelper,
+} from './prompt-helpers';
 
 const log = getLogger('PromptLibrary');
 import type {
   PromptTemplate,
-  PromptVariable,
-  CommandConflict,
   PromptCreateInput,
   PromptUpdateInput,
 } from '../../shared/types';
@@ -58,7 +61,7 @@ export class PromptLibrary {
     this.projectPath = projectPath ?? null;
 
     // Seed built-in prompts on first run
-    await this.seedBuiltins();
+    await this.seedBuiltinsOnce();
 
     // Load all prompts
     await this.reload();
@@ -180,48 +183,9 @@ export class PromptLibrary {
 
   /**
    * Compute command conflicts for all loaded prompts.
-   * Priority: project > user > builtin
    */
   private computeConflicts(): void {
-    const claimedCommands = new Map<string, string>(); // command → prompt id
-
-    // Sort prompts by priority: project > user > builtin
-    const sorted = Array.from(this.prompts.values()).sort((a, b) => {
-      const priority = { project: 0, user: 1, builtin: 2 };
-      return (priority[a.source] ?? 3) - (priority[b.source] ?? 3);
-    });
-
-    for (const prompt of sorted) {
-      prompt.commandConflict = null;
-
-      if (!prompt.command || prompt.hidden) continue;
-
-      // Check system command conflict
-      const systemCmd = CommandRegistry.getSystemCommand(prompt.command);
-      if (systemCmd) {
-        prompt.commandConflict = {
-          type: 'system',
-          reason: `Conflicts with ${systemCmd.owner} (/${prompt.command})`,
-          owner: systemCmd.owner,
-        };
-        continue;
-      }
-
-      // Check duplicate prompt command
-      const existingId = claimedCommands.get(prompt.command);
-      if (existingId) {
-        const existing = this.prompts.get(existingId);
-        prompt.commandConflict = {
-          type: 'duplicate',
-          reason: `/${prompt.command} is already used by ${existing?.title ?? existingId}`,
-          conflictingPromptId: existingId,
-        };
-        continue;
-      }
-
-      // Claim the command
-      claimedCommands.set(prompt.command, prompt.id);
-    }
+    computeConflicts(this.prompts);
   }
 
   // ── Query ───────────────────────────────────────────────────────────
@@ -289,13 +253,7 @@ export class PromptLibrary {
    * Fill template variables. Returns the final prompt text.
    */
   fillTemplate(content: string, values: Record<string, string>): string {
-    let result = content;
-    for (const [key, value] of Object.entries(values)) {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-    }
-    // Remove unfilled optional variables
-    result = result.replace(/\{\{\w+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    return result;
+    return fillTemplateHelper(content, values);
   }
 
   // ── Validation ──────────────────────────────────────────────────────
@@ -307,36 +265,7 @@ export class PromptLibrary {
     command: string,
     excludePromptId?: string
   ): { valid: boolean; error?: string } {
-    if (!command) return { valid: true };
-
-    if (!COMMAND_REGEX.test(command)) {
-      return {
-        valid: false,
-        error: 'Command must be lowercase, 2-20 chars, letters/numbers/hyphens only',
-      };
-    }
-
-    // Check system commands
-    const systemCmd = CommandRegistry.getSystemCommand(command);
-    if (systemCmd) {
-      return {
-        valid: false,
-        error: `/${command} is a system command (${systemCmd.owner})`,
-      };
-    }
-
-    // Check existing prompts
-    for (const prompt of this.prompts.values()) {
-      if (prompt.id === excludePromptId) continue;
-      if (prompt.command === command && !prompt.hidden) {
-        return {
-          valid: false,
-          error: `/${command} is already used by ${prompt.title}`,
-        };
-      }
-    }
-
-    return { valid: true };
+    return validateCommandHelper(command, this.prompts, excludePromptId);
   }
 
   // ── CRUD ────────────────────────────────────────────────────────────
@@ -463,68 +392,12 @@ export class PromptLibrary {
   /**
    * Seed built-in prompts from resources/prompts/ into the global directory.
    */
-  private async seedBuiltins(): Promise<void> {
+  private async seedBuiltinsOnce(): Promise<void> {
     if (this.seeded) return;
     this.seeded = true;
 
     const bundledDir = path.join(__dirname, '../../resources/prompts');
-    if (!existsSync(bundledDir)) return;
-
-    await fs.mkdir(PILOT_PROMPTS_DIR, { recursive: true });
-
-    let bundledFiles: string[];
-    try {
-      bundledFiles = (await fs.readdir(bundledDir)).filter(f => f.endsWith('.md'));
-    } catch {
-      /* Expected: bundled prompts directory may not exist */
-      return;
-    }
-
-    for (const filename of bundledFiles) {
-      const destPath = path.join(PILOT_PROMPTS_DIR, filename);
-      const srcPath = path.join(bundledDir, filename);
-
-      if (!existsSync(destPath)) {
-        // New file — copy and add content hash
-        const content = await fs.readFile(srcPath, 'utf-8');
-        const { data: fm, content: body } = matter(content);
-        fm._contentHash = computeHash(body.trim());
-        const fileContent = matter.stringify(body.trim(), fm);
-        await fs.writeFile(destPath, fileContent, 'utf-8');
-        continue;
-      }
-
-      // File exists — check if we should update
-      try {
-        const srcContent = await fs.readFile(srcPath, 'utf-8');
-        const destContent = await fs.readFile(destPath, 'utf-8');
-
-        const { data: srcFm, content: srcBody } = matter(srcContent);
-        const { data: destFm, content: destBody } = matter(destContent);
-
-        const srcVersion = typeof srcFm.version === 'number' ? srcFm.version : 0;
-        const destVersion = typeof destFm.version === 'number' ? destFm.version : 0;
-
-        if (srcVersion > destVersion) {
-          // Check if user has edited the file
-          const storedHash = destFm._contentHash;
-          const currentHash = computeHash(destBody.trim());
-
-          if (storedHash && storedHash !== currentHash) {
-            // User has edited — don't overwrite
-            continue;
-          }
-
-          // Safe to update
-          const fm = { ...srcFm };
-          fm._contentHash = computeHash(srcBody.trim());
-          const fileContent = matter.stringify(srcBody.trim(), fm);
-          await fs.writeFile(destPath, fileContent, 'utf-8');
-        }
-      } catch (err) {
-        log.debug('Failed to scaffold prompt file', err);
-      }
-    }
+    await seedBuiltins(bundledDir, PILOT_PROMPTS_DIR);
   }
 
   // ── File Watching ───────────────────────────────────────────────────

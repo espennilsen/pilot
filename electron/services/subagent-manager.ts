@@ -1,27 +1,10 @@
-import {
-  createAgentSession,
-  SessionManager,
-  SettingsManager,
-  DefaultResourceLoader,
-  type AgentSessionEvent,
-  type ToolDefinition,
-} from '@mariozechner/pi-coding-agent';
+import type { AgentSessionEvent } from '@mariozechner/pi-coding-agent';
 import { randomUUID } from 'crypto';
-import { extractLastAssistantText } from '../utils/message-utils';
 import { broadcastToRenderer } from '../utils/broadcast';
-import { createSandboxedTools, type SandboxOptions } from './sandboxed-tools';
-import { loadProjectSettings } from './project-settings';
-import { getPiAgentDir } from './app-settings';
-import { ExtensionManager } from './extension-manager';
-import {
-  PILOT_AUTH_FILE,
-  PILOT_MODELS_FILE,
-} from './pilot-paths';
 import { IPC } from '../../shared/ipc';
 import type {
   StagedDiff,
   SubagentRecord,
-  SubagentStatus,
   SubagentSpawnOptions,
   SubagentPoolTask,
   SubagentResult,
@@ -33,11 +16,10 @@ import {
   type PoolInternal,
   DEFAULT_MAX_PER_TAB,
   DEFAULT_MAX_CONCURRENT,
-  DEFAULT_MAX_TURNS,
-  DEFAULT_MAX_TOKENS,
   DEFAULT_TIMEOUT,
   buildPoolResult,
 } from './subagent-helpers';
+import { startSubagentSession } from './subagent-session';
 
 export class SubagentManager {
   private subagents = new Map<string, SubagentInternal>();
@@ -328,18 +310,10 @@ export class SubagentManager {
     sub.status = 'running';
     this.sendSubagentEvent(sub, { type: 'subagent_start', subId, role: sub.role });
 
-    const piAgentDir = getPiAgentDir();
-    const projectSettings = loadProjectSettings(projectPath);
-    const settingsManager = SettingsManager.create(projectPath, piAgentDir);
-
     // Track modified files for conflict detection
     const modifiedFilesSet = new Set<string>();
 
-    const sandboxOptions: SandboxOptions = {
-      jailEnabled: projectSettings.jail.enabled,
-      yoloMode: projectSettings.yoloMode,
-      allowedPaths: options.allowedPaths ?? projectSettings.jail.allowedPaths,
-      tabId: sub.parentTabId,
+    await startSubagentSession(sub, projectPath, options, this.parentSessionManager, {
       onStagedDiff: (diff: StagedDiff) => {
         // Track file modifications
         modifiedFilesSet.add(diff.filePath);
@@ -351,8 +325,6 @@ export class SubagentManager {
           if (ownership) {
             const existingOwner = ownership.get(diff.filePath);
             if (existingOwner && existingOwner !== subId) {
-              // File conflict detected — this will be returned as an error
-              // in the tool result via the sandboxed tools system
               console.warn(
                 `[SubagentManager] File conflict: ${diff.filePath} already modified by ${existingOwner}, blocked for ${subId}`
               );
@@ -369,116 +341,26 @@ export class SubagentManager {
           diff,
         });
       },
-    };
+      onEvent: (event: AgentSessionEvent) => {
+        // Forward select events to parent renderer
+        this.sendSubagentEvent(sub, event);
 
-    // Create tools — full or read-only based on options
-    let customTools: ToolDefinition[];
-    if (options.readOnly) {
-      const { readOnlyTools } = createSandboxedTools(projectPath, sandboxOptions);
-      customTools = readOnlyTools;
-    } else {
-      const { tools, readOnlyTools } = createSandboxedTools(projectPath, sandboxOptions);
-      customTools = [...tools, ...readOnlyTools];
-    }
-
-    // Build system prompt
-    const extensionManager = new ExtensionManager();
-    extensionManager.setProject(projectPath);
-    const enabledExtensions = extensionManager.listExtensions().filter((e) => e.enabled);
-    const enabledSkills = extensionManager.listSkills();
-
-    const systemPromptParts: string[] = [];
-    if (options.systemPrompt) {
-      systemPromptParts.push(options.systemPrompt);
-    }
-    systemPromptParts.push(
-      `You are a subagent with role "${options.role}". Complete the given task thoroughly and report your results clearly.`,
-      `Do not spawn subagents. You are a leaf worker — focus on implementation.`
-    );
-
-    const resourceLoader = new DefaultResourceLoader({
-      cwd: projectPath,
-      agentDir: piAgentDir,
-      settingsManager,
-      noExtensions: true,
-      noSkills: true,
-      additionalExtensionPaths: enabledExtensions.map((e) => e.path),
-      additionalSkillPaths: enabledSkills.map((s) => s.skillMdPath),
-      appendSystemPrompt: systemPromptParts.join('\n\n'),
-    });
-    await resourceLoader.reload();
-
-    // Use in-memory session for subagents (no persistence needed)
-    const sessionMgr = SessionManager.inMemory(projectPath);
-
-    const { session } = await createAgentSession({
-      cwd: projectPath,
-      agentDir: piAgentDir,
-      sessionManager: sessionMgr,
-      authStorage: this.parentSessionManager.getAuthStorage(),
-      modelRegistry: this.parentSessionManager.getModelRegistry(),
-      settingsManager,
-      resourceLoader,
-      tools: [],
-      customTools,
-    });
-
-    sub.session = session;
-
-    // Subscribe to events and track tokens
-    const unsub = session.subscribe((event: AgentSessionEvent) => {
-      // Forward select events to parent renderer
-      this.sendSubagentEvent(sub, event);
-
-      // Track token usage
-      if (event.type === 'turn_end') {
-        const usage = (event as any).usage;
-        if (usage) {
-          sub.tokenUsage.input += usage.inputTokens || 0;
-          sub.tokenUsage.output += usage.outputTokens || 0;
+        // Track token usage
+        if (event.type === 'turn_end') {
+          const usage = (event as any).usage;
+          if (usage) {
+            sub.tokenUsage.input += usage.inputTokens || 0;
+            sub.tokenUsage.output += usage.outputTokens || 0;
+          }
         }
-      }
-
-      // Detect completion
-      if (event.type === 'agent_end') {
-        const resultText = extractLastAssistantText(session.state.messages);
-        this.markCompleted(subId, resultText || '(no output)');
-      }
-    });
-
-    sub.unsub = unsub;
-
-    // Set timeout
-    const timeoutMs = DEFAULT_TIMEOUT;
-    const timeoutTimer = setTimeout(() => {
-      if (sub.status === 'running') {
-        this.abort(subId).catch(() => {});
-        this.markFailed(subId, `Subagent timed out after ${timeoutMs}ms`);
-      }
-    }, timeoutMs);
-
-    // Send the prompt
-    try {
-      await session.prompt(options.prompt);
-    } catch (err: any) {
-      clearTimeout(timeoutTimer);
-      if (sub.status === 'running') {
-        this.markFailed(subId, err.message || String(err));
-      }
-      return;
-    }
-
-    clearTimeout(timeoutTimer);
-
-    // If still running after prompt returns (shouldn't happen normally),
-    // the agent_end event handler above will handle completion.
-    // But as a safety net:
-    if (sub.status === 'running') {
-      const resultText = extractLastAssistantText(session.state.messages);
-      if (resultText) {
+      },
+      onCompleted: (resultText: string) => {
         this.markCompleted(subId, resultText);
-      }
-    }
+      },
+      onFailed: (error: string) => {
+        this.markFailed(subId, error);
+      },
+    }, DEFAULT_TIMEOUT);
   }
 
   // ─── State transitions ────────────────────────────────────────────
