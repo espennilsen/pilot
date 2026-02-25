@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Plus, Edit3, Trash2, Eye, EyeOff, RotateCw, FolderOpen } from 'lucide-react';
 import { usePromptStore } from '../../stores/prompt-store';
 import { useProjectStore } from '../../stores/project-store';
@@ -6,6 +6,21 @@ import PromptEditor from './PromptEditor';
 import type { PromptTemplate } from '../../../shared/types';
 import { IPC } from '../../../shared/ipc';
 import { on } from '../../lib/ipc-client';
+
+/** Display order for categories */
+const CATEGORY_ORDER = ['Code', 'Debug', 'Refactor', 'Explain', 'Writing', 'Custom'];
+
+/** Source priority for sorting within a category (project first) */
+const SOURCE_PRIORITY: Record<string, number> = { project: 0, user: 1, builtin: 2 };
+
+/** Compact source label */
+function sourceLabel(source: string): { text: string; className: string } {
+  switch (source) {
+    case 'project': return { text: 'project', className: 'bg-accent/15 text-accent' };
+    case 'builtin': return { text: 'built-in', className: 'bg-bg-elevated text-text-secondary' };
+    default: return { text: 'custom', className: 'bg-warning/15 text-warning' };
+  }
+}
 
 export default function PromptManagerPanel() {
   const {
@@ -34,16 +49,47 @@ export default function PromptManagerPanel() {
     return unsubscribe;
   }, [loadPrompts]);
 
-  // Organize prompts into sections
-  const projectPrompts = prompts.filter(p => p.source === 'project' && !p.hidden);
-  const globalBuiltIn = prompts.filter(p => p.source === 'builtin' && !p.hidden);
-  const globalCustom = prompts.filter(p => p.source === 'user' && !p.hidden);
-  const hiddenPrompts = prompts.filter(p => p.hidden);
+  // Group visible prompts by category
+  const { categoryGroups, hiddenPrompts } = useMemo(() => {
+    const visible = prompts.filter(p => !p.hidden);
+    const hidden = prompts.filter(p => p.hidden);
+
+    const grouped = new Map<string, PromptTemplate[]>();
+    for (const prompt of visible) {
+      const cat = prompt.category || 'Custom';
+      const list = grouped.get(cat) ?? [];
+      list.push(prompt);
+      grouped.set(cat, list);
+    }
+
+    // Sort within each category: project first, then by title
+    for (const [, list] of grouped) {
+      list.sort((a, b) => {
+        const sp = (SOURCE_PRIORITY[a.source] ?? 9) - (SOURCE_PRIORITY[b.source] ?? 9);
+        if (sp !== 0) return sp;
+        return a.title.localeCompare(b.title);
+      });
+    }
+
+    // Return categories in display order, only those with prompts
+    const ordered: { category: string; prompts: PromptTemplate[] }[] = [];
+    for (const cat of CATEGORY_ORDER) {
+      const list = grouped.get(cat);
+      if (list && list.length > 0) ordered.push({ category: cat, prompts: list });
+    }
+    // Include any extra categories not in CATEGORY_ORDER
+    for (const [cat, list] of grouped) {
+      if (!CATEGORY_ORDER.includes(cat) && list.length > 0) {
+        ordered.push({ category: cat, prompts: list });
+      }
+    }
+
+    return { categoryGroups: ordered, hiddenPrompts: hidden };
+  }, [prompts]);
 
   // Find overrides (by same ID/filename between project and global)
   const getOverrideInfo = (prompt: PromptTemplate) => {
     if (prompt.source === 'project') {
-      // Check if there's a global prompt with the same ID that we override
       const globalMatch = prompts.find(
         p => p.id === prompt.id && p.source !== 'project'
       );
@@ -52,7 +98,6 @@ export default function PromptManagerPanel() {
       }
     }
     if (prompt.source !== 'project') {
-      // Check if there's a project prompt with the same ID that overrides us
       const projectMatch = prompts.find(
         p => p.id === prompt.id && p.source === 'project'
       );
@@ -92,14 +137,11 @@ export default function PromptManagerPanel() {
 
   const handleResetBuiltIns = async () => {
     const hiddenBuiltIns = prompts.filter(p => p.source === 'builtin' && p.hidden);
-    if (hiddenBuiltIns.length === 0) {
-      return;
-    }
-    
+    if (hiddenBuiltIns.length === 0) return;
+
     const confirmed = window.confirm(
       `Unhide ${hiddenBuiltIns.length} built-in prompt(s)?`
     );
-    
     if (confirmed) {
       for (const prompt of hiddenBuiltIns) {
         await unhidePrompt(prompt.id);
@@ -112,6 +154,7 @@ export default function PromptManagerPanel() {
     const hasConflict = !!prompt.commandConflict;
     const isBuiltIn = prompt.source === 'builtin';
     const isUserOrProject = prompt.source === 'user' || prompt.source === 'project';
+    const sl = sourceLabel(prompt.source);
 
     return (
       <div key={prompt.id} className="space-y-1">
@@ -131,11 +174,9 @@ export default function PromptManagerPanel() {
                     /{prompt.command}
                   </code>
                 )}
-                {prompt.category !== 'Custom' && (
-                  <span className="text-xs text-text-secondary">
-                    {prompt.category}
-                  </span>
-                )}
+                <span className={`text-[11px] px-1.5 py-0.5 rounded ${sl.className}`}>
+                  {sl.text}
+                </span>
               </div>
               {prompt.description && (
                 <p className="text-sm text-text-secondary truncate mt-0.5">
@@ -144,7 +185,7 @@ export default function PromptManagerPanel() {
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {isBuiltIn && (
               <>
@@ -184,13 +225,13 @@ export default function PromptManagerPanel() {
             )}
           </div>
         </div>
-        
+
         {overrideInfo && (
           <div className="ml-12 text-xs text-text-secondary">
             {overrideInfo.type === 'overrides' ? (
-              <span>↳ overrides global "{overrideInfo.targetTitle}"</span>
+              <span>↳ overrides global &ldquo;{overrideInfo.targetTitle}&rdquo;</span>
             ) : (
-              <span className="opacity-60">↳ overridden by project "{overrideInfo.targetTitle}"</span>
+              <span className="opacity-60">↳ overridden by project &ldquo;{overrideInfo.targetTitle}&rdquo;</span>
             )}
           </div>
         )}
@@ -228,47 +269,20 @@ export default function PromptManagerPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Project Prompts Section */}
-      {projectPath && projectPrompts.length > 0 && (
-        <div className="bg-bg-surface border border-border rounded-md p-4">
+      {/* Category-grouped prompts */}
+      {categoryGroups.map(({ category, prompts: catPrompts }) => (
+        <div key={category} className="bg-bg-surface border border-border rounded-md p-4">
           <div className="flex items-center gap-2 mb-4">
-            <FolderOpen size={18} className="text-accent" />
-            <h3 className="text-sm font-semibold text-text-primary">
-              Project Prompts
-            </h3>
-            <span className="text-xs text-text-secondary ml-auto">
-              {projectPath.split('/').pop()}
+            <h3 className="text-sm font-semibold text-text-primary">{category}</h3>
+            <span className="text-xs text-text-secondary">
+              {catPrompts.length} {catPrompts.length === 1 ? 'prompt' : 'prompts'}
             </span>
           </div>
           <div className="space-y-2">
-            {projectPrompts.map(renderPromptRow)}
+            {catPrompts.map(renderPromptRow)}
           </div>
         </div>
-      )}
-
-      {/* Global Built-in Section */}
-      {globalBuiltIn.length > 0 && (
-        <div className="bg-bg-surface border border-border rounded-md p-4">
-          <h3 className="text-sm font-semibold text-text-primary mb-4">
-            Global Built-in
-          </h3>
-          <div className="space-y-2">
-            {globalBuiltIn.map(renderPromptRow)}
-          </div>
-        </div>
-      )}
-
-      {/* Global Custom Section */}
-      {globalCustom.length > 0 && (
-        <div className="bg-bg-surface border border-border rounded-md p-4">
-          <h3 className="text-sm font-semibold text-text-primary mb-4">
-            Global Custom
-          </h3>
-          <div className="space-y-2">
-            {globalCustom.map(renderPromptRow)}
-          </div>
-        </div>
-      )}
+      ))}
 
       {/* Hidden Prompts Section */}
       {hiddenPrompts.length > 0 && (
