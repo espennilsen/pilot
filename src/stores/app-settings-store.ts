@@ -50,7 +50,7 @@ interface AppSettingsStore {
  * The real platform-specific path is loaded from the main process via IPC
  * and replaces this default once the app initializes.
  */
-const DEFAULT_PI_AGENT_DIR = '~/.config/.pilot';
+const DEFAULT_PI_AGENT_DIR = '~/.config/pilot';
 
 /**
  * App settings store — manages app-level configuration (terminal, editor, developer mode, keybindings).
@@ -85,12 +85,14 @@ Additional tools:
 - pilot_task_create/update/query/comment: Manage the project task board
 - pilot_show_file: Open a file in the editor with optional line highlighting
 - pilot_open_url: Open a URL in the user's browser (requires confirmation)
+- pilot_web: Open a URL or local HTML file in an in-app web tab (no confirmation needed)
 - pilot_subagent: Delegate work to parallel sub-agents
 - web_fetch: Fetch URLs and call APIs
 
 Guidelines:
 - File edits are staged for user review before being applied to disk
 - Use pilot_show_file to visually point out code when explaining, reviewing, or debugging
+- Use pilot_web to show HTML previews, documentation, or web pages inside the app. Use pilot_open_url when the user needs their full browser (login flows, bookmarking, etc.)
 - Use memory tools to persist useful context across sessions — check existing memories before adding duplicates
 - Keep memories concise: one fact per entry, use categories and appropriate scope (global vs project)`,
     commitMsgModel: '',
