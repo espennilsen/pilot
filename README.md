@@ -124,20 +124,6 @@ All shortcuts are rebindable in Settings → Keybindings.
 
 ---
 
-## Architecture
-
-```
-Renderer (React 19)          ← No Node access, all calls via window.api
-    ↕ Typed IPC (contextBridge)
-Main Process (Electron)      ← Pi SDK, file system, git, PTY, IPC handlers
-    ↕
-Pi Coding Agent SDK          ← Sessions, streaming, tools, auth, persistence
-```
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown.
-
----
-
 ## Documentation
 
 Full documentation lives in [`docs/`](docs/INDEX.md):
