@@ -120,6 +120,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+          path: artifacts
+
+      - name: Remove empty files
+        run: find artifacts -type f -empty -delete
 
       - name: Delete previous nightly release
         run: gh release delete nightly --yes --cleanup-tag || true
@@ -130,8 +134,9 @@ jobs:
         with:
           tag_name: nightly
           name: "Nightly Build (${{ steps.sha.outputs.short }})"
-          files: '**/*'
+          files: artifacts/**/*
           prerelease: true
+          fail_on_unmatched_files: false
           body: |
             Automated nightly build from `main` branch.
             Commit: ${{ github.sha }}
