@@ -18,7 +18,9 @@
 </p>
 
 > [!WARNING]
-> **Pilot is in early development.** Pre-built binaries are not yet available — you'll need to build from source. The app runs on **macOS**, **Windows**, and **Linux**.
+> **Pilot is in early development.** The app runs on **macOS**, **Windows**, and **Linux**.
+>
+> [**Nightly builds**](https://github.com/espennilsen/pilot/releases/tag/nightly) are available for all platforms — use at your own risk. These are unstable, unsigned builds generated automatically from the latest `main` branch.
 
 ---
 
