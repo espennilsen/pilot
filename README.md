@@ -4,10 +4,10 @@
 
 <h1 align="center">Pilot</h1>
 
-<p align="center"><strong>Your cockpit for AI-powered coding.</strong></p>
+<p align="center"><strong>An Integrated Agentic Environment (IAE) for AI-powered coding.</strong></p>
 
 <p align="center">
-  A native desktop GUI for the <a href="https://www.npmjs.com/package/@mariozechner/pi-coding-agent">Pi Coding Agent</a> — chat with an AI agent, review diffs before they touch disk, manage git, run dev commands, coordinate subagents, and track tasks, all from one keyboard-driven app.
+  A native desktop environment for the <a href="https://www.npmjs.com/package/@mariozechner/pi-coding-agent">Pi Coding Agent</a> — chat with an AI agent, review diffs before they touch disk, manage git, run dev commands, coordinate subagents, and track tasks, all from one keyboard-driven app.
 </p>
 
 <p align="center">
