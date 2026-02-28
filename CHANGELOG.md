@@ -2,6 +2,21 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-02-28
+
+### Added
+- **MCP server support** — connect to Model Context Protocol servers via stdio, SSE, and streamable HTTP transports; auto-reconnect with exponential backoff; config file watching for external edits
+- **MCP settings UI** — add/edit/remove/test/restart servers from settings panel; status bar indicator showing connected server count
+- **MCP config** — global (`~/.config/.pilot/mcp.json`) and per-project (`.pilot/mcp.json`) configuration
+- **Test framework** — vitest 4.0 with `test` and `test:watch` scripts; 31 smoke tests covering `paths.ts` utilities, `StagedDiffManager`, and IPC channel integrity
+
+### Changed
+- **Pi SDK** updated from 0.54.1 → 0.55.3
+- **electron-vite** updated from 2.3.0 → 4.0.1 (supports vite 5/6/7)
+- **@vitejs/plugin-react** updated from 4.7.0 → 5.1.4
+- **lucide-react** updated from 0.462.0 → 0.575.0
+- **Patch updates** — electron 40.6.0→40.6.1, tailwindcss 4.2.0→4.2.1, @tailwindcss/vite 4.2.0→4.2.1, autoprefixer 10.4.24→10.4.27, simple-git 3.32.1→3.32.3
+
 ## 2026-02-25
 
 ### Added
