@@ -25,6 +25,8 @@ import { registerPromptsIpc } from '../ipc/prompts';
 import { registerCompanionIpc } from '../ipc/companion';
 import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
+import { registerMcpIpc } from '../ipc/mcp';
+import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
 import { CompanionAuth } from '../services/companion-auth';
@@ -47,6 +49,7 @@ let companionAuth: CompanionAuth | null = null;
 let companionServer: CompanionServer | null = null;
 let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
+let mcpManager: McpManager | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -277,6 +280,8 @@ app.whenReady().then(async () => {
   sessionManager = new PilotSessionManager();
   devService = new DevCommandsService();
   extensionManager = new ExtensionManager();
+  mcpManager = new McpManager();
+  sessionManager.mcpManager = mcpManager;
   terminalService = mainWindow ? new TerminalService(mainWindow) : null;
   
   // Register IPC handlers
@@ -298,6 +303,7 @@ app.whenReady().then(async () => {
   registerMemoryIpc(sessionManager.memoryManager);
   registerTasksIpc(sessionManager.taskManager);
   registerSubagentIpc(sessionManager.subagentManager);
+  registerMcpIpc(mcpManager);
   registerAttachmentIpc();
 
   // Register system commands in the CommandRegistry
@@ -528,6 +534,7 @@ app.on('window-all-closed', () => {
 // Cleanup on quit
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
+  mcpManager?.disposeAll();
   devService?.dispose();
   terminalService?.disposeAll();
   promptLibrary?.dispose();

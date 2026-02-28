@@ -32,6 +32,7 @@ import {
   handlePossibleMemoryCommand,
 } from './pi-session-commands';
 import { extractMemoriesInBackground } from './pi-session-memory';
+import type { McpManager } from './mcp-manager';
 
 export class PilotSessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -46,6 +47,7 @@ export class PilotSessionManager {
   public memoryManager = new MemoryManager();
   public taskManager = new TaskManager();
   public subagentManager: SubagentManager;
+  public mcpManager: McpManager | null = null;
 
   constructor() {
     ensurePilotAppDirs();
@@ -91,12 +93,35 @@ export class PilotSessionManager {
     projectPath: string,
     sessionMgr: SessionManager
   ): Promise<void> {
+    // Start MCP servers for this project/tab (if manager is set).
+    // Use a timeout to prevent slow MCP servers from blocking session creation.
+    if (this.mcpManager) {
+      const MCP_STARTUP_TIMEOUT = 10_000;
+      try {
+        const startResult = await Promise.race([
+          this.mcpManager.startAllForProject(projectPath, tabId).then(() => 'ok' as const),
+          new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), MCP_STARTUP_TIMEOUT)),
+        ]);
+        if (startResult === 'timeout') {
+          console.warn('[SessionManager] MCP server startup timed out — session will proceed without pending servers');
+        }
+      } catch (err) {
+        console.warn('[SessionManager] Failed to start MCP servers:', err);
+      }
+    }
+
+    const mcpToolCount = this.mcpManager?.getToolDefinitions(projectPath).length ?? 0;
+    if (mcpToolCount > 0) {
+      console.log(`[SessionManager] Including ${mcpToolCount} MCP tools in session`);
+    }
+
     const { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions } = await buildSessionConfig({
       tabId,
       projectPath,
       memoryManager: this.memoryManager,
       taskManager: this.taskManager,
       subagentManager: this.subagentManager,
+      mcpManager: this.mcpManager,
       onStagedDiff: (diff: StagedDiff) => {
         this.stagedDiffs.addDiff(diff);
         this.sendToRenderer(IPC.SANDBOX_STAGED_DIFF, { tabId, diff });
@@ -213,6 +238,9 @@ export class PilotSessionManager {
   dispose(tabId: string): void {
     // Clean up subagents for this tab first
     this.subagentManager.cleanup(tabId);
+
+    // Release MCP server references for this tab
+    this.mcpManager?.stopAllForTab(tabId).catch(() => {});
 
     const unsub = this.unsubscribers.get(tabId);
     unsub?.();

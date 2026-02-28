@@ -78,6 +78,42 @@ export interface PilotAppSettings {
   };
 }
 
+// MCP (Model Context Protocol) types
+export type McpTransportType = 'stdio' | 'sse' | 'streamable-http';
+
+export interface McpServerConfig {
+  name: string;
+  transport: McpTransportType;
+  enabled: boolean;
+  // stdio
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  // sse + streamable-http
+  url?: string;
+  headers?: Record<string, string>;
+  // shared
+  env?: Record<string, string>;
+  /** Where this config came from */
+  scope?: 'global' | 'project';
+}
+
+export interface McpServerStatus {
+  name: string;
+  transport: McpTransportType;
+  scope: 'global' | 'project';
+  status: 'connecting' | 'connected' | 'error' | 'disconnected';
+  toolCount: number;
+  error: string | null;
+  enabled: boolean;
+}
+
+export interface McpToolInfo {
+  serverName: string;
+  name: string;
+  description: string;
+}
+
 // Sandbox settings
 export interface ProjectSandboxSettings {
   jail: {

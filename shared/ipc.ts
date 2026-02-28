@@ -207,6 +207,19 @@ export const IPC = {
   COMPANION_REMOTE_ACTIVATION: 'companion:remote-activation',
   COMPANION_TUNNEL_OUTPUT: 'companion:tunnel-output',  // main → renderer (streaming output)
 
+  // MCP Servers
+  MCP_LIST_SERVERS: 'mcp:list-servers',
+  MCP_ADD_SERVER: 'mcp:add-server',
+  MCP_UPDATE_SERVER: 'mcp:update-server',
+  MCP_REMOVE_SERVER: 'mcp:remove-server',
+  MCP_START_SERVER: 'mcp:start-server',
+  MCP_STOP_SERVER: 'mcp:stop-server',
+  MCP_RESTART_SERVER: 'mcp:restart-server',
+  MCP_GET_TOOLS: 'mcp:get-tools',
+  MCP_TEST_SERVER: 'mcp:test-server',
+  MCP_SERVER_STATUS: 'mcp:server-status',     // main → renderer
+  MCP_CONFIG_CHANGED: 'mcp:config-changed',   // main → renderer
+
   // Attachments
   ATTACHMENT_SAVE: 'attachment:save',
 

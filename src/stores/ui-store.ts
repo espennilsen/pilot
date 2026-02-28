@@ -31,6 +31,12 @@ export type SidebarPane = 'sessions' | 'memory' | 'tasks';
 /** Context panel tab type (right sidebar). */
 export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents';
 
+/** Settings panel tab type. */
+export type SettingsTab =
+  | 'general' | 'auth' | 'project' | 'files'
+  | 'companion' | 'system-prompt' | 'prompts' | 'keybindings'
+  | 'extensions' | 'skills' | 'mcp' | 'developer';
+
 interface UIStore {
   sidebarVisible: boolean;
   sidebarPane: SidebarPane;
@@ -40,7 +46,7 @@ interface UIStore {
   sidebarWidth: number;
   contextPanelWidth: number;
   settingsOpen: boolean;
-  settingsTab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt';
+  settingsTab: SettingsTab;
   terminalVisible: boolean;
   terminalHeight: number;
   terminalTabs: { id: string; name: string }[];
@@ -57,9 +63,9 @@ interface UIStore {
   toggleFocusMode: () => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
-  openSettings: (tab?: 'general' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt') => void;
+  openSettings: (tab?: SettingsTab) => void;
   closeSettings: () => void;
-  setSettingsTab: (tab: 'general' | 'auth' | 'project' | 'extensions' | 'skills' | 'developer' | 'keybindings' | 'prompts' | 'companion' | 'system-prompt') => void;
+  setSettingsTab: (tab: SettingsTab) => void;
   toggleTerminal: () => void;
   setTerminalHeight: (height: number) => void;
   addTerminalTab: () => string;

@@ -2,7 +2,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useEffect } from 'react';
 import {
   X, Settings, FolderCog, Puzzle, BookOpen, Terminal, Keyboard,
-  Shield, FolderOpen, KeyRound, FileText, Smartphone, MessageSquareText,
+  Shield, FolderOpen, KeyRound, FileText, Smartphone, MessageSquareText, Plug,
 } from 'lucide-react';
 import { ReopenWelcomeButton } from './settings-helpers';
 import { GeneralSettings } from './sections/GeneralSettings';
@@ -16,6 +16,7 @@ import { ExtensionsSettings } from './sections/ExtensionsSettings';
 import { SkillsSettings } from './sections/SkillsSettings';
 import { DeveloperSettings } from './sections/DeveloperSettings';
 import { SystemPromptSettings } from './sections/SystemPromptSettings';
+import { McpSettings } from './sections/McpSettings';
 
 const TABS = [
   { id: 'general' as const, label: 'General', icon: Settings },
@@ -28,6 +29,7 @@ const TABS = [
   { id: 'keybindings' as const, label: 'Keybindings', icon: Keyboard },
   { id: 'extensions' as const, label: 'Extensions', icon: Puzzle },
   { id: 'skills' as const, label: 'Skills', icon: BookOpen },
+  { id: 'mcp' as const, label: 'MCP Servers', icon: Plug },
   { id: 'developer' as const, label: 'Developer', icon: Terminal },
 ];
 
@@ -110,6 +112,7 @@ export default function SettingsPanel() {
             {settingsTab === 'keybindings' && <KeybindingsSettings />}
             {settingsTab === 'extensions' && <ExtensionsSettings />}
             {settingsTab === 'skills' && <SkillsSettings />}
+            {settingsTab === 'mcp' && <McpSettings />}
             {settingsTab === 'developer' && <DeveloperSettings />}
           </div>
         </div>

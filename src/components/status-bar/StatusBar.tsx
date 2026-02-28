@@ -5,6 +5,8 @@ import { useTabStore } from '../../stores/tab-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useDevCommandStore } from '../../stores/dev-command-store';
+import { useMcpStore } from '../../stores/mcp-store';
+import { useUIStore } from '../../stores/ui-store';
 import { MemoryIndicator } from '../memory/MemoryIndicator';
 
 function formatTokenCount(n: number): string {
@@ -38,6 +40,11 @@ export default function StatusBar() {
 
   const { hasAnyAuth } = useAuthStore();
   const isConnected = hasAnyAuth;
+  const mcpStatuses = useMcpStore(s => s.statuses);
+  const mcpConnected = mcpStatuses.filter(s => s.status === 'connected').length;
+  const mcpErrors = mcpStatuses.filter(s => s.status === 'error').length;
+  const mcpTotal = mcpStatuses.length;
+  const openSettings = useUIStore(s => s.openSettings);
 
   const autoAccepted = activeTabId ? getAutoAcceptedTools(activeTabId) : [];
   const hasRunningDevCommand = Object.values(devCommandStates).some(state => state.status === 'running');
@@ -96,6 +103,18 @@ export default function StatusBar() {
 
       {/* Right side */}
       <div className="flex items-center gap-4">
+        {/* MCP indicator */}
+        {mcpTotal > 0 && (
+          <button
+            onClick={() => openSettings('mcp')}
+            className="flex items-center gap-1.5 hover:text-text-primary transition-colors"
+            title={`MCP: ${mcpConnected}/${mcpTotal} servers connected${mcpErrors > 0 ? ` (${mcpErrors} error${mcpErrors > 1 ? 's' : ''})` : ''}\nClick to manage`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${mcpErrors > 0 ? 'bg-error' : mcpConnected > 0 ? 'bg-success' : 'bg-text-tertiary'}`} />
+            <span className="font-mono">MCP {mcpConnected}/{mcpTotal}</span>
+          </button>
+        )}
+
         {/* Memory indicator */}
         <MemoryIndicator />
 

@@ -25,6 +25,7 @@ import { createWebFetchTool } from './web-fetch-tool';
 import { createMemoryTools } from './memory-tools';
 import { createEditorTools } from './editor-tools';
 import type { StagedDiff } from '../../shared/types';
+import type { McpManager } from './mcp-manager';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ export interface SessionConfigOptions {
   memoryManager: MemoryManager;
   taskManager: TaskManager;
   subagentManager: SubagentManager;
+  mcpManager?: McpManager | null;
   onStagedDiff: (diff: StagedDiff) => void;
 }
 
@@ -58,7 +60,7 @@ export interface SessionConfigOptions {
 export async function buildSessionConfig(
   options: SessionConfigOptions
 ): Promise<SessionConfigResult> {
-  const { tabId, projectPath, memoryManager, taskManager, subagentManager, onStagedDiff } = options;
+  const { tabId, projectPath, memoryManager, taskManager, subagentManager, mcpManager, onStagedDiff } = options;
 
   const projectSettings = loadProjectSettings(projectPath);
   const piAgentDir = getPiAgentDir();
@@ -130,6 +132,11 @@ export async function buildSessionConfig(
 
   const editorTools = createEditorTools(projectPath);
 
+  // Get MCP tools from connected servers
+  const mcpTools = mcpManager
+    ? mcpManager.getToolDefinitions(projectPath)
+    : [];
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
@@ -138,6 +145,7 @@ export async function buildSessionConfig(
     ...editorTools,
     ...subagentTools,
     createWebFetchTool(),
+    ...mcpTools,
   ];
 
   return { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions };
