@@ -9,13 +9,17 @@ import Dockerode from 'dockerode';
 import { BrowserWindow } from 'electron';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { createHash } from 'crypto';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
 import type { DockerSandboxState, DockerSandboxConfig } from '../../shared/types';
 
-/** Docker image name for the sandbox */
+/** Docker image name for the base sandbox */
 const SANDBOX_IMAGE = 'pilot-sandbox:latest';
+
+/** Project-specific image tag prefix — full tag is pilot-sandbox-<hash>:latest */
+const PROJECT_IMAGE_PREFIX = 'pilot-sandbox-project-';
 
 /** Default virtual display resolution */
 const DEFAULT_RESOLUTION = '1280x800x24';
@@ -119,6 +123,7 @@ export class SandboxDockerService {
 
     try {
       await this.ensureImage();
+      const image = await this.ensureProjectImage(projectPath);
 
       const [vncPort, wsPort] = await Promise.all([
         this.findAvailablePort(),
@@ -126,7 +131,7 @@ export class SandboxDockerService {
       ]);
 
       const container = await this.docker.createContainer({
-        Image: SANDBOX_IMAGE,
+        Image: image,
         Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
         Labels: {
           'pilot.sandbox': 'true',
@@ -384,6 +389,57 @@ export class SandboxDockerService {
         else resolve();
       });
     });
+  }
+
+  /**
+   * Build a project-specific image if <project>/.pilot/sandbox.Dockerfile exists.
+   * The Dockerfile should use `FROM pilot-sandbox:latest` as its base.
+   * Returns the image tag to use for the container.
+   */
+  private async ensureProjectImage(projectPath: string): Promise<string> {
+    const dockerfilePath = join(projectPath, '.pilot', 'sandbox.Dockerfile');
+    if (!existsSync(dockerfilePath)) {
+      return SANDBOX_IMAGE;
+    }
+
+    // Stable tag derived from the project path
+    const hash = createHash('sha256').update(projectPath).digest('hex').slice(0, 12);
+    const projectImage = `${PROJECT_IMAGE_PREFIX}${hash}:latest`;
+
+    // Check if we need to rebuild: compare Dockerfile mtime vs image creation time
+    const dockerfileMtime = statSync(dockerfilePath).mtimeMs;
+    let needsBuild = true;
+
+    try {
+      const imageInfo = await this.docker.getImage(projectImage).inspect();
+      const imageCreated = new Date(imageInfo.Created).getTime();
+      if (imageCreated > dockerfileMtime) {
+        needsBuild = false; // Image is newer than Dockerfile — skip rebuild
+      }
+    } catch {
+      // Image doesn't exist — need to build
+    }
+
+    if (!needsBuild) {
+      return projectImage;
+    }
+
+    this.pushEvent(projectPath, { status: 'starting', error: undefined });
+
+    // Build with the project root as context so the Dockerfile can COPY project files
+    const stream = await this.docker.buildImage(
+      { context: projectPath, src: ['.pilot/sandbox.Dockerfile'] },
+      { t: projectImage, dockerfile: '.pilot/sandbox.Dockerfile' },
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      this.docker.modem.followProgress(stream, (err) => {
+        if (err) reject(new Error(`Project sandbox image build failed: ${err.message}`));
+        else resolve();
+      });
+    });
+
+    return projectImage;
   }
 
   /** Find an available TCP port on localhost. */
