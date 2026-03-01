@@ -108,3 +108,4 @@ temp/
 # Pilot App Local Config
 # ========================================
 .pilot/
+.todos/
