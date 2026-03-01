@@ -244,6 +244,9 @@ export class PilotSessionManager {
     // Release MCP server references for this tab
     this.mcpManager?.stopAllForTab(tabId).catch(() => {});
 
+    // Check if this was the last tab for its project — stop sandbox if so
+    const projectPath = this.tabProjectPaths.get(tabId);
+
     const unsub = this.unsubscribers.get(tabId);
     unsub?.();
     this.unsubscribers.delete(tabId);
@@ -256,6 +259,14 @@ export class PilotSessionManager {
     this.tabProjectPaths.delete(tabId);
     this.lastUserMessages.delete(tabId);
     this.tabSandboxOptions.delete(tabId);
+
+    // Stop Docker sandbox when no more tabs reference this project
+    if (projectPath && this.sandboxDockerService) {
+      const stillUsed = [...this.tabProjectPaths.values()].some(p => p === projectPath);
+      if (!stillUsed) {
+        this.sandboxDockerService.stopSandbox(projectPath).catch(() => { /* best effort */ });
+      }
+    }
   }
 
   /**
