@@ -128,6 +128,16 @@ export interface ProjectSandboxSettings {
 }
 
 // Docker sandbox — project-scoped containers with virtual display
+/** Result of the Docker availability check */
+export interface DockerSandboxCheckResult {
+  /** Whether the Docker daemon is running and responsive */
+  available: boolean;
+  /** Human-readable reason when not available */
+  reason?: 'not-installed' | 'not-running' | 'service-init-failed';
+  /** Detail message for the UI */
+  message?: string;
+}
+
 /** Status of a project-scoped Docker sandbox container */
 export interface DockerSandboxState {
   containerId: string;

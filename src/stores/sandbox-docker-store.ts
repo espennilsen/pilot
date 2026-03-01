@@ -2,7 +2,7 @@
  * @file Docker sandbox store — per-project container state and tools toggle.
  */
 import { create } from 'zustand';
-import type { DockerSandboxState } from '../../shared/types';
+import type { DockerSandboxState, DockerSandboxCheckResult } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
@@ -13,6 +13,8 @@ interface SandboxDockerStore {
   toolsEnabledByProject: Record<string, boolean>;
   /** Whether Docker is available on the host (null = not yet checked) */
   isDockerAvailable: boolean | null;
+  /** Human-readable message when Docker is not available */
+  dockerUnavailableMessage: string | null;
   /** Loading states per project */
   loadingByProject: Record<string, boolean>;
   /** Error message (transient) */
@@ -41,18 +43,20 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
   stateByProject: {},
   toolsEnabledByProject: {},
   isDockerAvailable: null,
+  dockerUnavailableMessage: null,
   loadingByProject: {},
   error: null,
 
   checkDockerAvailable: async () => {
     try {
-      const available = await invoke(IPC.DOCKER_SANDBOX_STATUS, '__docker_check__') as DockerSandboxState | null;
-      // If the call doesn't throw, Docker IPC is working.
-      // The actual availability is determined by the service.
-      set({ isDockerAvailable: true });
-      return true;
+      const result = await invoke(IPC.DOCKER_SANDBOX_CHECK) as DockerSandboxCheckResult;
+      set({
+        isDockerAvailable: result.available,
+        dockerUnavailableMessage: result.message ?? null,
+      });
+      return result.available;
     } catch {
-      set({ isDockerAvailable: false });
+      set({ isDockerAvailable: false, dockerUnavailableMessage: null });
       return false;
     }
   },
@@ -104,13 +108,12 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
       if (result) {
         set(state => ({
           stateByProject: { ...state.stateByProject, [projectPath]: result },
-          isDockerAvailable: true,
         }));
       } else {
         // No sandbox for this project — ensure we don't have stale state
         set(state => {
           const { [projectPath]: _, ...rest } = state.stateByProject;
-          return { stateByProject: rest, isDockerAvailable: true };
+          return { stateByProject: rest };
         });
       }
     } catch {
@@ -180,6 +183,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
       stateByProject: {},
       toolsEnabledByProject: {},
       isDockerAvailable: null,
+      dockerUnavailableMessage: null,
       loadingByProject: {},
       error: null,
     });

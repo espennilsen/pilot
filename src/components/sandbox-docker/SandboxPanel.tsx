@@ -11,7 +11,7 @@ import SandboxViewer from './SandboxViewer';
 
 export default function SandboxPanel() {
   const { projectPath } = useProjectStore();
-  const { loadStatus, loadToolsEnabled, isDockerAvailable } = useSandboxDockerStore();
+  const { loadStatus, loadToolsEnabled, checkDockerAvailable, isDockerAvailable, dockerUnavailableMessage } = useSandboxDockerStore();
   const sandboxState = useSandboxDockerStore(
     (s) => projectPath ? s.stateByProject[projectPath] ?? null : null
   );
@@ -19,13 +19,14 @@ export default function SandboxPanel() {
     (s) => projectPath ? s.loadingByProject[projectPath] ?? false : false
   );
 
-  // Load sandbox status when project changes
+  // Check Docker availability and load sandbox status when project changes
   useEffect(() => {
     if (projectPath) {
+      checkDockerAvailable();
       loadStatus(projectPath);
       loadToolsEnabled(projectPath);
     }
-  }, [projectPath, loadStatus, loadToolsEnabled]);
+  }, [projectPath, checkDockerAvailable, loadStatus, loadToolsEnabled]);
 
   // No project selected
   if (!projectPath) {
@@ -45,11 +46,17 @@ export default function SandboxPanel() {
       <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
         <AlertCircle className="w-12 h-12 text-warning" />
         <div className="text-center">
-          <p className="text-sm font-medium text-text-primary mb-1">Docker not found</p>
-          <p className="text-xs text-text-secondary">
-            Install Docker Desktop to use sandboxes.
+          <p className="text-sm font-medium text-text-primary mb-1">Docker not available</p>
+          <p className="text-xs text-text-secondary max-w-xs">
+            {dockerUnavailableMessage ?? 'Install Docker Desktop to use sandboxes.'}
           </p>
         </div>
+        <button
+          onClick={() => checkDockerAvailable()}
+          className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary border border-border rounded hover:bg-bg-surface transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }

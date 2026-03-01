@@ -121,6 +121,7 @@ export const IPC = {
   DEV_SERVER_URL: 'dev:server-url',         // main → renderer (URL detected in output)
 
   // Docker Sandbox
+  DOCKER_SANDBOX_CHECK: 'docker-sandbox:check',
   DOCKER_SANDBOX_START: 'docker-sandbox:start',
   DOCKER_SANDBOX_STOP: 'docker-sandbox:stop',
   DOCKER_SANDBOX_STATUS: 'docker-sandbox:status',
