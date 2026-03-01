@@ -71,6 +71,26 @@ export default function MessageInput({ onSend, onSteer, onFollowUp, onAbort, onS
   const isSlashMode = slashMatch !== null && !isStreaming;
 
   // Load slash commands every time the slash menu opens
+  // Listen for prefill events (e.g. from conflict resolution "Ask Agent" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ text: string }>).detail;
+      if (detail?.text) {
+        setInput(detail.text);
+        // Focus and move cursor to end so user can add comments
+        setTimeout(() => {
+          const ta = textareaRef.current;
+          if (ta) {
+            ta.focus();
+            ta.selectionStart = ta.selectionEnd = ta.value.length;
+          }
+        }, 0);
+      }
+    };
+    window.addEventListener('pilot:prefill-input', handler);
+    return () => window.removeEventListener('pilot:prefill-input', handler);
+  }, []);
+
   useEffect(() => {
     if (isSlashMode && activeTabId && !slashCommandsLoadingRef.current) {
       slashCommandsLoadingRef.current = true;

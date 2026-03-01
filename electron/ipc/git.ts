@@ -131,4 +131,8 @@ export function registerGitIpc() {
   ipcMain.handle(IPC.GIT_SKIP_COMMIT, async (_event, projectPath?: string) => {
     return getGitService(projectPath).skipRebaseCommit();
   });
+
+  ipcMain.handle(IPC.GIT_RESOLVE_CONFLICT_STRATEGY, async (_event, filePath: string, strategy: 'ours' | 'theirs' | 'mark-resolved', projectPath?: string) => {
+    await getGitService(projectPath).resolveConflictWithStrategy(filePath, strategy);
+  });
 }

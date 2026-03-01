@@ -7,13 +7,18 @@ import GitBranches from './GitBranches';
 import GitCommitInput from './GitCommitInput';
 import GitCommitLog from './GitCommitLog';
 import GitStash from './GitStash';
+import GitConflictBanner from './GitConflictBanner';
+import GitConflictsList from './GitConflictsList';
+import type { ConflictFile } from '../../../shared/types';
 
 type GitView = 'status' | 'history' | 'stash';
 
 export default function GitPanel() {
   const { projectPath } = useProjectStore();
-  const { isAvailable, isRepo, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, isLoading, error } = useGitStore();
+  const { isAvailable, isRepo, status, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, loadConflicts, conflictedFiles, isLoading, error } = useGitStore();
   const [currentView, setCurrentView] = useState<GitView>('status');
+
+  const hasConflicts = (status?.operationInProgress != null) || (status?.conflicted?.length ?? 0) > 0;
 
   // Initialize git when project changes
   useEffect(() => {
@@ -22,12 +27,47 @@ export default function GitPanel() {
     }
   }, [projectPath, initGit]);
 
+  // Load conflict details when conflicts are detected
+  useEffect(() => {
+    if (hasConflicts && conflictedFiles.length === 0) {
+      loadConflicts();
+    }
+  }, [hasConflicts, conflictedFiles.length, loadConflicts]);
+
   const handleRefresh = () => {
     refreshStatus();
     refreshBranches();
     if (currentView === 'stash') {
       loadStashes();
     }
+    if (hasConflicts) {
+      loadConflicts();
+    }
+  };
+
+  /** Build a resolution prompt and pre-fill the chat input */
+  const handleAskAgent = (file: ConflictFile) => {
+    const op = status?.operationInProgress;
+    const opDesc = op
+      ? `${op.type} of \`${op.incoming}\` into \`${file.oursRef}\``
+      : 'a git operation';
+
+    const prompt = [
+      `Resolve the merge conflict in \`${file.path}\`.`,
+      '',
+      `This conflict arose from ${opDesc}.`,
+      `The file contains ${file.conflictCount} conflict region${file.conflictCount !== 1 ? 's' : ''}.`,
+      '',
+      'Here is the current file with conflict markers:',
+      '```',
+      file.markerContent,
+      '```',
+      '',
+      'Edit the file to resolve all conflicts and remove all conflict markers (<<<<<<< ======= >>>>>>>).',
+    ].join('\n');
+
+    // Dispatch event for MessageInput to pick up
+    window.dispatchEvent(new CustomEvent('pilot:prefill-input', { detail: { text: prompt } }));
   };
 
   // If no project is selected
@@ -148,9 +188,11 @@ export default function GitPanel() {
       <div className="flex-1 overflow-hidden">
         {currentView === 'status' && (
           <div className="h-full overflow-y-auto p-3 space-y-3">
+            {hasConflicts && <GitConflictBanner />}
+            {hasConflicts && <GitConflictsList onAskAgent={handleAskAgent} />}
             <GitStatus />
             <GitBranches />
-            <GitCommitInput />
+            {!hasConflicts && <GitCommitInput />}
           </div>
         )}
         {currentView === 'history' && <GitCommitLog />}

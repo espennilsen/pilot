@@ -391,6 +391,17 @@ export class GitService {
     await this.git.add([filePath]);
   }
 
+  /** Resolve a conflict by choosing a strategy: keep ours, keep theirs, or just mark resolved. */
+  async resolveConflictWithStrategy(filePath: string, strategy: 'ours' | 'theirs' | 'mark-resolved'): Promise<void> {
+    if (strategy === 'ours') {
+      await this.git.raw(['checkout', '--ours', '--', filePath]);
+    } else if (strategy === 'theirs') {
+      await this.git.raw(['checkout', '--theirs', '--', filePath]);
+    }
+    // All strategies finish with git add to mark as resolved
+    await this.git.add([filePath]);
+  }
+
   /** Skip the current commit during a rebase. */
   async skipRebaseCommit(): Promise<GitOperationResult> {
     try {

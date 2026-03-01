@@ -119,6 +119,7 @@ export const IPC = {
   GIT_CONTINUE_OPERATION: 'git:continue-operation',
   GIT_RESOLVE_FILE: 'git:resolve-file',
   GIT_SKIP_COMMIT: 'git:skip-commit',
+  GIT_RESOLVE_CONFLICT_STRATEGY: 'git:resolve-conflict-strategy',
 
   // Dev commands
   DEV_LOAD_CONFIG: 'dev:load-config',

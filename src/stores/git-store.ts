@@ -53,6 +53,7 @@ interface GitStore {
   revert: (commitHash: string) => Promise<GitOperationResult>;
   loadConflicts: () => Promise<void>;
   resolveFile: (path: string) => Promise<void>;
+  resolveConflictWithStrategy: (path: string, strategy: 'ours' | 'theirs' | 'mark-resolved') => Promise<void>;
   abortOperation: () => Promise<void>;
   continueOperation: () => Promise<GitOperationResult>;
   skipCommit: () => Promise<GitOperationResult>;
@@ -440,6 +441,16 @@ export const useGitStore = create<GitStore>((set, get) => ({
     try {
       await invoke(IPC.GIT_RESOLVE_FILE, path);
       // Remove from local conflict list
+      set({ conflictedFiles: get().conflictedFiles.filter(f => f.path !== path) });
+      await get().refreshStatus();
+    } catch (error) {
+      set({ error: String(error) });
+    }
+  },
+
+  resolveConflictWithStrategy: async (path: string, strategy: 'ours' | 'theirs' | 'mark-resolved') => {
+    try {
+      await invoke(IPC.GIT_RESOLVE_CONFLICT_STRATEGY, path, strategy);
       set({ conflictedFiles: get().conflictedFiles.filter(f => f.path !== path) });
       await get().refreshStatus();
     } catch (error) {
