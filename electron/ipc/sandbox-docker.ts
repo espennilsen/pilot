@@ -3,6 +3,7 @@
  */
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
+import { loadProjectSettings, saveProjectSettings } from '../services/project-settings';
 import type { SandboxDockerService } from '../services/sandbox-docker-service';
 
 export function registerSandboxDockerIpc(service: SandboxDockerService) {
@@ -27,15 +28,12 @@ export function registerSandboxDockerIpc(service: SandboxDockerService) {
   });
 
   ipcMain.handle(IPC.DOCKER_SANDBOX_SET_TOOLS_ENABLED, async (_event, projectPath: string, enabled: boolean) => {
-    // Load project settings, update dockerToolsEnabled, save
-    const { loadProjectSettings, saveProjectSettings } = await import('../services/project-settings');
     const settings = loadProjectSettings(projectPath);
     settings.dockerToolsEnabled = enabled;
     saveProjectSettings(projectPath, settings);
   });
 
   ipcMain.handle(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, async (_event, projectPath: string) => {
-    const { loadProjectSettings } = await import('../services/project-settings');
     const settings = loadProjectSettings(projectPath);
     return settings.dockerToolsEnabled ?? false;
   });
