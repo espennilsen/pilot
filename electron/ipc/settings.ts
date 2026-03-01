@@ -25,6 +25,11 @@ export function registerSettingsIpc(sessionManager?: PilotSessionManager) {
       });
     }
 
+    // Toggle Docker sandbox tools on all live sessions when the global setting changes
+    if ('dockerSandboxEnabled' in updates && sessionManager) {
+      sessionManager.updateDockerToolsGlobally(Boolean(updates.dockerSandboxEnabled));
+    }
+
     return result;
   });
 

@@ -318,7 +318,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error('[DockerSandbox] Failed to initialize service:', err);
   }
-  registerSandboxDockerIpc(sandboxDockerService);
+  registerSandboxDockerIpc(sandboxDockerService, sessionManager);
 
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');
