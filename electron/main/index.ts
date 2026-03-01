@@ -309,11 +309,16 @@ app.whenReady().then(async () => {
   registerMcpIpc(mcpManager);
   registerAttachmentIpc();
 
-  // Docker sandbox
-  sandboxDockerService = new SandboxDockerService();
-  sessionManager.sandboxDockerService = sandboxDockerService;
+  // Docker sandbox — always register IPC handlers so the renderer gets
+  // graceful responses even when Docker is unavailable or init fails.
+  try {
+    sandboxDockerService = new SandboxDockerService();
+    sessionManager.sandboxDockerService = sandboxDockerService;
+    sandboxDockerService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
+  } catch (err) {
+    console.error('[DockerSandbox] Failed to initialize service:', err);
+  }
   registerSandboxDockerIpc(sandboxDockerService);
-  sandboxDockerService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
 
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');
