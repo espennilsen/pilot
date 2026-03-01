@@ -2,7 +2,7 @@
  * @file Git store — manages git operations, status, branches, commits, blame, and diffs.
  */
 import { create } from 'zustand';
-import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions } from '../../shared/types';
+import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions, ConflictFile, GitOperationResult } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
@@ -20,6 +20,10 @@ interface GitStore {
   isLoading: boolean;
   error: string | null;
   currentProjectPath: string | null;
+
+  // Conflict resolution state
+  conflictedFiles: ConflictFile[];
+  isConflictLoading: boolean;
 
   // Actions
   initGit: (projectPath: string) => Promise<void>;
@@ -41,6 +45,17 @@ interface GitStore {
   clearBlame: () => void;
   clearDiff: () => void;
   reset: () => void;
+
+  // Conflict resolution actions
+  merge: (branch: string) => Promise<GitOperationResult>;
+  rebase: (upstream: string) => Promise<GitOperationResult>;
+  cherryPick: (commitHash: string) => Promise<GitOperationResult>;
+  revert: (commitHash: string) => Promise<GitOperationResult>;
+  loadConflicts: () => Promise<void>;
+  resolveFile: (path: string) => Promise<void>;
+  abortOperation: () => Promise<void>;
+  continueOperation: () => Promise<GitOperationResult>;
+  skipCommit: () => Promise<GitOperationResult>;
 }
 
 /**
@@ -60,6 +75,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
   isLoading: false,
   error: null,
   currentProjectPath: null,
+  conflictedFiles: [],
+  isConflictLoading: false,
 
   initGit: async (projectPath: string) => {
     set({ isLoading: true, error: null, currentProjectPath: projectPath });
@@ -338,6 +355,144 @@ export const useGitStore = create<GitStore>((set, get) => ({
       isLoading: false,
       error: null,
       currentProjectPath: null,
+      conflictedFiles: [],
+      isConflictLoading: false,
     });
+  },
+
+  // ── Conflict resolution actions ──────────────────────────────────
+
+  merge: async (branch: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_MERGE, branch) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  rebase: async (upstream: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_REBASE, upstream) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  cherryPick: async (commitHash: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_CHERRY_PICK, commitHash) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  revert: async (commitHash: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_REVERT, commitHash) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  loadConflicts: async () => {
+    set({ isConflictLoading: true });
+    try {
+      const files = await invoke(IPC.GIT_GET_CONFLICTS) as ConflictFile[];
+      set({ conflictedFiles: files, isConflictLoading: false });
+    } catch (error) {
+      set({ error: String(error), isConflictLoading: false });
+    }
+  },
+
+  resolveFile: async (path: string) => {
+    try {
+      await invoke(IPC.GIT_RESOLVE_FILE, path);
+      // Remove from local conflict list
+      set({ conflictedFiles: get().conflictedFiles.filter(f => f.path !== path) });
+      await get().refreshStatus();
+    } catch (error) {
+      set({ error: String(error) });
+    }
+  },
+
+  abortOperation: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await invoke(IPC.GIT_ABORT_OPERATION);
+      set({ conflictedFiles: [], isLoading: false });
+      await get().refreshStatus();
+      await get().refreshBranches();
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+    }
+  },
+
+  continueOperation: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_CONTINUE_OPERATION) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      } else {
+        set({ conflictedFiles: [] });
+      }
+      set({ isLoading: false });
+      await get().refreshBranches();
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  skipCommit: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await invoke(IPC.GIT_SKIP_COMMIT) as GitOperationResult;
+      await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      } else {
+        set({ conflictedFiles: [] });
+      }
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
   },
 }));

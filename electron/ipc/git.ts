@@ -93,4 +93,42 @@ export function registerGitIpc() {
   ipcMain.handle(IPC.GIT_STASH_APPLY, async (_event, stashId: string, projectPath?: string) => {
     await getGitService(projectPath).stashApply(stashId);
   });
+
+  // ── Conflict resolution ────────────────────────────────────────────
+
+  ipcMain.handle(IPC.GIT_MERGE, async (_event, branch: string, projectPath?: string) => {
+    return getGitService(projectPath).merge(branch);
+  });
+
+  ipcMain.handle(IPC.GIT_REBASE, async (_event, upstream: string, projectPath?: string) => {
+    return getGitService(projectPath).rebase(upstream);
+  });
+
+  ipcMain.handle(IPC.GIT_CHERRY_PICK, async (_event, commitHash: string, projectPath?: string) => {
+    return getGitService(projectPath).cherryPick(commitHash);
+  });
+
+  ipcMain.handle(IPC.GIT_REVERT, async (_event, commitHash: string, projectPath?: string) => {
+    return getGitService(projectPath).revert(commitHash);
+  });
+
+  ipcMain.handle(IPC.GIT_GET_CONFLICTS, async (_event, projectPath?: string) => {
+    return getGitService(projectPath).getConflictedFiles();
+  });
+
+  ipcMain.handle(IPC.GIT_ABORT_OPERATION, async (_event, projectPath?: string) => {
+    await getGitService(projectPath).abortOperation();
+  });
+
+  ipcMain.handle(IPC.GIT_CONTINUE_OPERATION, async (_event, projectPath?: string) => {
+    return getGitService(projectPath).continueOperation();
+  });
+
+  ipcMain.handle(IPC.GIT_RESOLVE_FILE, async (_event, filePath: string, projectPath?: string) => {
+    await getGitService(projectPath).resolveFile(filePath);
+  });
+
+  ipcMain.handle(IPC.GIT_SKIP_COMMIT, async (_event, projectPath?: string) => {
+    return getGitService(projectPath).skipRebaseCommit();
+  });
 }
