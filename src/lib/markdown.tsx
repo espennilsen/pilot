@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import CodeBlock from '../components/chat/CodeBlock';
-import { ContextMenu, type MenuEntry } from '../components/shared/ContextMenu';
-import { useTabStore } from '../stores/tab-store';
-import { useProjectStore } from '../stores/project-store';
+import ChatLink from '../components/shared/ChatLink';
 
 interface CodeBlockMatch {
   type: 'code';
@@ -17,16 +15,25 @@ interface TextBlockMatch {
 
 type Block = CodeBlockMatch | TextBlockMatch;
 
-export function renderMarkdown(text: string): React.ReactNode {
-  // Split by code blocks first
+/**
+ * Lightweight Markdown renderer.
+ *
+ * Exported as a proper React component so Vite Fast Refresh can hot-replace
+ * this module without invalidating the entire importer tree.
+ */
+export default function Markdown({ text }: { text: string }) {
   const blocks = parseBlocks(text);
-  
-  return blocks.map((block, index) => {
-    if (block.type === 'code') {
-      return <CodeBlock key={index} language={block.language} code={block.code} />;
-    }
-    return <div key={index}>{renderTextBlock(block.content)}</div>;
-  });
+
+  return (
+    <>
+      {blocks.map((block, index) => {
+        if (block.type === 'code') {
+          return <CodeBlock key={index} language={block.language} code={block.code} />;
+        }
+        return <div key={index}>{renderTextBlock(block.content)}</div>;
+      })}
+    </>
+  );
 }
 
 function parseBlocks(text: string): Block[] {
@@ -267,58 +274,6 @@ function processItalic(text: string, counter: KeyCounter): React.ReactNode[] {
   }
   
   return parts;
-}
-
-/** Handle link clicks — external URLs open in system browser, others are suppressed */
-function handleLinkClick(e: React.MouseEvent<HTMLAnchorElement>, href: string): void {
-  e.preventDefault();
-  if (/^https?:\/\//.test(href)) {
-    window.api.openExternal(href);
-  }
-  // Relative paths and anchors (#) are intentionally no-ops in the markdown preview
-}
-
-function ChatLink({ href, children }: { href: string; children: React.ReactNode }) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    if (/^https?:\/\//.test(href)) {
-      e.preventDefault();
-      setMenu({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const menuItems: MenuEntry[] = [
-    {
-      label: 'Open in Web Tab',
-      action: () => {
-        const projectPath = useProjectStore.getState().projectPath;
-        useTabStore.getState().addWebTab(href, projectPath);
-      },
-    },
-    {
-      label: 'Copy Link',
-      action: () => {
-        navigator.clipboard.writeText(href);
-      },
-    },
-  ];
-
-  return (
-    <>
-      <a
-        href={href}
-        className="text-accent hover:underline cursor-pointer"
-        onClick={(e) => handleLinkClick(e, href)}
-        onContextMenu={handleContextMenu}
-      >
-        {children}
-      </a>
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />
-      )}
-    </>
-  );
 }
 
 function processLinks(text: string, counter: KeyCounter): React.ReactNode[] {

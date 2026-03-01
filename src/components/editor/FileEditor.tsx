@@ -3,7 +3,7 @@ import { Save, Undo2, AlertTriangle, Eye, Pencil, Globe } from 'lucide-react';
 import { useHighlight } from '../../hooks/useHighlight';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
-import { renderMarkdown } from '../../lib/markdown';
+import Markdown from '../../lib/markdown';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on } from '../../lib/ipc-client';
 import { shortcutLabel } from '../../lib/keybindings';
@@ -471,7 +471,7 @@ export default function FileEditor() {
             /* Rendered markdown preview */
             <div ref={previewRef} className="h-full overflow-auto px-6 py-4" onClick={handlePreviewClick}>
               <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
-                {renderMarkdown(state.editContent || '')}
+                <Markdown text={state.editContent || ''} />
               </div>
             </div>
           ) : (
