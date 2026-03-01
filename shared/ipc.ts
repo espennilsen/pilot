@@ -120,6 +120,7 @@ export const IPC = {
   GIT_RESOLVE_FILE: 'git:resolve-file',
   GIT_SKIP_COMMIT: 'git:skip-commit',
   GIT_RESOLVE_CONFLICT_STRATEGY: 'git:resolve-conflict-strategy',
+  GIT_STATUS_CHANGED: 'git:status-changed',                       // main → renderer push
 
   // Dev commands
   DEV_LOAD_CONFIG: 'dev:load-config',
