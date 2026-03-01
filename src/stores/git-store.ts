@@ -247,8 +247,12 @@ export const useGitStore = create<GitStore>((set, get) => ({
   pull: async () => {
     set({ isLoading: true, error: null });
     try {
-      await invoke(IPC.GIT_PULL);
+      const result = await invoke(IPC.GIT_PULL) as GitOperationResult;
       await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -326,9 +330,13 @@ export const useGitStore = create<GitStore>((set, get) => ({
   applyStash: async (stashId: string) => {
     set({ isLoading: true, error: null });
     try {
-      await invoke(IPC.GIT_STASH_APPLY, stashId);
+      const result = await invoke(IPC.GIT_STASH_APPLY, stashId) as GitOperationResult;
       await get().loadStashes();
       await get().refreshStatus();
+      if (!result.success) {
+        await get().loadConflicts();
+      }
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }

@@ -133,11 +133,20 @@ export class GitService {
     }
   }
 
-  async pull(remote = 'origin', branch?: string): Promise<void> {
-    if (branch) {
-      await this.git.pull(remote, branch);
-    } else {
-      await this.git.pull();
+  async pull(remote = 'origin', branch?: string): Promise<GitOperationResult> {
+    try {
+      if (branch) {
+        await this.git.pull(remote, branch);
+      } else {
+        await this.git.pull();
+      }
+      return { success: true, conflicts: [], message: 'Pull completed successfully' };
+    } catch (err: unknown) {
+      const conflicts = await this.getConflictedPaths();
+      if (conflicts.length > 0) {
+        return { success: false, conflicts, message: `Pull produced ${conflicts.length} conflict(s)` };
+      }
+      throw err;
     }
   }
 
@@ -196,8 +205,17 @@ export class GitService {
     }
   }
 
-  async stashApply(stashId: string): Promise<void> {
-    await this.git.stash(['apply', stashId]);
+  async stashApply(stashId: string): Promise<GitOperationResult> {
+    try {
+      await this.git.stash(['apply', stashId]);
+      return { success: true, conflicts: [], message: `Applied stash ${stashId} successfully` };
+    } catch (err: unknown) {
+      const conflicts = await this.getConflictedPaths();
+      if (conflicts.length > 0) {
+        return { success: false, conflicts, message: `Stash apply produced ${conflicts.length} conflict(s)` };
+      }
+      throw err;
+    }
   }
 
   // ── Merge / Rebase / Cherry-pick / Revert ──────────────────────────
