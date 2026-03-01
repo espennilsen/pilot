@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChatMessage, ToolCallInfo } from '../../stores/chat-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
-import { renderMarkdown } from '../../lib/markdown';
+import Markdown from '../../lib/markdown';
 import { attachmentUrl } from '../../lib/attachment-url';
 import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
@@ -106,7 +106,7 @@ function AssistantMessage({ message }: MessageBubbleProps) {
       
       {/* Message content */}
       <div className="text-text-primary prose prose-invert max-w-none">
-        {message.content && renderMarkdown(message.content)}
+        {message.content && <Markdown text={message.content} />}
         {message.isStreaming && <StreamingCursor />}
       </div>
     </div>

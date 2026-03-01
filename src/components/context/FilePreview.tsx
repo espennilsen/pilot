@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { X, ArrowLeft, Save, Undo2, Eye, Pencil } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useHighlight } from '../../hooks/useHighlight';
-import { renderMarkdown } from '../../lib/markdown';
+import Markdown from '../../lib/markdown';
 import { shortcutLabel } from '../../lib/keybindings';
 import 'highlight.js/styles/tokyo-night-dark.css';
 
@@ -242,7 +242,7 @@ export default function FilePreview() {
             /* Rendered markdown preview */
             <div ref={previewRef} className="h-full overflow-auto px-4 py-3">
               <div className="text-text-primary prose prose-invert max-w-none text-sm leading-relaxed">
-                {renderMarkdown(displayContent)}
+                <Markdown text={displayContent} />
               </div>
             </div>
           ) : (
