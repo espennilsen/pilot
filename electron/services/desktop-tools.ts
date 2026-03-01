@@ -1,28 +1,28 @@
 /**
- * @file Agent tool definitions for the Docker sandbox virtual display.
+ * @file Agent tool definitions for the Docker desktop virtual display.
  *
  * 16 tools covering mouse, keyboard, screen, clipboard, and lifecycle control.
- * Each tool calls execInSandbox() with xdotool/scrot/xclip commands.
- * Tools are only included when dockerToolsEnabled is true for the project.
+ * Each tool calls execInDesktop() with xdotool/scrot/xclip commands.
+ * Tools are only included when desktopToolsEnabled is true for the project.
  */
 import { Type } from '@sinclair/typebox';
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
-import type { SandboxDockerService } from './sandbox-docker-service';
+import type { DesktopService } from './desktop-service';
 
-/** Maximum wait time for sandbox_wait tool (seconds) */
+/** Maximum wait time for desktop_wait tool (seconds) */
 const MAX_WAIT_SECONDS = 30;
 
 /**
- * Create all sandbox agent tools for a given project.
+ * Create all desktop agent tools for a given project.
  * Returns an empty array if the service is not provided.
  */
-export function createSandboxDockerTools(
-  service: SandboxDockerService,
+export function createDesktopTools(
+  service: DesktopService,
   projectPath: string,
 ): ToolDefinition[] {
-  /** Helper: exec in sandbox and return text result */
+  /** Helper: exec in desktop and return text result */
   async function exec(cmd: string): Promise<string> {
-    return service.execInSandbox(projectPath, cmd);
+    return service.execInDesktop(projectPath, cmd);
   }
 
   /** Helper: build a simple text response */
@@ -34,9 +34,9 @@ export function createSandboxDockerTools(
     // ── Mouse tools ─────────────────────────────────────────────────
 
     {
-      name: 'sandbox_click',
-      label: 'Sandbox Click',
-      description: 'Left-click at screen coordinates (x, y) in the sandbox virtual display.',
+      name: 'desktop_click',
+      label: 'Desktop Click',
+      description: 'Left-click at screen coordinates (x, y) in the desktop virtual display.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate' }),
         y: Type.Number({ description: 'Y coordinate' }),
@@ -48,9 +48,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_double_click',
-      label: 'Sandbox Double Click',
-      description: 'Double-click at screen coordinates (x, y) in the sandbox virtual display.',
+      name: 'desktop_double_click',
+      label: 'Desktop Double Click',
+      description: 'Double-click at screen coordinates (x, y) in the desktop virtual display.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate' }),
         y: Type.Number({ description: 'Y coordinate' }),
@@ -62,9 +62,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_right_click',
-      label: 'Sandbox Right Click',
-      description: 'Right-click at screen coordinates (x, y) in the sandbox virtual display.',
+      name: 'desktop_right_click',
+      label: 'Desktop Right Click',
+      description: 'Right-click at screen coordinates (x, y) in the desktop virtual display.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate' }),
         y: Type.Number({ description: 'Y coordinate' }),
@@ -76,9 +76,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_middle_click',
-      label: 'Sandbox Middle Click',
-      description: 'Middle-click at screen coordinates (x, y) in the sandbox virtual display.',
+      name: 'desktop_middle_click',
+      label: 'Desktop Middle Click',
+      description: 'Middle-click at screen coordinates (x, y) in the desktop virtual display.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate' }),
         y: Type.Number({ description: 'Y coordinate' }),
@@ -90,8 +90,8 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_hover',
-      label: 'Sandbox Hover',
+      name: 'desktop_hover',
+      label: 'Desktop Hover',
       description: 'Move the mouse cursor to screen coordinates (x, y) without clicking.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate' }),
@@ -104,9 +104,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_drag',
-      label: 'Sandbox Drag',
-      description: 'Click-and-drag from (startX, startY) to (endX, endY) in the sandbox virtual display.',
+      name: 'desktop_drag',
+      label: 'Desktop Drag',
+      description: 'Click-and-drag from (startX, startY) to (endX, endY) in the desktop virtual display.',
       parameters: Type.Object({
         startX: Type.Number({ description: 'Starting X coordinate' }),
         startY: Type.Number({ description: 'Starting Y coordinate' }),
@@ -123,8 +123,8 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_scroll',
-      label: 'Sandbox Scroll',
+      name: 'desktop_scroll',
+      label: 'Desktop Scroll',
       description: 'Scroll at screen coordinates (x, y). Direction: "up", "down", "left", "right". Amount is number of scroll increments.',
       parameters: Type.Object({
         x: Type.Number({ description: 'X coordinate to scroll at' }),
@@ -153,9 +153,9 @@ export function createSandboxDockerTools(
     // ── Keyboard tools ──────────────────────────────────────────────
 
     {
-      name: 'sandbox_type',
-      label: 'Sandbox Type',
-      description: 'Type text string into the focused window in the sandbox. For special keys, use sandbox_key instead.',
+      name: 'desktop_type',
+      label: 'Desktop Type',
+      description: 'Type text string into the focused window in the desktop. For special keys, use desktop_key instead.',
       parameters: Type.Object({
         text: Type.String({ description: 'Text to type' }),
       }),
@@ -169,9 +169,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_key',
-      label: 'Sandbox Key',
-      description: 'Press a key or key combination in the sandbox. Examples: "Return", "ctrl+c", "alt+Tab", "ctrl+shift+t", "Escape", "BackSpace", "Delete", "space".',
+      name: 'desktop_key',
+      label: 'Desktop Key',
+      description: 'Press a key or key combination in the desktop. Examples: "Return", "ctrl+c", "alt+Tab", "ctrl+shift+t", "Escape", "BackSpace", "Delete", "space".',
       parameters: Type.Object({
         keys: Type.String({ description: 'Key or key combo (e.g. "ctrl+c", "Return", "alt+F4")' }),
       }),
@@ -184,12 +184,12 @@ export function createSandboxDockerTools(
     // ── Screen tools ────────────────────────────────────────────────
 
     {
-      name: 'sandbox_screenshot',
-      label: 'Sandbox Screenshot',
-      description: 'Take a screenshot of the sandbox virtual display. Returns a PNG image you can analyze to determine coordinates for clicking, reading text, etc.',
+      name: 'desktop_screenshot',
+      label: 'Desktop Screenshot',
+      description: 'Take a screenshot of the desktop virtual display. Returns a PNG image you can analyze to determine coordinates for clicking, reading text, etc.',
       parameters: Type.Object({}),
       async execute() {
-        const base64 = await service.screenshotSandbox(projectPath);
+        const base64 = await service.screenshotDesktop(projectPath);
         return {
           content: [{
             type: 'image' as const,
@@ -204,9 +204,9 @@ export function createSandboxDockerTools(
     // ── Clipboard tools ─────────────────────────────────────────────
 
     {
-      name: 'sandbox_clipboard_get',
-      label: 'Sandbox Clipboard Get',
-      description: 'Read the current clipboard contents in the sandbox.',
+      name: 'desktop_clipboard_get',
+      label: 'Desktop Clipboard Get',
+      description: 'Read the current clipboard contents in the desktop.',
       parameters: Type.Object({}),
       async execute() {
         const text = await exec('xclip -selection clipboard -o 2>/dev/null || echo ""');
@@ -215,9 +215,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_clipboard_set',
-      label: 'Sandbox Clipboard Set',
-      description: 'Set the clipboard contents in the sandbox.',
+      name: 'desktop_clipboard_set',
+      label: 'Desktop Clipboard Set',
+      description: 'Set the clipboard contents in the desktop.',
       parameters: Type.Object({
         text: Type.String({ description: 'Text to copy to clipboard' }),
       }),
@@ -231,33 +231,33 @@ export function createSandboxDockerTools(
     // ── Lifecycle tools ─────────────────────────────────────────────
 
     {
-      name: 'sandbox_start',
-      label: 'Sandbox Start',
-      description: 'Start the sandbox virtual display for this project. Must be called before using other sandbox tools. Returns connection info.',
+      name: 'desktop_start',
+      label: 'Desktop Start',
+      description: 'Start the desktop virtual display for this project. Must be called before using other desktop tools. Returns connection info.',
       parameters: Type.Object({}),
       async execute() {
-        const state = await service.startSandbox(projectPath);
+        const state = await service.startDesktop(projectPath);
         return textResult(
-          `Sandbox started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
+          `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
           `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true`
         );
       },
     },
 
     {
-      name: 'sandbox_stop',
-      label: 'Sandbox Stop',
-      description: 'Stop the sandbox virtual display for this project.',
+      name: 'desktop_stop',
+      label: 'Desktop Stop',
+      description: 'Stop the desktop virtual display for this project.',
       parameters: Type.Object({}),
       async execute() {
-        await service.stopSandbox(projectPath);
-        return textResult('Sandbox stopped');
+        await service.stopDesktop(projectPath);
+        return textResult('Desktop stopped');
       },
     },
 
     {
-      name: 'sandbox_wait',
-      label: 'Sandbox Wait',
+      name: 'desktop_wait',
+      label: 'Desktop Wait',
       description: `Wait for a specified number of seconds (max ${MAX_WAIT_SECONDS}). Useful to let animations, page loads, or other async operations complete before taking a screenshot.`,
       parameters: Type.Object({
         seconds: Type.Number({ description: `Seconds to wait (max ${MAX_WAIT_SECONDS})` }),
@@ -270,9 +270,9 @@ export function createSandboxDockerTools(
     },
 
     {
-      name: 'sandbox_open_browser',
-      label: 'Sandbox Open Browser',
-      description: 'Open a URL in a browser inside the sandbox. Launches Chromium by default. The browser runs in the virtual display — use sandbox_screenshot to see the page.',
+      name: 'desktop_open_browser',
+      label: 'Desktop Open Browser',
+      description: 'Open a URL in a browser inside the desktop. Launches Chromium by default. The browser runs in the virtual display — use desktop_screenshot to see the page.',
       parameters: Type.Object({
         url: Type.String({ description: 'URL to open (e.g. "https://example.com" or "http://localhost:3000")' }),
         browser: Type.Optional(Type.Union([
@@ -299,14 +299,14 @@ export function createSandboxDockerTools(
           await new Promise(resolve => setTimeout(resolve, wait * 1000));
         }
 
-        return textResult(`Opened ${url} in ${browser}. Use sandbox_screenshot to see the page.`);
+        return textResult(`Opened ${url} in ${browser}. Use desktop_screenshot to see the page.`);
       },
     },
 
     {
-      name: 'sandbox_exec',
-      label: 'Sandbox Exec',
-      description: 'Run an arbitrary shell command inside the sandbox container. Returns stdout and stderr. Use for installing packages, running scripts, launching applications, etc.',
+      name: 'desktop_exec',
+      label: 'Desktop Exec',
+      description: 'Run an arbitrary shell command inside the desktop container. Returns stdout and stderr. Use for installing packages, running scripts, launching applications, etc.',
       parameters: Type.Object({
         command: Type.String({ description: 'Shell command to execute' }),
       }),

@@ -16,7 +16,7 @@ interface AppSettingsStore {
   autoStartDevServer: boolean;
   keybindOverrides: Record<string, string | null>;
   hiddenPaths: string[];
-  dockerSandboxEnabled: boolean;
+  desktopEnabled: boolean;
   systemPrompt: string;
   commitMsgModel: string;
   commitMsgMaxTokens: number;
@@ -37,7 +37,7 @@ interface AppSettingsStore {
   setDeveloperMode: (enabled: boolean) => Promise<void>;
   setAutoStartDevServer: (enabled: boolean) => Promise<void>;
   setHiddenPaths: (paths: string[]) => Promise<void>;
-  setDockerSandboxEnabled: (enabled: boolean) => Promise<void>;
+  setDesktopEnabled: (enabled: boolean) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   setKeybindOverride: (id: string, combo: string | null) => Promise<void>;
   clearKeybindOverride: (id: string) => Promise<void>;
@@ -78,7 +78,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     autoStartDevServer: false,
     keybindOverrides: {},
     hiddenPaths: [],
-    dockerSandboxEnabled: false,
+    desktopEnabled: false,
     systemPrompt: `You are Pilot, an AI agent.
 
 Additional tools:
@@ -124,7 +124,7 @@ Guidelines:
         autoStartDevServer: settings.autoStartDevServer ?? false,
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
-        dockerSandboxEnabled: settings.dockerSandboxEnabled ?? false,
+        desktopEnabled: settings.desktopEnabled ?? false,
         systemPrompt: settings.systemPrompt ?? '',
         commitMsgModel: settings.commitMsgModel ?? '',
         commitMsgMaxTokens: settings.commitMsgMaxTokens ?? 4096,
@@ -156,7 +156,7 @@ Guidelines:
         autoStartDevServer: updated.autoStartDevServer ?? false,
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
-        dockerSandboxEnabled: updated.dockerSandboxEnabled ?? false,
+        desktopEnabled: updated.desktopEnabled ?? false,
         systemPrompt: updated.systemPrompt ?? '',
         commitMsgModel: updated.commitMsgModel ?? '',
         commitMsgMaxTokens: updated.commitMsgMaxTokens ?? 4096,
@@ -182,7 +182,7 @@ Guidelines:
     setDeveloperMode: async (enabled: boolean) => updateSetting({ developerMode: enabled }, true),
     setAutoStartDevServer: async (enabled: boolean) => updateSetting({ autoStartDevServer: enabled }, true),
     setHiddenPaths: async (paths: string[]) => updateSetting({ hiddenPaths: paths }, true),
-    setDockerSandboxEnabled: async (enabled: boolean) => updateSetting({ dockerSandboxEnabled: enabled }, true),
+    setDesktopEnabled: async (enabled: boolean) => updateSetting({ desktopEnabled: enabled }, true),
     completeOnboarding: async () => updateSetting({ onboardingComplete: true }),
     setKeybindOverride: async (id: string, combo: string | null) => {
       const overrides = { ...get().keybindOverrides, [id]: combo };

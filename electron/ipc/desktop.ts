@@ -4,12 +4,12 @@
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { loadProjectSettings, saveProjectSettings } from '../services/project-settings';
-import type { SandboxDockerService } from '../services/sandbox-docker-service';
+import type { DesktopService } from '../services/desktop-service';
 import type { PilotSessionManager } from '../services/pi-session-manager';
-import type { DockerSandboxCheckResult } from '../../shared/types';
+import type { DesktopCheckResult } from '../../shared/types';
 
-export function registerSandboxDockerIpc(service: SandboxDockerService | null, sessionManager?: PilotSessionManager) {
-  ipcMain.handle(IPC.DOCKER_SANDBOX_CHECK, async (): Promise<DockerSandboxCheckResult> => {
+export function registerDesktopIpc(service: DesktopService | null, sessionManager?: PilotSessionManager) {
+  ipcMain.handle(IPC.DESKTOP_CHECK, async (): Promise<DesktopCheckResult> => {
     if (!service) {
       return {
         available: false,
@@ -36,44 +36,44 @@ export function registerSandboxDockerIpc(service: SandboxDockerService | null, s
     }
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_START, async (_event, projectPath: string) => {
+  ipcMain.handle(IPC.DESKTOP_START, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
     return service.startSandbox(projectPath);
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_STOP, async (_event, projectPath: string) => {
+  ipcMain.handle(IPC.DESKTOP_STOP, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
     await service.stopSandbox(projectPath);
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_STATUS, async (_event, projectPath: string) => {
+  ipcMain.handle(IPC.DESKTOP_STATUS, async (_event, projectPath: string) => {
     if (!service) return null;
     return service.getSandboxStatus(projectPath);
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_EXEC, async (_event, projectPath: string, command: string) => {
+  ipcMain.handle(IPC.DESKTOP_EXEC, async (_event, projectPath: string, command: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
     return service.execInSandbox(projectPath, command);
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_SCREENSHOT, async (_event, projectPath: string) => {
+  ipcMain.handle(IPC.DESKTOP_SCREENSHOT, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
     return service.screenshotSandbox(projectPath);
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_SET_TOOLS_ENABLED, async (_event, projectPath: string, enabled: boolean) => {
+  ipcMain.handle(IPC.DESKTOP_SET_TOOLS_ENABLED, async (_event, projectPath: string, enabled: boolean) => {
     const settings = loadProjectSettings(projectPath);
-    settings.dockerToolsEnabled = enabled;
+    settings.desktopToolsEnabled = enabled;
     saveProjectSettings(projectPath, settings);
 
     // Update live sessions for this project
     if (sessionManager) {
-      sessionManager.updateDockerToolsForProject(projectPath, enabled);
+      sessionManager.updateDesktopToolsForProject(projectPath, enabled);
     }
   });
 
-  ipcMain.handle(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, async (_event, projectPath: string) => {
+  ipcMain.handle(IPC.DESKTOP_GET_TOOLS_ENABLED, async (_event, projectPath: string) => {
     const settings = loadProjectSettings(projectPath);
-    return settings.dockerToolsEnabled ?? null;
+    return settings.desktopToolsEnabled ?? null;
   });
 }

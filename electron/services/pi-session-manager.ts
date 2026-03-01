@@ -33,7 +33,7 @@ import {
 } from './pi-session-commands';
 import { extractMemoriesInBackground } from './pi-session-memory';
 import type { McpManager } from './mcp-manager';
-import { createSandboxDockerTools } from './sandbox-docker-tools';
+import { createDesktopTools } from './desktop-tools';
 import { loadProjectSettings } from './project-settings';
 
 export class PilotSessionManager {
@@ -50,7 +50,7 @@ export class PilotSessionManager {
   public taskManager = new TaskManager();
   public subagentManager: SubagentManager;
   public mcpManager: McpManager | null = null;
-  public sandboxDockerService: import('./sandbox-docker-service').SandboxDockerService | null = null;
+  public desktopService: import('./desktop-service').DesktopService | null = null;
 
   constructor() {
     ensurePilotAppDirs();
@@ -125,7 +125,7 @@ export class PilotSessionManager {
       taskManager: this.taskManager,
       subagentManager: this.subagentManager,
       mcpManager: this.mcpManager,
-      sandboxDockerService: this.sandboxDockerService,
+      desktopService: this.desktopService,
       onStagedDiff: (diff: StagedDiff) => {
         this.stagedDiffs.addDiff(diff);
         this.sendToRenderer(IPC.SANDBOX_STAGED_DIFF, { tabId, diff });
@@ -263,10 +263,10 @@ export class PilotSessionManager {
     this.tabSandboxOptions.delete(tabId);
 
     // Stop Docker sandbox when no more tabs reference this project
-    if (projectPath && this.sandboxDockerService) {
+    if (projectPath && this.desktopService) {
       const stillUsed = [...this.tabProjectPaths.values()].some(p => p === projectPath);
       if (!stillUsed) {
-        this.sandboxDockerService.stopSandbox(projectPath).catch(() => { /* best effort */ });
+        this.desktopService.stopSandbox(projectPath).catch(() => { /* best effort */ });
       }
     }
   }
@@ -298,7 +298,7 @@ export class PilotSessionManager {
    * Accesses the private _toolRegistry on AgentSession (a Map<string, ToolDefinition>)
    * to inject/remove tools at runtime, then calls setActiveToolsByName to apply.
    */
-  updateDockerTools(tabId: string, enabled: boolean): void {
+  updateDesktopTools(tabId: string, enabled: boolean): void {
     const session = this.sessions.get(tabId);
     if (!session) return;
 
@@ -309,19 +309,19 @@ export class PilotSessionManager {
     const registry = (session as any)._toolRegistry as Map<string, any> | undefined;
     if (!registry) return;
 
-    const SANDBOX_TOOL_PREFIX = 'sandbox_';
-    const hasSandboxTools = [...registry.keys()].some(name => name.startsWith(SANDBOX_TOOL_PREFIX));
+    const DESKTOP_TOOL_PREFIX = 'desktop_';
+    const hasDesktopTools = [...registry.keys()].some(name => name.startsWith(DESKTOP_TOOL_PREFIX));
 
-    if (enabled && !hasSandboxTools && this.sandboxDockerService) {
+    if (enabled && !hasDesktopTools && this.desktopService) {
       // Inject sandbox tools into the registry
-      const tools = createSandboxDockerTools(this.sandboxDockerService, projectPath);
+      const tools = createDesktopTools(this.desktopService, projectPath);
       for (const tool of tools) {
         registry.set(tool.name, tool);
       }
-    } else if (!enabled && hasSandboxTools) {
+    } else if (!enabled && hasDesktopTools) {
       // Remove sandbox tools from the registry
       for (const name of [...registry.keys()]) {
-        if (name.startsWith(SANDBOX_TOOL_PREFIX)) {
+        if (name.startsWith(DESKTOP_TOOL_PREFIX)) {
           registry.delete(name);
         }
       }
@@ -335,10 +335,10 @@ export class PilotSessionManager {
   /**
    * Update Docker sandbox tools on all live sessions for a project.
    */
-  updateDockerToolsForProject(projectPath: string, enabled: boolean): void {
+  updateDesktopToolsForProject(projectPath: string, enabled: boolean): void {
     for (const [tabId, pp] of this.tabProjectPaths) {
       if (pp === projectPath) {
-        this.updateDockerTools(tabId, enabled);
+        this.updateDesktopTools(tabId, enabled);
       }
     }
   }
@@ -346,12 +346,12 @@ export class PilotSessionManager {
   /**
    * Update Docker sandbox tools on ALL live sessions (for global setting change).
    */
-  updateDockerToolsGlobally(enabled: boolean): void {
+  updateDesktopToolsGlobally(enabled: boolean): void {
     for (const [tabId, projectPath] of this.tabProjectPaths) {
       // Skip tabs that have an explicit per-project override
       const projectSettings = loadProjectSettings(projectPath);
-      if (projectSettings.dockerToolsEnabled !== undefined) continue;
-      this.updateDockerTools(tabId, enabled);
+      if (projectSettings.desktopToolsEnabled !== undefined) continue;
+      this.updateDesktopTools(tabId, enabled);
     }
   }
 

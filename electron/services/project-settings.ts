@@ -24,7 +24,7 @@ export function loadProjectSettings(projectPath: string): ProjectSandboxSettings
         allowedPaths: parsed.jail?.allowedPaths ?? DEFAULT_SETTINGS.jail.allowedPaths,
       },
       yoloMode: parsed.yoloMode ?? DEFAULT_SETTINGS.yoloMode,
-      dockerToolsEnabled: parsed.dockerToolsEnabled ?? undefined,
+      desktopToolsEnabled: parsed.desktopToolsEnabled ?? undefined,
     };
   } catch {
     /* Expected: settings.json may not exist for project */
@@ -50,7 +50,7 @@ export function saveProjectSettings(projectPath: string, settings: ProjectSandbo
     ...existing,
     jail: settings.jail,
     yoloMode: settings.yoloMode,
-    ...(settings.dockerToolsEnabled != null ? { dockerToolsEnabled: settings.dockerToolsEnabled } : {}),
+    ...(settings.desktopToolsEnabled != null ? { desktopToolsEnabled: settings.desktopToolsEnabled } : {}),
   };
 
   writeFileSync(settingsPath, JSON.stringify(merged, null, 2));

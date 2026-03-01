@@ -1,7 +1,7 @@
 /**
- * @file Docker sandbox service — manages project-scoped containers with virtual display.
+ * @file Docker desktop service — manages project-scoped containers with virtual display.
  *
- * Each sandbox is a Docker container running Xvfb + fluxbox + x11vnc + noVNC,
+ * Each desktop is a Docker container running Xvfb + fluxbox + x11vnc + noVNC,
  * keyed by projectPath. The agent can control the virtual display via xdotool,
  * take screenshots via scrot, and interact with the clipboard via xclip.
  */
@@ -13,13 +13,13 @@ import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync
 import { createHash } from 'crypto';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
-import type { DockerSandboxState, DockerSandboxConfig } from '../../shared/types';
+import type { DesktopState, DesktopConfig } from '../../shared/types';
 
-/** Docker image name for the base sandbox */
-const SANDBOX_IMAGE = 'pilot-sandbox:latest';
+/** Docker image name for the base desktop */
+const SANDBOX_IMAGE = 'pilot-desktop:latest';
 
-/** Project-specific image tag prefix — full tag is pilot-sandbox-<hash>:latest */
-const PROJECT_IMAGE_PREFIX = 'pilot-sandbox-project-';
+/** Project-specific image tag prefix — full tag is pilot-desktop-<hash>:latest */
+const PROJECT_IMAGE_PREFIX = 'pilot-desktop-project-';
 
 /** Default virtual display resolution */
 const DEFAULT_RESOLUTION = '1280x800x24';
@@ -91,9 +91,9 @@ function resolveDockerOptions(): Dockerode.DockerOptions {
   return {};
 }
 
-export class SandboxDockerService {
+export class DesktopService {
   private docker: Dockerode;
-  private sandboxes = new Map<string, DockerSandboxState>();
+  private desktops = new Map<string, DesktopState>();
 
   constructor() {
     this.docker = new Dockerode(resolveDockerOptions());
@@ -111,10 +111,10 @@ export class SandboxDockerService {
     }
   }
 
-  /** Start a sandbox container for a project. Returns the sandbox state. */
-  async startSandbox(projectPath: string): Promise<DockerSandboxState> {
+  /** Start a desktop container for a project. Returns the desktop state. */
+  async startDesktop(projectPath: string): Promise<DesktopState> {
     // Already running? Return existing state.
-    const existing = this.sandboxes.get(projectPath);
+    const existing = this.desktops.get(projectPath);
     if (existing && (existing.status === 'running' || existing.status === 'starting')) {
       return existing;
     }
@@ -134,7 +134,7 @@ export class SandboxDockerService {
         Image: image,
         Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
         Labels: {
-          'pilot.sandbox': 'true',
+          'pilot.desktop': 'true',
           'pilot.project': projectPath,
         },
         ExposedPorts: { '5900/tcp': {}, '6080/tcp': {} },
@@ -151,27 +151,27 @@ export class SandboxDockerService {
 
       await container.start();
 
-      const state: DockerSandboxState = {
+      const state: DesktopState = {
         containerId: container.id,
         wsPort,
         vncPort,
         status: 'starting',
         createdAt: Date.now(),
       };
-      this.sandboxes.set(projectPath, state);
+      this.desktops.set(projectPath, state);
 
       // Wait for noVNC to be ready
       await this.waitForReady(wsPort);
 
       state.status = 'running';
-      this.sandboxes.set(projectPath, { ...state });
+      this.desktops.set(projectPath, { ...state });
       this.persistConfig(projectPath, state);
       this.pushEvent(projectPath, state);
 
       return { ...state };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const errorState: DockerSandboxState = {
+      const errorState: DesktopState = {
         containerId: '',
         wsPort: 0,
         vncPort: 0,
@@ -179,15 +179,15 @@ export class SandboxDockerService {
         createdAt: Date.now(),
         error: errorMsg,
       };
-      this.sandboxes.set(projectPath, errorState);
+      this.desktops.set(projectPath, errorState);
       this.pushEvent(projectPath, errorState);
       throw err;
     }
   }
 
-  /** Stop and remove the sandbox container for a project. */
-  async stopSandbox(projectPath: string): Promise<void> {
-    const state = this.sandboxes.get(projectPath);
+  /** Stop and remove the desktop container for a project. */
+  async stopDesktop(projectPath: string): Promise<void> {
+    const state = this.desktops.get(projectPath);
     if (!state || !state.containerId) return;
 
     this.pushEvent(projectPath, { ...state, status: 'stopping' });
@@ -200,7 +200,7 @@ export class SandboxDockerService {
       // Best effort — container might be gone already
     }
 
-    this.sandboxes.delete(projectPath);
+    this.desktops.delete(projectPath);
     this.removePersisted(projectPath);
     this.pushEvent(projectPath, {
       containerId: '',
@@ -211,9 +211,9 @@ export class SandboxDockerService {
     });
   }
 
-  /** Get current sandbox status for a project. Returns null if no sandbox. */
-  async getSandboxStatus(projectPath: string): Promise<DockerSandboxState | null> {
-    const cached = this.sandboxes.get(projectPath);
+  /** Get current desktop status for a project. Returns null if no desktop. */
+  async getDesktopStatus(projectPath: string): Promise<DesktopState | null> {
+    const cached = this.desktops.get(projectPath);
     if (cached) return { ...cached };
 
     // Check persisted config
@@ -225,14 +225,14 @@ export class SandboxDockerService {
       const container = this.docker.getContainer(config.containerId);
       const info = await container.inspect();
       if (info.State.Running) {
-        const state: DockerSandboxState = {
+        const state: DesktopState = {
           containerId: config.containerId,
           wsPort: config.wsPort,
           vncPort: config.vncPort,
           status: 'running',
           createdAt: config.createdAt,
         };
-        this.sandboxes.set(projectPath, state);
+        this.desktops.set(projectPath, state);
         return state;
       }
     } catch {
@@ -243,11 +243,11 @@ export class SandboxDockerService {
     return null;
   }
 
-  /** Execute a command inside the sandbox container. Returns stdout. */
-  async execInSandbox(projectPath: string, command: string): Promise<string> {
-    const state = this.sandboxes.get(projectPath);
+  /** Execute a command inside the desktop container. Returns stdout. */
+  async execInDesktop(projectPath: string, command: string): Promise<string> {
+    const state = this.desktops.get(projectPath);
     if (!state || state.status !== 'running') {
-      throw new Error('No running sandbox for this project');
+      throw new Error('No running desktop for this project');
     }
 
     const container = this.docker.getContainer(state.containerId);
@@ -263,14 +263,14 @@ export class SandboxDockerService {
   }
 
   /** Take a screenshot of the virtual display. Returns base64-encoded PNG. */
-  async screenshotSandbox(projectPath: string): Promise<string> {
-    const state = this.sandboxes.get(projectPath);
+  async screenshotDesktop(projectPath: string): Promise<string> {
+    const state = this.desktops.get(projectPath);
     if (!state || state.status !== 'running') {
-      throw new Error('No running sandbox for this project');
+      throw new Error('No running desktop for this project');
     }
 
     // Capture screenshot inside container
-    await this.execInSandbox(projectPath, 'DISPLAY=:99 scrot -o /tmp/screen.png');
+    await this.execInDesktop(projectPath, 'DISPLAY=:99 scrot -o /tmp/screen.png');
 
     // Read the file out via tar archive
     const container = this.docker.getContainer(state.containerId);
@@ -301,15 +301,15 @@ export class SandboxDockerService {
     return pngBuffer.toString('base64');
   }
 
-  /** Reconcile persisted sandbox configs on app startup. */
+  /** Reconcile persisted desktop configs on app startup. */
   async reconcileOnStartup(): Promise<void> {
     if (!(await this.isDockerAvailable())) return;
 
-    // Find all running pilot-sandbox containers
+    // Find all running pilot-desktop containers
     try {
       const containers = await this.docker.listContainers({
         all: true,
-        filters: { label: ['pilot.sandbox=true'] },
+        filters: { label: ['pilot.desktop=true'] },
       });
 
       for (const containerInfo of containers) {
@@ -322,14 +322,14 @@ export class SandboxDockerService {
           const vncMapping = ports.find(p => p.PrivatePort === 5900);
           const wsMapping = ports.find(p => p.PrivatePort === 6080);
 
-          const state: DockerSandboxState = {
+          const state: DesktopState = {
             containerId: containerInfo.Id,
             wsPort: wsMapping?.PublicPort ?? 0,
             vncPort: vncMapping?.PublicPort ?? 0,
             status: 'running',
             createdAt: new Date(containerInfo.Created * 1000).getTime(),
           };
-          this.sandboxes.set(projectPath, state);
+          this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
         } else {
           // Dead container — clean up
@@ -347,7 +347,7 @@ export class SandboxDockerService {
 
   // ── Private helpers ──────────────────────────────────────────────
 
-  /** Build the sandbox Docker image if it doesn't exist. */
+  /** Build the desktop Docker image if it doesn't exist. */
   private async ensureImage(): Promise<void> {
     try {
       await this.docker.getImage(SANDBOX_IMAGE).inspect();
@@ -357,11 +357,11 @@ export class SandboxDockerService {
     }
 
     // Resolve Dockerfile context path
-    // In dev: resources/docker/sandbox/ relative to project root
-    // In prod: app.getAppPath()/resources/docker/sandbox/
+    // In dev: resources/docker/desktop/ relative to project root
+    // In prod: app.getAppPath()/resources/docker/desktop/
     const contextPaths = [
-      join(__dirname, '../../resources/docker/sandbox'),
-      join(__dirname, '../../../resources/docker/sandbox'),
+      join(__dirname, '../../resources/docker/desktop'),
+      join(__dirname, '../../../resources/docker/desktop'),
     ];
 
     let contextPath: string | null = null;
@@ -373,7 +373,7 @@ export class SandboxDockerService {
     }
 
     if (!contextPath) {
-      throw new Error('Sandbox Dockerfile not found — cannot build image');
+      throw new Error('Desktop Dockerfile not found — cannot build image');
     }
 
     // Build the image
@@ -392,12 +392,12 @@ export class SandboxDockerService {
   }
 
   /**
-   * Build a project-specific image if <project>/.pilot/sandbox.Dockerfile exists.
-   * The Dockerfile should use `FROM pilot-sandbox:latest` as its base.
+   * Build a project-specific image if <project>/.pilot/desktop.Dockerfile exists.
+   * The Dockerfile should use `FROM pilot-desktop:latest` as its base.
    * Returns the image tag to use for the container.
    */
   private async ensureProjectImage(projectPath: string): Promise<string> {
-    const dockerfilePath = join(projectPath, '.pilot', 'sandbox.Dockerfile');
+    const dockerfilePath = join(projectPath, '.pilot', 'desktop.Dockerfile');
     if (!existsSync(dockerfilePath)) {
       return SANDBOX_IMAGE;
     }
@@ -428,13 +428,13 @@ export class SandboxDockerService {
 
     // Build with the project root as context so the Dockerfile can COPY project files
     const stream = await this.docker.buildImage(
-      { context: projectPath, src: ['.pilot/sandbox.Dockerfile'] },
-      { t: projectImage, dockerfile: '.pilot/sandbox.Dockerfile' },
+      { context: projectPath, src: ['.pilot/desktop.Dockerfile'] },
+      { t: projectImage, dockerfile: '.pilot/desktop.Dockerfile' },
     );
 
     await new Promise<void>((resolve, reject) => {
       this.docker.modem.followProgress(stream, (err) => {
-        if (err) reject(new Error(`Project sandbox image build failed: ${err.message}`));
+        if (err) reject(new Error(`Project desktop image build failed: ${err.message}`));
         else resolve();
       });
     });
@@ -485,7 +485,7 @@ export class SandboxDockerService {
       }
     }
 
-    throw new Error(`Sandbox noVNC did not become ready within ${READY_TIMEOUT_MS / 1000}s`);
+    throw new Error(`Desktop noVNC did not become ready within ${READY_TIMEOUT_MS / 1000}s`);
   }
 
   /** Collect all output from a Docker exec stream. */
@@ -531,50 +531,50 @@ export class SandboxDockerService {
     return parts.join('');
   }
 
-  /** Push a sandbox event to the renderer (and companion). */
-  private pushEvent(projectPath: string, state: Partial<DockerSandboxState>): void {
+  /** Push a desktop event to the renderer (and companion). */
+  private pushEvent(projectPath: string, state: Partial<DesktopState>): void {
     const payload = { projectPath, ...state };
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(IPC.DOCKER_SANDBOX_EVENT, payload);
+      win.webContents.send(IPC.DESKTOP_EVENT, payload);
     }
     try {
       const { companionBridge } = require('./companion-ipc-bridge');
-      companionBridge.forwardEvent(IPC.DOCKER_SANDBOX_EVENT, payload);
+      companionBridge.forwardEvent(IPC.DESKTOP_EVENT, payload);
     } catch { /* companion not available */ }
   }
 
-  /** Persist sandbox config to <project>/.pilot/sandbox.json */
-  private persistConfig(projectPath: string, state: DockerSandboxState): void {
+  /** Persist desktop config to <project>/.pilot/desktop.json */
+  private persistConfig(projectPath: string, state: DesktopState): void {
     try {
       const pilotDir = join(projectPath, '.pilot');
       if (!existsSync(pilotDir)) mkdirSync(pilotDir, { recursive: true });
 
-      const config: DockerSandboxConfig = {
+      const config: DesktopConfig = {
         containerId: state.containerId,
         wsPort: state.wsPort,
         vncPort: state.vncPort,
         status: state.status,
         createdAt: state.createdAt,
       };
-      writeFileSync(join(pilotDir, 'sandbox.json'), JSON.stringify(config, null, 2));
+      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2));
     } catch { /* best effort */ }
   }
 
-  /** Load persisted sandbox config. Returns null if not found. */
-  private loadPersistedConfig(projectPath: string): DockerSandboxConfig | null {
+  /** Load persisted desktop config. Returns null if not found. */
+  private loadPersistedConfig(projectPath: string): DesktopConfig | null {
     try {
-      const configPath = join(projectPath, '.pilot', 'sandbox.json');
+      const configPath = join(projectPath, '.pilot', 'desktop.json');
       if (!existsSync(configPath)) return null;
-      return JSON.parse(readFileSync(configPath, 'utf-8')) as DockerSandboxConfig;
+      return JSON.parse(readFileSync(configPath, 'utf-8')) as DesktopConfig;
     } catch {
       return null;
     }
   }
 
-  /** Remove persisted sandbox config. */
+  /** Remove persisted desktop config. */
   private removePersisted(projectPath: string): void {
     try {
-      const configPath = join(projectPath, '.pilot', 'sandbox.json');
+      const configPath = join(projectPath, '.pilot', 'desktop.json');
       if (existsSync(configPath)) unlinkSync(configPath);
     } catch { /* best effort */ }
   }

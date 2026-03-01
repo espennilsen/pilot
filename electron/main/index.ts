@@ -26,8 +26,8 @@ import { registerCompanionIpc } from '../ipc/companion';
 import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
-import { registerSandboxDockerIpc } from '../ipc/sandbox-docker';
-import { SandboxDockerService } from '../services/sandbox-docker-service';
+import { registerDesktopIpc } from '../ipc/desktop';
+import { DesktopService } from '../services/desktop-service';
 import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
@@ -52,7 +52,7 @@ let companionServer: CompanionServer | null = null;
 let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
-let sandboxDockerService: SandboxDockerService | null = null;
+let desktopService: DesktopService | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -312,13 +312,13 @@ app.whenReady().then(async () => {
   // Docker sandbox — always register IPC handlers so the renderer gets
   // graceful responses even when Docker is unavailable or init fails.
   try {
-    sandboxDockerService = new SandboxDockerService();
-    sessionManager.sandboxDockerService = sandboxDockerService;
-    sandboxDockerService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
+    desktopService = new DesktopService();
+    sessionManager.desktopService = desktopService;
+    desktopService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
   } catch (err) {
-    console.error('[DockerSandbox] Failed to initialize service:', err);
+    console.error('[Desktop] Failed to initialize service:', err);
   }
-  registerSandboxDockerIpc(sandboxDockerService, sessionManager);
+  registerDesktopIpc(desktopService, sessionManager);
 
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');

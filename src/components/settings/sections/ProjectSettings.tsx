@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSandboxStore } from '../../../stores/sandbox-store';
-import { useSandboxDockerStore } from '../../../stores/sandbox-docker-store';
+import { useDesktopStore } from '../../../stores/desktop-store';
 import { useAppSettingsStore } from '../../../stores/app-settings-store';
 import { useTabStore } from '../../../stores/tab-store';
 import { useProjectStore } from '../../../stores/project-store';
@@ -9,7 +9,7 @@ import { SettingRow, Toggle } from '../settings-helpers';
 
 export function ProjectSettings() {
   const { jailEnabled, yoloMode, allowedPaths, updateSettings } = useSandboxStore();
-  const dockerGlobalEnabled = useAppSettingsStore((s) => s.dockerSandboxEnabled);
+  const desktopGlobalEnabled = useAppSettingsStore((s) => s.desktopEnabled);
   const activeTab = useTabStore((s) => s.tabs.find(t => t.id === s.activeTabId));
   const projectPath = useProjectStore((s) => s.projectPath);
   const [newPath, setNewPath] = useState('');
@@ -140,14 +140,14 @@ export function ProjectSettings() {
         </div>
       )}
 
-      {/* ── Docker Sandbox ── */}
+      {/* ── Desktop ── */}
       <div className="border-t border-border pt-4 mt-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-4">Docker Sandbox</h3>
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-4">Desktop</h3>
 
-        <DockerSandboxProjectToggle
+        <DesktopProjectToggle
           projectPath={pp}
           tabId={tabId}
-          globalEnabled={dockerGlobalEnabled}
+          globalEnabled={desktopGlobalEnabled}
           updateSettings={updateSettings}
         />
       </div>
@@ -155,8 +155,8 @@ export function ProjectSettings() {
   );
 }
 
-/** Per-project Docker sandbox toggle with global fallback display */
-function DockerSandboxProjectToggle({
+/** Per-project Desktop toggle with global fallback display */
+function DesktopProjectToggle({
   projectPath,
   tabId,
   globalEnabled,
@@ -167,8 +167,8 @@ function DockerSandboxProjectToggle({
   globalEnabled: boolean;
   updateSettings: (pp: string, tabId: string, overrides: Record<string, unknown>) => Promise<void>;
 }) {
-  const toolsEnabled = useSandboxDockerStore((s) => s.toolsEnabledByProject[projectPath]);
-  const { loadToolsEnabled, setToolsEnabled } = useSandboxDockerStore();
+  const toolsEnabled = useDesktopStore((s) => s.toolsEnabledByProject[projectPath]);
+  const { loadToolsEnabled, setToolsEnabled } = useDesktopStore();
 
   // Load current project value on mount
   useEffect(() => {
@@ -187,7 +187,7 @@ function DockerSandboxProjectToggle({
   if (!projectPath) {
     return (
       <div className="p-3 bg-bg-surface border border-border rounded-md">
-        <p className="text-xs text-text-tertiary">Open a project to configure sandbox settings.</p>
+        <p className="text-xs text-text-tertiary">Open a project to configure desktop settings.</p>
       </div>
     );
   }
@@ -196,10 +196,10 @@ function DockerSandboxProjectToggle({
     <div className="space-y-3">
       <SettingRow
         icon={<Container className="w-4 h-4 text-accent" />}
-        label="Enable Sandbox"
+        label="Enable Desktop"
         description={
           hasProjectOverride
-            ? 'Project override active. Overrides the global Docker Sandbox setting for this project.'
+            ? 'Project override active. Overrides the global Desktop setting for this project.'
             : `Inheriting from global setting (${globalEnabled ? 'enabled' : 'disabled'}). Toggle to set a project-specific override.`
         }
       >
@@ -211,9 +211,9 @@ function DockerSandboxProjectToggle({
           <button
             onClick={() => {
               // Remove the project override by setting to undefined → falls back to global
-              updateSettings(projectPath, tabId, { dockerToolsEnabled: undefined });
-              // Also clear from the docker store so it re-reads global
-              useSandboxDockerStore.setState((s) => {
+              updateSettings(projectPath, tabId, { desktopToolsEnabled: undefined });
+              // Also clear from the desktop store so it re-reads global
+              useDesktopStore.setState((s) => {
                 const { [projectPath]: _, ...rest } = s.toolsEnabledByProject;
                 return { toolsEnabledByProject: rest };
               });
@@ -226,7 +226,7 @@ function DockerSandboxProjectToggle({
       )}
 
       <p className="ml-9 text-xs text-text-tertiary">
-        When enabled, the Sandbox tab appears in the context panel and agent tools for controlling the virtual display are available. Takes effect on next conversation.
+        When enabled, the Desktop tab appears in the context panel and agent tools for controlling the virtual display are available. Takes effect on next conversation.
       </p>
     </div>
   );

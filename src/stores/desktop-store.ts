@@ -1,20 +1,20 @@
 /**
- * @file Docker sandbox store — per-project container state and tools toggle.
+ * @file Desktop store — per-project container state and tools toggle.
  */
 import { create } from 'zustand';
-import type { DockerSandboxState, DockerSandboxCheckResult } from '../../shared/types';
+import type { DesktopState, DesktopCheckResult } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
-interface SandboxDockerStore {
+interface DesktopStore {
   /** Per-project sandbox state, keyed by projectPath */
-  stateByProject: Record<string, DockerSandboxState>;
+  stateByProject: Record<string, DesktopState>;
   /** Per-project tools toggle state */
   toolsEnabledByProject: Record<string, boolean>;
-  /** Whether Docker is available on the host (null = not yet checked) */
-  isDockerAvailable: boolean | null;
-  /** Human-readable message when Docker is not available */
-  dockerUnavailableMessage: string | null;
+  /** Whether Desktop is available on the host (null = not yet checked) */
+  isDesktopAvailable: boolean | null;
+  /** Human-readable message when Desktop is not available */
+  desktopUnavailableMessage: string | null;
   /** Loading states per project */
   loadingByProject: Record<string, boolean>;
   /** Error message (transient) */
@@ -29,34 +29,34 @@ interface SandboxDockerStore {
   loadToolsEnabled: (projectPath: string) => Promise<void>;
 
   /** Handle push events from main process */
-  handleEvent: (payload: { projectPath: string } & Partial<DockerSandboxState>) => void;
+  handleEvent: (payload: { projectPath: string } & Partial<DesktopState>) => void;
 
   // Selectors (plain functions, not reactive)
-  getSandboxState: (projectPath: string) => DockerSandboxState | null;
+  getSandboxState: (projectPath: string) => DesktopState | null;
   isToolsEnabled: (projectPath: string) => boolean;
   isProjectLoading: (projectPath: string) => boolean;
 
   reset: () => void;
 }
 
-export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
+export const useDesktopStore = create<DesktopStore>((set, get) => ({
   stateByProject: {},
   toolsEnabledByProject: {},
-  isDockerAvailable: null,
-  dockerUnavailableMessage: null,
+  isDesktopAvailable: null,
+  desktopUnavailableMessage: null,
   loadingByProject: {},
   error: null,
 
   checkDockerAvailable: async () => {
     try {
-      const result = await invoke(IPC.DOCKER_SANDBOX_CHECK) as DockerSandboxCheckResult;
+      const result = await invoke(IPC.DESKTOP_CHECK) as DesktopCheckResult;
       set({
-        isDockerAvailable: result.available,
-        dockerUnavailableMessage: result.message ?? null,
+        isDesktopAvailable: result.available,
+        desktopUnavailableMessage: result.message ?? null,
       });
       return result.available;
     } catch {
-      set({ isDockerAvailable: false, dockerUnavailableMessage: null });
+      set({ isDesktopAvailable: false, desktopUnavailableMessage: null });
       return false;
     }
   },
@@ -67,7 +67,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
       error: null,
     }));
     try {
-      const result = await invoke(IPC.DOCKER_SANDBOX_START, projectPath) as DockerSandboxState;
+      const result = await invoke(IPC.DESKTOP_START, projectPath) as DesktopState;
       set(state => ({
         stateByProject: { ...state.stateByProject, [projectPath]: result },
         loadingByProject: { ...state.loadingByProject, [projectPath]: false },
@@ -86,7 +86,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
       error: null,
     }));
     try {
-      await invoke(IPC.DOCKER_SANDBOX_STOP, projectPath);
+      await invoke(IPC.DESKTOP_STOP, projectPath);
       set(state => {
         const { [projectPath]: _, ...rest } = state.stateByProject;
         return {
@@ -104,7 +104,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
 
   loadStatus: async (projectPath: string) => {
     try {
-      const result = await invoke(IPC.DOCKER_SANDBOX_STATUS, projectPath) as DockerSandboxState | null;
+      const result = await invoke(IPC.DESKTOP_STATUS, projectPath) as DesktopState | null;
       if (result) {
         set(state => ({
           stateByProject: { ...state.stateByProject, [projectPath]: result },
@@ -117,13 +117,13 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
         });
       }
     } catch {
-      // Docker not available or other error — fail silently
+      // Desktop not available or other error — fail silently
     }
   },
 
   setToolsEnabled: async (projectPath: string, enabled: boolean) => {
     try {
-      await invoke(IPC.DOCKER_SANDBOX_SET_TOOLS_ENABLED, projectPath, enabled);
+      await invoke(IPC.DESKTOP_SET_TOOLS_ENABLED, projectPath, enabled);
       set(state => ({
         toolsEnabledByProject: { ...state.toolsEnabledByProject, [projectPath]: enabled },
       }));
@@ -134,7 +134,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
 
   loadToolsEnabled: async (projectPath: string) => {
     try {
-      const enabled = await invoke(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, projectPath) as boolean | null;
+      const enabled = await invoke(IPC.DESKTOP_GET_TOOLS_ENABLED, projectPath) as boolean | null;
       if (enabled === null) {
         // No project-level override — remove any stale entry so global setting is used
         set(state => {
@@ -166,7 +166,7 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
         return {
           stateByProject: {
             ...state.stateByProject,
-            [projectPath]: { ...existing, ...stateUpdate } as DockerSandboxState,
+            [projectPath]: { ...existing, ...stateUpdate } as DesktopState,
           },
         };
       });
@@ -182,8 +182,8 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
     set({
       stateByProject: {},
       toolsEnabledByProject: {},
-      isDockerAvailable: null,
-      dockerUnavailableMessage: null,
+      isDesktopAvailable: null,
+      desktopUnavailableMessage: null,
       loadingByProject: {},
       error: null,
     });

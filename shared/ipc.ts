@@ -120,16 +120,16 @@ export const IPC = {
   DEV_COMMAND_STATUS: 'dev:command-status', // main → renderer
   DEV_SERVER_URL: 'dev:server-url',         // main → renderer (URL detected in output)
 
-  // Docker Sandbox
-  DOCKER_SANDBOX_CHECK: 'docker-sandbox:check',
-  DOCKER_SANDBOX_START: 'docker-sandbox:start',
-  DOCKER_SANDBOX_STOP: 'docker-sandbox:stop',
-  DOCKER_SANDBOX_STATUS: 'docker-sandbox:status',
-  DOCKER_SANDBOX_EXEC: 'docker-sandbox:exec',
-  DOCKER_SANDBOX_SCREENSHOT: 'docker-sandbox:screenshot',
-  DOCKER_SANDBOX_EVENT: 'docker-sandbox:event',                     // main → renderer push
-  DOCKER_SANDBOX_SET_TOOLS_ENABLED: 'docker-sandbox:set-tools-enabled',
-  DOCKER_SANDBOX_GET_TOOLS_ENABLED: 'docker-sandbox:get-tools-enabled',
+  // Desktop
+  DESKTOP_CHECK: 'desktop:check',
+  DESKTOP_START: 'desktop:start',
+  DESKTOP_STOP: 'desktop:stop',
+  DESKTOP_STATUS: 'desktop:status',
+  DESKTOP_EXEC: 'desktop:exec',
+  DESKTOP_SCREENSHOT: 'desktop:screenshot',
+  DESKTOP_EVENT: 'desktop:event',                     // main → renderer push
+  DESKTOP_SET_TOOLS_ENABLED: 'desktop:set-tools-enabled',
+  DESKTOP_GET_TOOLS_ENABLED: 'desktop:get-tools-enabled',
 
   // Extensions
   EXTENSIONS_LIST: 'extensions:list',

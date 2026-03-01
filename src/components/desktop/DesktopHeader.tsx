@@ -1,10 +1,10 @@
 /**
- * @file Sandbox header — status badge, start/stop buttons, agent tools toggle.
+ * @file Desktop header — status badge, start/stop buttons, agent tools toggle.
  */
 import { Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
-import { useSandboxDockerStore } from '../../stores/sandbox-docker-store';
+import { useDesktopStore } from '../../stores/desktop-store';
 
-interface SandboxHeaderProps {
+interface DesktopHeaderProps {
   projectPath: string;
 }
 
@@ -16,13 +16,13 @@ const statusConfig = {
   error: { label: 'Error', dot: 'bg-error', text: 'text-error' },
 } as const;
 
-export default function SandboxHeader({ projectPath }: SandboxHeaderProps) {
-  const sandboxState = useSandboxDockerStore((s) => s.stateByProject[projectPath]);
-  const toolsEnabled = useSandboxDockerStore((s) => s.toolsEnabledByProject[projectPath] ?? false);
-  const isLoading = useSandboxDockerStore((s) => s.loadingByProject[projectPath] ?? false);
-  const { startSandbox, stopSandbox, setToolsEnabled } = useSandboxDockerStore();
+export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
+  const desktopState = useDesktopStore((s) => s.stateByProject[projectPath]);
+  const toolsEnabled = useDesktopStore((s) => s.toolsEnabledByProject[projectPath] ?? false);
+  const isLoading = useDesktopStore((s) => s.loadingByProject[projectPath] ?? false);
+  const { startSandbox, stopSandbox, setToolsEnabled } = useDesktopStore();
 
-  const status = sandboxState?.status ?? 'stopped';
+  const status = desktopState?.status ?? 'stopped';
   const config = statusConfig[status] ?? statusConfig.stopped;
   const isRunning = status === 'running';
   const isBusy = status === 'starting' || status === 'stopping' || isLoading;
@@ -31,7 +31,7 @@ export default function SandboxHeader({ projectPath }: SandboxHeaderProps) {
     <div className="px-3 py-2 border-b border-border bg-bg-elevated flex items-center justify-between gap-2">
       {/* Status badge */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-text-primary">Sandbox</span>
+        <span className="text-sm font-medium text-text-primary">Desktop</span>
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${config.dot}`} />
           <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
@@ -44,8 +44,8 @@ export default function SandboxHeader({ projectPath }: SandboxHeaderProps) {
           onClick={() => setToolsEnabled(projectPath, !toolsEnabled)}
           className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-bg-surface"
           title={toolsEnabled
-            ? 'Agent sandbox tools enabled — click to disable (takes effect next conversation)'
-            : 'Agent sandbox tools disabled — click to enable (takes effect next conversation)'}
+            ? 'Agent desktop tools enabled — click to disable (takes effect next conversation)'
+            : 'Agent desktop tools disabled — click to enable (takes effect next conversation)'}
         >
           {toolsEnabled ? (
             <ToggleRight className="w-4 h-4 text-accent" />

@@ -7,7 +7,7 @@ import { IPC } from '../../../../shared/ipc';
 import { invoke } from '../../../lib/ipc-client';
 
 export function GeneralSettings() {
-  const { piAgentDir, theme, setTheme, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig, dockerSandboxEnabled, setDockerSandboxEnabled } = useAppSettingsStore();
+  const { piAgentDir, theme, setTheme, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig, desktopEnabled, setDesktopEnabled } = useAppSettingsStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const [dirInput, setDirInput] = useState(piAgentDir);
   const [dirDirty, setDirDirty] = useState(false);
@@ -96,10 +96,10 @@ export function GeneralSettings() {
 
       <SettingRow
         icon={<Container className="w-4 h-4 text-accent" />}
-        label="Docker Sandbox"
-        description="Show the Sandbox panel and allow per-project Docker containers with a virtual display the agent can control. Requires Docker. Per-project override available in Project settings."
+        label="Desktop"
+        description="Show the Desktop panel and allow per-project Docker containers with a virtual display the agent can control. Requires Docker. Per-project override available in Project settings."
       >
-        <Toggle checked={dockerSandboxEnabled} onChange={setDockerSandboxEnabled} />
+        <Toggle checked={desktopEnabled} onChange={setDesktopEnabled} />
       </SettingRow>
 
       {/* ── AI Commit Messages ── */}

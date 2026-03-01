@@ -1,5 +1,5 @@
 /**
- * @file noVNC iframe wrapper — displays the sandbox virtual display.
+ * @file noVNC iframe wrapper — displays the desktop virtual display.
  *
  * The container's noVNC HTTP server may take a moment to serve pages after
  * the TCP port is open. If the iframe fails to load, we retry automatically
@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 
-interface SandboxViewerProps {
+interface DesktopViewerProps {
   wsPort: number;
 }
 
@@ -18,7 +18,7 @@ const MAX_RETRIES = 10;
 const INITIAL_DELAY_MS = 500;
 const MAX_DELAY_MS = 4000;
 
-export default function SandboxViewer({ wsPort }: SandboxViewerProps) {
+export default function DesktopViewer({ wsPort }: DesktopViewerProps) {
   const noVncUrl = `http://localhost:${wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [retries, setRetries] = useState(0);
@@ -64,7 +64,7 @@ export default function SandboxViewer({ wsPort }: SandboxViewerProps) {
         ref={iframeRef}
         src={noVncUrl}
         className="w-full h-full border-0"
-        title="Sandbox Virtual Display"
+        title="Desktop Virtual Display"
         sandbox="allow-scripts allow-same-origin allow-forms"
         allow="clipboard-read; clipboard-write"
         onLoad={handleLoad}
@@ -75,8 +75,8 @@ export default function SandboxViewer({ wsPort }: SandboxViewerProps) {
           <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-text-secondary">
             {retries >= MAX_RETRIES
-              ? 'Could not connect to sandbox display'
-              : 'Connecting to sandbox display…'}
+              ? 'Could not connect to desktop display'
+              : 'Connecting to desktop display…'}
           </p>
         </div>
       )}

@@ -76,8 +76,8 @@ export interface PilotAppSettings {
       appName?: string;
     };
   };
-  /** Enable Docker sandbox feature globally. Per-project .pilot/settings.json overrides this. Default: false */
-  dockerSandboxEnabled?: boolean;
+  /** Enable Desktop feature globally. Per-project .pilot/settings.json overrides this. Default: false */
+  desktopEnabled?: boolean;
 }
 
 // MCP (Model Context Protocol) types
@@ -123,13 +123,13 @@ export interface ProjectSandboxSettings {
     allowedPaths: string[];
   };
   yoloMode: boolean;
-  /** Enable Docker sandbox agent tools. Default: false (no tool defs sent to agent). */
-  dockerToolsEnabled?: boolean;
+  /** Enable Desktop agent tools. Default: false (no tool defs sent to agent). */
+  desktopToolsEnabled?: boolean;
 }
 
-// Docker sandbox — project-scoped containers with virtual display
-/** Result of the Docker availability check */
-export interface DockerSandboxCheckResult {
+// Desktop — project-scoped containers with virtual display
+/** Result of the Desktop availability check */
+export interface DesktopCheckResult {
   /** Whether the Docker daemon is running and responsive */
   available: boolean;
   /** Human-readable reason when not available */
@@ -138,8 +138,8 @@ export interface DockerSandboxCheckResult {
   message?: string;
 }
 
-/** Status of a project-scoped Docker sandbox container */
-export interface DockerSandboxState {
+/** Status of a project-scoped Desktop container */
+export interface DesktopState {
   containerId: string;
   /** noVNC websockify port on host */
   wsPort: number;
@@ -153,7 +153,7 @@ export interface DockerSandboxState {
 }
 
 /** Persisted to <project>/.pilot/sandbox.json for startup reconciliation */
-export interface DockerSandboxConfig {
+export interface DesktopConfig {
   containerId: string;
   wsPort: number;
   vncPort: number;
