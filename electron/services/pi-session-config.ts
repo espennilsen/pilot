@@ -24,6 +24,8 @@ import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
 import { createMemoryTools } from './memory-tools';
 import { createEditorTools } from './editor-tools';
+import { createSandboxDockerTools } from './sandbox-docker-tools';
+import type { SandboxDockerService } from './sandbox-docker-service';
 import type { StagedDiff } from '../../shared/types';
 import type { McpManager } from './mcp-manager';
 
@@ -45,6 +47,7 @@ export interface SessionConfigOptions {
   taskManager: TaskManager;
   subagentManager: SubagentManager;
   mcpManager?: McpManager | null;
+  sandboxDockerService?: SandboxDockerService | null;
   onStagedDiff: (diff: StagedDiff) => void;
 }
 
@@ -60,7 +63,7 @@ export interface SessionConfigOptions {
 export async function buildSessionConfig(
   options: SessionConfigOptions
 ): Promise<SessionConfigResult> {
-  const { tabId, projectPath, memoryManager, taskManager, subagentManager, mcpManager, onStagedDiff } = options;
+  const { tabId, projectPath, memoryManager, taskManager, subagentManager, mcpManager, sandboxDockerService, onStagedDiff } = options;
 
   const projectSettings = loadProjectSettings(projectPath);
   const piAgentDir = getPiAgentDir();
@@ -137,6 +140,11 @@ export async function buildSessionConfig(
     ? mcpManager.getToolDefinitions(projectPath)
     : [];
 
+  // Docker sandbox tools — only included when explicitly enabled for the project
+  const dockerTools = (projectSettings.dockerToolsEnabled && sandboxDockerService)
+    ? createSandboxDockerTools(sandboxDockerService, projectPath)
+    : [];
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
@@ -146,6 +154,7 @@ export async function buildSessionConfig(
     ...subagentTools,
     createWebFetchTool(),
     ...mcpTools,
+    ...dockerTools,
   ];
 
   return { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions };

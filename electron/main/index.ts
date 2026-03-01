@@ -311,6 +311,7 @@ app.whenReady().then(async () => {
 
   // Docker sandbox
   sandboxDockerService = new SandboxDockerService();
+  sessionManager.sandboxDockerService = sandboxDockerService;
   registerSandboxDockerIpc(sandboxDockerService);
   sandboxDockerService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
 

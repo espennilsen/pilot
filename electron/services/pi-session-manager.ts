@@ -48,6 +48,7 @@ export class PilotSessionManager {
   public taskManager = new TaskManager();
   public subagentManager: SubagentManager;
   public mcpManager: McpManager | null = null;
+  public sandboxDockerService: import('./sandbox-docker-service').SandboxDockerService | null = null;
 
   constructor() {
     ensurePilotAppDirs();
@@ -122,6 +123,7 @@ export class PilotSessionManager {
       taskManager: this.taskManager,
       subagentManager: this.subagentManager,
       mcpManager: this.mcpManager,
+      sandboxDockerService: this.sandboxDockerService,
       onStagedDiff: (diff: StagedDiff) => {
         this.stagedDiffs.addDiff(diff);
         this.sendToRenderer(IPC.SANDBOX_STAGED_DIFF, { tabId, diff });
