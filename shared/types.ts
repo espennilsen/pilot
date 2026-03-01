@@ -152,7 +152,7 @@ export interface DesktopState {
   error?: string;
 }
 
-/** Persisted to <project>/.pilot/sandbox.json for startup reconciliation */
+/** Persisted to <project>/.pilot/desktop.json for startup reconciliation */
 export interface DesktopConfig {
   containerId: string;
   wsPort: number;

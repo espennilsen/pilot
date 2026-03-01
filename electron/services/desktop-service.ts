@@ -16,7 +16,7 @@ import { IPC } from '../../shared/ipc';
 import type { DesktopState, DesktopConfig } from '../../shared/types';
 
 /** Docker image name for the base desktop */
-const SANDBOX_IMAGE = 'pilot-desktop:latest';
+const DESKTOP_IMAGE = 'pilot-desktop:latest';
 
 /** Project-specific image tag prefix — full tag is pilot-desktop-<hash>:latest */
 const PROJECT_IMAGE_PREFIX = 'pilot-desktop-project-';
@@ -350,7 +350,7 @@ export class DesktopService {
   /** Build the desktop Docker image if it doesn't exist. */
   private async ensureImage(): Promise<void> {
     try {
-      await this.docker.getImage(SANDBOX_IMAGE).inspect();
+      await this.docker.getImage(DESKTOP_IMAGE).inspect();
       return; // Image already exists
     } catch {
       // Image doesn't exist — build it
@@ -379,7 +379,7 @@ export class DesktopService {
     // Build the image
     const stream = await this.docker.buildImage(
       { context: contextPath, src: ['Dockerfile', 'entrypoint.sh'] },
-      { t: SANDBOX_IMAGE },
+      { t: DESKTOP_IMAGE },
     );
 
     // Wait for build to complete
@@ -399,7 +399,7 @@ export class DesktopService {
   private async ensureProjectImage(projectPath: string): Promise<string> {
     const dockerfilePath = join(projectPath, '.pilot', 'desktop.Dockerfile');
     if (!existsSync(dockerfilePath)) {
-      return SANDBOX_IMAGE;
+      return DESKTOP_IMAGE;
     }
 
     // Stable tag derived from the project path

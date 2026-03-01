@@ -1,5 +1,5 @@
 /**
- * @file IPC handlers for Docker sandbox management.
+ * @file IPC handlers for Docker desktop management.
  */
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
@@ -14,7 +14,7 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
       return {
         available: false,
         reason: 'service-init-failed',
-        message: 'Docker sandbox service failed to initialise. Check that Docker is installed.',
+        message: 'Docker desktop service failed to initialise. Check that Docker is installed.',
       };
     }
     try {
@@ -31,18 +31,18 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
       return {
         available: false,
         reason: 'not-installed',
-        message: 'Docker is not installed. Install Docker Desktop to use sandboxes.',
+        message: 'Docker is not installed. Install Docker Desktop to use desktop environments.',
       };
     }
   });
 
   ipcMain.handle(IPC.DESKTOP_START, async (_event, projectPath: string) => {
-    if (!service) throw new Error('Docker sandbox service is not available');
+    if (!service) throw new Error('Docker desktop service is not available');
     return service.startDesktop(projectPath);
   });
 
   ipcMain.handle(IPC.DESKTOP_STOP, async (_event, projectPath: string) => {
-    if (!service) throw new Error('Docker sandbox service is not available');
+    if (!service) throw new Error('Docker desktop service is not available');
     await service.stopDesktop(projectPath);
   });
 
@@ -52,12 +52,12 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
   });
 
   ipcMain.handle(IPC.DESKTOP_EXEC, async (_event, projectPath: string, command: string) => {
-    if (!service) throw new Error('Docker sandbox service is not available');
+    if (!service) throw new Error('Docker desktop service is not available');
     return service.execInDesktop(projectPath, command);
   });
 
   ipcMain.handle(IPC.DESKTOP_SCREENSHOT, async (_event, projectPath: string) => {
-    if (!service) throw new Error('Docker sandbox service is not available');
+    if (!service) throw new Error('Docker desktop service is not available');
     return service.screenshotDesktop(projectPath);
   });
 

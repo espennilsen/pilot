@@ -7,7 +7,7 @@ import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
 interface DesktopStore {
-  /** Per-project sandbox state, keyed by projectPath */
+  /** Per-project desktop state, keyed by projectPath */
   stateByProject: Record<string, DesktopState>;
   /** Per-project tools toggle state */
   toolsEnabledByProject: Record<string, boolean>;
@@ -110,7 +110,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
           stateByProject: { ...state.stateByProject, [projectPath]: result },
         }));
       } else {
-        // No sandbox for this project — ensure we don't have stale state
+        // No desktop for this project — ensure we don't have stale state
         set(state => {
           const { [projectPath]: _, ...rest } = state.stateByProject;
           return { stateByProject: rest };
