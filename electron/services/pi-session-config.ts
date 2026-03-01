@@ -140,8 +140,11 @@ export async function buildSessionConfig(
     ? mcpManager.getToolDefinitions(projectPath)
     : [];
 
-  // Docker sandbox tools — only included when explicitly enabled for the project
-  const dockerTools = (projectSettings.dockerToolsEnabled && sandboxDockerService)
+  // Docker sandbox tools — project setting overrides global; when neither is set, disabled
+  const dockerEffectivelyEnabled = projectSettings.dockerToolsEnabled !== undefined
+    ? projectSettings.dockerToolsEnabled
+    : (appSettings.dockerSandboxEnabled ?? false);
+  const dockerTools = (dockerEffectivelyEnabled && sandboxDockerService)
     ? createSandboxDockerTools(sandboxDockerService, projectPath)
     : [];
 

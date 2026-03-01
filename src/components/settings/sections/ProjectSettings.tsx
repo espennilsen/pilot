@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useSandboxStore } from '../../../stores/sandbox-store';
+import { useSandboxDockerStore } from '../../../stores/sandbox-docker-store';
+import { useAppSettingsStore } from '../../../stores/app-settings-store';
 import { useTabStore } from '../../../stores/tab-store';
 import { useProjectStore } from '../../../stores/project-store';
-import { Shield, Zap, FolderPlus, X } from 'lucide-react';
+import { Shield, Zap, FolderPlus, X, Container } from 'lucide-react';
 import { SettingRow, Toggle } from '../settings-helpers';
 
 export function ProjectSettings() {
   const { jailEnabled, yoloMode, allowedPaths, updateSettings } = useSandboxStore();
+  const dockerGlobalEnabled = useAppSettingsStore((s) => s.dockerSandboxEnabled);
   const activeTab = useTabStore((s) => s.tabs.find(t => t.id === s.activeTabId));
   const projectPath = useProjectStore((s) => s.projectPath);
   const [newPath, setNewPath] = useState('');
@@ -136,6 +139,95 @@ export function ProjectSettings() {
           </p>
         </div>
       )}
+
+      {/* ── Docker Sandbox ── */}
+      <div className="border-t border-border pt-4 mt-2">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-4">Docker Sandbox</h3>
+
+        <DockerSandboxProjectToggle
+          projectPath={pp}
+          tabId={tabId}
+          globalEnabled={dockerGlobalEnabled}
+          updateSettings={updateSettings}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Per-project Docker sandbox toggle with global fallback display */
+function DockerSandboxProjectToggle({
+  projectPath,
+  tabId,
+  globalEnabled,
+  updateSettings,
+}: {
+  projectPath: string;
+  tabId: string;
+  globalEnabled: boolean;
+  updateSettings: (pp: string, tabId: string, overrides: Record<string, unknown>) => Promise<void>;
+}) {
+  const toolsEnabled = useSandboxDockerStore((s) => s.toolsEnabledByProject[projectPath]);
+  const { loadToolsEnabled, setToolsEnabled } = useSandboxDockerStore();
+
+  // Load current project value on mount
+  useState(() => {
+    if (projectPath) loadToolsEnabled(projectPath);
+  });
+
+  // Determine effective state: project override > global
+  const hasProjectOverride = toolsEnabled !== undefined;
+  const effectiveEnabled = hasProjectOverride ? toolsEnabled : globalEnabled;
+
+  const handleToggle = (enabled: boolean) => {
+    if (!projectPath) return;
+    setToolsEnabled(projectPath, enabled);
+  };
+
+  if (!projectPath) {
+    return (
+      <div className="p-3 bg-bg-surface border border-border rounded-md">
+        <p className="text-xs text-text-tertiary">Open a project to configure sandbox settings.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <SettingRow
+        icon={<Container className="w-4 h-4 text-accent" />}
+        label="Enable Sandbox"
+        description={
+          hasProjectOverride
+            ? 'Project override active. Overrides the global Docker Sandbox setting for this project.'
+            : `Inheriting from global setting (${globalEnabled ? 'enabled' : 'disabled'}). Toggle to set a project-specific override.`
+        }
+      >
+        <Toggle checked={effectiveEnabled} onChange={handleToggle} />
+      </SettingRow>
+
+      {hasProjectOverride && (
+        <div className="ml-9">
+          <button
+            onClick={() => {
+              // Remove the project override by setting to undefined → falls back to global
+              updateSettings(projectPath, tabId, { dockerToolsEnabled: undefined });
+              // Also clear from the docker store so it re-reads global
+              useSandboxDockerStore.setState((s) => {
+                const { [projectPath]: _, ...rest } = s.toolsEnabledByProject;
+                return { toolsEnabledByProject: rest };
+              });
+            }}
+            className="text-xs text-accent hover:text-accent/80 transition-colors"
+          >
+            Reset to global default
+          </button>
+        </div>
+      )}
+
+      <p className="ml-9 text-xs text-text-tertiary">
+        When enabled, the Sandbox tab appears in the context panel and agent tools for controlling the virtual display are available. Takes effect on next conversation.
+      </p>
     </div>
   );
 }

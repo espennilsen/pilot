@@ -3,6 +3,8 @@ import { useUIStore, type ContextPanelTab } from '../../stores/ui-store';
 import { Tooltip } from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
+import { useSandboxDockerStore } from '../../stores/sandbox-docker-store';
+import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useSubagentStore } from '../../stores/subagent-store';
 import FileTree from './FileTree';
@@ -25,8 +27,17 @@ export default function ContextPanel() {
       ).length
     : 0;
 
+  // Docker sandbox: project override > global setting
+  const globalSandboxEnabled = useAppSettingsStore((s) => s.dockerSandboxEnabled);
+  const projectDockerOverride = useSandboxDockerStore(
+    (s) => projectPath ? s.toolsEnabledByProject[projectPath] : undefined
+  );
+  const sandboxEnabled = projectDockerOverride !== undefined ? projectDockerOverride : globalSandboxEnabled;
+
   // If the active tab was 'tasks', fall back to 'files'
-  const effectiveTab = contextPanelTab === 'tasks' ? 'files' : contextPanelTab;
+  // Also fall back if sandbox tab is selected but sandbox is disabled
+  let effectiveTab = contextPanelTab === 'tasks' ? 'files' : contextPanelTab;
+  if (effectiveTab === 'sandbox' && !sandboxEnabled) effectiveTab = 'files';
 
   const handleTabClick = (tab: ContextPanelTab) => {
     if (!contextPanelVisible) toggleContextPanel();
@@ -83,15 +94,17 @@ export default function ContextPanel() {
           </button>
         </Tooltip>
 
-        {/* Sandbox */}
-        <Tooltip content="Sandbox" position="left">
-          <button
-            className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
-            onClick={() => handleTabClick('sandbox')}
-          >
-            <Monitor className="w-4 h-4" />
-          </button>
-        </Tooltip>
+        {/* Sandbox — only shown when enabled globally or per-project */}
+        {sandboxEnabled && (
+          <Tooltip content="Sandbox" position="left">
+            <button
+              className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+              onClick={() => handleTabClick('sandbox')}
+            >
+              <Monitor className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -167,16 +180,18 @@ export default function ContextPanel() {
             </span>
           )}
         </button>
-        <button
-          onClick={() => setContextPanelTab('sandbox')}
-          className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-sm ${
-            effectiveTab === 'sandbox'
-              ? 'text-accent bg-bg-base border-b-2 border-accent'
-              : 'text-text-secondary hover:text-text-primary hover:bg-bg-base/50'
-          }`}
-        >
-          Sandbox
-        </button>
+        {sandboxEnabled && (
+          <button
+            onClick={() => setContextPanelTab('sandbox')}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-sm ${
+              effectiveTab === 'sandbox'
+                ? 'text-accent bg-bg-base border-b-2 border-accent'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-base/50'
+            }`}
+          >
+            Sandbox
+          </button>
+        )}
       </div>
 
       {/* Content */}

@@ -76,6 +76,8 @@ export interface PilotAppSettings {
       appName?: string;
     };
   };
+  /** Enable Docker sandbox feature globally. Per-project .pilot/settings.json overrides this. Default: false */
+  dockerSandboxEnabled?: boolean;
 }
 
 // MCP (Model Context Protocol) types
