@@ -24,6 +24,7 @@ interface DesktopStore {
   checkDesktopAvailable: () => Promise<boolean>;
   startDesktop: (projectPath: string) => Promise<void>;
   stopDesktop: (projectPath: string) => Promise<void>;
+  rebuildDesktop: (projectPath: string) => Promise<void>;
   loadStatus: (projectPath: string) => Promise<void>;
   setToolsEnabled: (projectPath: string, enabled: boolean) => Promise<void>;
   loadToolsEnabled: (projectPath: string) => Promise<void>;
@@ -87,13 +88,29 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     }));
     try {
       await invoke(IPC.DESKTOP_STOP, projectPath);
-      set(state => {
-        const { [projectPath]: _, ...rest } = state.stateByProject;
-        return {
-          stateByProject: rest,
-          loadingByProject: { ...state.loadingByProject, [projectPath]: false },
-        };
-      });
+      // State update comes via DESKTOP_EVENT push (handleEvent sets status to 'stopped')
+      set(state => ({
+        loadingByProject: { ...state.loadingByProject, [projectPath]: false },
+      }));
+    } catch (err) {
+      set(state => ({
+        error: String(err),
+        loadingByProject: { ...state.loadingByProject, [projectPath]: false },
+      }));
+    }
+  },
+
+  rebuildDesktop: async (projectPath: string) => {
+    set(state => ({
+      loadingByProject: { ...state.loadingByProject, [projectPath]: true },
+      error: null,
+    }));
+    try {
+      const result = await invoke(IPC.DESKTOP_REBUILD, projectPath) as DesktopState;
+      set(state => ({
+        stateByProject: { ...state.stateByProject, [projectPath]: result },
+        loadingByProject: { ...state.loadingByProject, [projectPath]: false },
+      }));
     } catch (err) {
       set(state => ({
         error: String(err),

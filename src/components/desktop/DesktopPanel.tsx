@@ -100,8 +100,28 @@ export default function DesktopPanel() {
           </div>
         )}
 
-        {/* Stopped / no desktop — show start prompt */}
-        {(!status || status === 'stopped') && !isLoading && (
+        {/* Stopped container — can resume */}
+        {status === 'stopped' && desktopState?.containerId && !isLoading && (
+          <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
+            <Monitor className="w-12 h-12 text-text-secondary" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-text-primary mb-1">Desktop stopped</p>
+              <p className="text-xs text-text-secondary max-w-xs">
+                The container is preserved. Resume to continue where you left off,
+                or rebuild to start fresh from the Dockerfile.
+              </p>
+            </div>
+            <button
+              onClick={() => useDesktopStore.getState().startDesktop(projectPath)}
+              className="px-4 py-2 bg-accent text-bg-base rounded hover:bg-accent/90 transition-colors text-sm font-medium"
+            >
+              Resume Desktop
+            </button>
+          </div>
+        )}
+
+        {/* No container at all — show start prompt */}
+        {(!status || (status === 'stopped' && !desktopState?.containerId)) && !isLoading && (
           <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
             <Monitor className="w-12 h-12 text-text-secondary" />
             <div className="text-center">

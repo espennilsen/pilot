@@ -111,7 +111,7 @@ export class DesktopService {
     }
   }
 
-  /** Start a desktop container for a project. Returns the desktop state. */
+  /** Start a desktop container for a project. Restarts a stopped container if one exists. */
   async startDesktop(projectPath: string): Promise<DesktopState> {
     // Already running? Return existing state.
     const existing = this.desktops.get(projectPath);
@@ -122,6 +122,11 @@ export class DesktopService {
     this.pushEvent(projectPath, { status: 'starting' });
 
     try {
+      // Try to restart an existing stopped container
+      const restarted = await this.tryRestartContainer(projectPath);
+      if (restarted) return restarted;
+
+      // No existing container — create a new one
       await this.ensureImage();
       const image = await this.ensureProjectImage(projectPath);
 
@@ -185,13 +190,17 @@ export class DesktopService {
     }
   }
 
-  /** Stop and remove all running desktop containers. Called on app quit. */
+  /** Stop all running desktop containers. Called on app quit. */
   async stopAll(): Promise<void> {
     const projects = [...this.desktops.keys()];
     await Promise.allSettled(projects.map(p => this.stopDesktop(p)));
   }
 
-  /** Stop and remove the desktop container for a project. */
+  /**
+   * Stop the desktop container for a project (without removing it).
+   * The container is preserved so it can be restarted later with its
+   * filesystem state intact.
+   */
   async stopDesktop(projectPath: string): Promise<void> {
     const state = this.desktops.get(projectPath);
     if (!state || !state.containerId) return;
@@ -201,20 +210,51 @@ export class DesktopService {
     try {
       const container = this.docker.getContainer(state.containerId);
       await container.stop({ t: 5 }).catch(() => { /* may already be stopped */ });
-      await container.remove({ force: true }).catch(() => { /* may already be removed */ });
     } catch {
       // Best effort — container might be gone already
     }
 
-    this.desktops.delete(projectPath);
-    this.removePersisted(projectPath);
-    this.pushEvent(projectPath, {
-      containerId: '',
+    const stoppedState: DesktopState = {
+      containerId: state.containerId,
       wsPort: 0,
       vncPort: 0,
       status: 'stopped',
-      createdAt: 0,
-    });
+      createdAt: state.createdAt,
+    };
+    this.desktops.set(projectPath, stoppedState);
+    this.persistConfig(projectPath, stoppedState);
+    this.pushEvent(projectPath, stoppedState);
+  }
+
+  /**
+   * Rebuild the desktop container for a project.
+   * Stops and removes the existing container, removes the project-specific
+   * Docker image (if any), then starts a fresh container from a rebuilt image.
+   */
+  async rebuildDesktop(projectPath: string): Promise<DesktopState> {
+    const state = this.desktops.get(projectPath);
+
+    // Stop and remove existing container
+    if (state?.containerId) {
+      try {
+        const container = this.docker.getContainer(state.containerId);
+        await container.stop({ t: 5 }).catch(() => {});
+        await container.remove({ force: true }).catch(() => {});
+      } catch { /* best effort */ }
+    }
+
+    this.desktops.delete(projectPath);
+    this.removePersisted(projectPath);
+
+    // Remove project-specific image to force a rebuild
+    const hash = createHash('sha256').update(projectPath).digest('hex').slice(0, 12);
+    const projectImage = `${PROJECT_IMAGE_PREFIX}${hash}:latest`;
+    try {
+      await this.docker.getImage(projectImage).remove({ force: true });
+    } catch { /* image may not exist */ }
+
+    // Start fresh — ensureProjectImage will rebuild from Dockerfile
+    return this.startDesktop(projectPath);
   }
 
   /** Get current desktop status for a project. Returns null if no desktop. */
@@ -224,12 +264,13 @@ export class DesktopService {
 
     // Check persisted config
     const config = this.loadPersistedConfig(projectPath);
-    if (!config) return null;
+    if (!config || !config.containerId) return null;
 
-    // Verify container is still alive
+    // Verify container still exists
     try {
       const container = this.docker.getContainer(config.containerId);
       const info = await container.inspect();
+
       if (info.State.Running) {
         const state: DesktopState = {
           containerId: config.containerId,
@@ -241,6 +282,17 @@ export class DesktopService {
         this.desktops.set(projectPath, state);
         return state;
       }
+
+      // Container exists but is stopped
+      const state: DesktopState = {
+        containerId: config.containerId,
+        wsPort: 0,
+        vncPort: 0,
+        status: 'stopped',
+        createdAt: config.createdAt,
+      };
+      this.desktops.set(projectPath, state);
+      return state;
     } catch {
       // Container is gone
     }
@@ -311,7 +363,7 @@ export class DesktopService {
   async reconcileOnStartup(): Promise<void> {
     if (!(await this.isDockerAvailable())) return;
 
-    // Find all running pilot-desktop containers
+    // Find all pilot-desktop containers (running or stopped)
     try {
       const containers = await this.docker.listContainers({
         all: true,
@@ -337,8 +389,19 @@ export class DesktopService {
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
+        } else if (containerInfo.State === 'exited' || containerInfo.State === 'created') {
+          // Stopped container — track it so the user can restart
+          const state: DesktopState = {
+            containerId: containerInfo.Id,
+            wsPort: 0,
+            vncPort: 0,
+            status: 'stopped',
+            createdAt: new Date(containerInfo.Created * 1000).getTime(),
+          };
+          this.desktops.set(projectPath, state);
+          this.persistConfig(projectPath, state);
         } else {
-          // Dead container — clean up
+          // Dead/removing/paused — clean up
           try {
             const container = this.docker.getContainer(containerInfo.Id);
             await container.remove({ force: true });
@@ -352,6 +415,54 @@ export class DesktopService {
   }
 
   // ── Private helpers ──────────────────────────────────────────────
+
+  /**
+   * Try to restart an existing stopped container for a project.
+   * Docker re-assigns host ports on restart, so we read them from the
+   * container info after starting. Returns the new state, or null if
+   * no stopped container was found.
+   */
+  private async tryRestartContainer(projectPath: string): Promise<DesktopState | null> {
+    const existing = this.desktops.get(projectPath);
+    if (!existing?.containerId) return null;
+
+    try {
+      const container = this.docker.getContainer(existing.containerId);
+      const info = await container.inspect();
+      if (info.State.Running) return null; // Already running — shouldn't happen
+
+      await container.start();
+
+      // Read the new port mappings assigned by Docker
+      const started = await container.inspect();
+      const portBindings = started.NetworkSettings?.Ports ?? {};
+      const vncPort = Number(portBindings['5900/tcp']?.[0]?.HostPort) || 0;
+      const wsPort = Number(portBindings['6080/tcp']?.[0]?.HostPort) || 0;
+
+      const state: DesktopState = {
+        containerId: existing.containerId,
+        wsPort,
+        vncPort,
+        status: 'starting',
+        createdAt: existing.createdAt,
+      };
+      this.desktops.set(projectPath, state);
+
+      await this.waitForReady(wsPort);
+
+      state.status = 'running';
+      this.desktops.set(projectPath, { ...state });
+      this.persistConfig(projectPath, state);
+      this.pushEvent(projectPath, state);
+
+      return { ...state };
+    } catch {
+      // Container is gone or can't be restarted — fall through to create a new one
+      this.desktops.delete(projectPath);
+      this.removePersisted(projectPath);
+      return null;
+    }
+  }
 
   /** Build the desktop Docker image if it doesn't exist. */
   private async ensureImage(): Promise<void> {

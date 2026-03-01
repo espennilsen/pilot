@@ -88,6 +88,12 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
     return service.execInDesktop(validPath, validCommand);
   });
 
+  ipcMain.handle(IPC.DESKTOP_REBUILD, async (_event, projectPath: unknown) => {
+    if (!service) throw new Error('Docker desktop service is not available');
+    const validPath = validateProjectPath(projectPath);
+    return service.rebuildDesktop(validPath);
+  });
+
   ipcMain.handle(IPC.DESKTOP_SCREENSHOT, async (_event, projectPath: unknown) => {
     if (!service) throw new Error('Docker desktop service is not available');
     const validPath = validateProjectPath(projectPath);

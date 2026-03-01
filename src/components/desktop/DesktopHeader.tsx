@@ -1,7 +1,7 @@
 /**
- * @file Desktop header — status badge, start/stop buttons, agent tools toggle.
+ * @file Desktop header — status badge, start/stop/rebuild buttons, agent tools toggle.
  */
-import { ExternalLink, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ExternalLink, Play, RefreshCw, Square, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useDesktopStore } from '../../stores/desktop-store';
 import { useTabStore } from '../../stores/tab-store';
 
@@ -21,11 +21,12 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
   const desktopState = useDesktopStore((s) => s.stateByProject[projectPath]);
   const toolsEnabled = useDesktopStore((s) => s.toolsEnabledByProject[projectPath] ?? false);
   const isLoading = useDesktopStore((s) => s.loadingByProject[projectPath] ?? false);
-  const { startDesktop, stopDesktop, setToolsEnabled } = useDesktopStore();
+  const { startDesktop, stopDesktop, rebuildDesktop, setToolsEnabled } = useDesktopStore();
 
   const status = desktopState?.status ?? 'stopped';
   const config = statusConfig[status] ?? statusConfig.stopped;
   const isRunning = status === 'running';
+  const isStopped = status === 'stopped' && !!desktopState?.containerId;
   const isBusy = status === 'starting' || status === 'stopping' || isLoading;
 
   return (
@@ -53,6 +54,16 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
             <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
           </button>
         )}
+
+        {/* Rebuild button */}
+        <button
+          onClick={() => rebuildDesktop(projectPath)}
+          disabled={isBusy}
+          className="p-1.5 hover:bg-bg-surface rounded transition-colors disabled:opacity-40"
+          title="Rebuild — removes container and image, rebuilds from Dockerfile"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-text-secondary ${isBusy ? 'animate-spin' : ''}`} />
+        </button>
 
         {/* Agent tools toggle */}
         <button
@@ -91,7 +102,7 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
               bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-40"
           >
             <Play className="w-3.5 h-3.5" />
-            Start
+            {isStopped ? 'Resume' : 'Start'}
           </button>
         )}
       </div>

@@ -197,7 +197,7 @@ describe('useDesktopStore', () => {
   // ── stopDesktop ───────────────────────────────────────────────
 
   describe('stopDesktop', () => {
-    it('removes project state on success', async () => {
+    it('keeps project state on success (container is preserved)', async () => {
       // Seed state
       useDesktopStore.getState().handleEvent({
         projectPath: '/project/a',
@@ -207,7 +207,8 @@ describe('useDesktopStore', () => {
 
       await useDesktopStore.getState().stopDesktop('/project/a');
 
-      expect(useDesktopStore.getState().stateByProject['/project/a']).toBeUndefined();
+      // State is kept — the DESKTOP_EVENT push (handleEvent) will update status to 'stopped'
+      expect(useDesktopStore.getState().stateByProject['/project/a']).toBeDefined();
       expect(useDesktopStore.getState().loadingByProject['/project/a']).toBe(false);
     });
 
@@ -218,6 +219,30 @@ describe('useDesktopStore', () => {
 
       expect(useDesktopStore.getState().loadingByProject['/project/a']).toBe(false);
       expect(useDesktopStore.getState().error).toContain('Stop failed');
+    });
+  });
+
+  // ── rebuildDesktop ────────────────────────────────────────────
+
+  describe('rebuildDesktop', () => {
+    it('sets loading then stores result on success', async () => {
+      const desktopState = makeDesktopState();
+      mockInvoke.mockResolvedValue(desktopState);
+
+      await useDesktopStore.getState().rebuildDesktop('/project/a');
+
+      expect(useDesktopStore.getState().stateByProject['/project/a']).toEqual(desktopState);
+      expect(useDesktopStore.getState().loadingByProject['/project/a']).toBe(false);
+      expect(useDesktopStore.getState().error).toBeNull();
+    });
+
+    it('sets error on failure', async () => {
+      mockInvoke.mockRejectedValue(new Error('Rebuild failed'));
+
+      await useDesktopStore.getState().rebuildDesktop('/project/a');
+
+      expect(useDesktopStore.getState().loadingByProject['/project/a']).toBe(false);
+      expect(useDesktopStore.getState().error).toContain('Rebuild failed');
     });
   });
 

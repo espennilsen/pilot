@@ -128,6 +128,7 @@ export const IPC = {
   DESKTOP_EXEC: 'desktop:exec',
   DESKTOP_SCREENSHOT: 'desktop:screenshot',
   DESKTOP_EVENT: 'desktop:event',                     // main → renderer push
+  DESKTOP_REBUILD: 'desktop:rebuild',
   DESKTOP_SET_TOOLS_ENABLED: 'desktop:set-tools-enabled',
   DESKTOP_GET_TOOLS_ENABLED: 'desktop:get-tools-enabled',
 
