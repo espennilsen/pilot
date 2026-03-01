@@ -110,6 +110,16 @@ export const IPC = {
   GIT_BLAME: 'git:blame',
   GIT_STASH_LIST: 'git:stash-list',
   GIT_STASH_APPLY: 'git:stash-apply',
+  GIT_MERGE: 'git:merge',
+  GIT_REBASE: 'git:rebase',
+  GIT_CHERRY_PICK: 'git:cherry-pick',
+  GIT_REVERT: 'git:revert',
+  GIT_GET_CONFLICTS: 'git:get-conflicts',
+  GIT_ABORT_OPERATION: 'git:abort-operation',
+  GIT_CONTINUE_OPERATION: 'git:continue-operation',
+  GIT_RESOLVE_FILE: 'git:resolve-file',
+  GIT_SKIP_COMMIT: 'git:skip-commit',
+  GIT_RESOLVE_CONFLICT_STRATEGY: 'git:resolve-conflict-strategy',
 
   // Dev commands
   DEV_LOAD_CONFIG: 'dev:load-config',

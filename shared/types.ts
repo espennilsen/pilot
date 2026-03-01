@@ -154,7 +154,52 @@ export interface GitStatus {
   staged: GitFileChange[];
   unstaged: GitFileChange[];
   untracked: string[];
+  conflicted: string[];
   isClean: boolean;
+  /** Non-null when a merge, rebase, cherry-pick, or revert is in progress */
+  operationInProgress: GitOperationState | null;
+}
+
+/** Tracks the state of an in-progress git operation that may produce conflicts */
+export interface GitOperationState {
+  type: 'merge' | 'rebase' | 'cherry-pick' | 'revert';
+  /** Branch or commit being merged / rebased onto / cherry-picked / reverted */
+  incoming: string;
+  /** Current step (rebase only — which commit in the sequence) */
+  step?: number;
+  /** Total steps (rebase only — total commits to replay) */
+  totalSteps?: number;
+  /** The commit hash currently being applied (rebase / cherry-pick) */
+  currentCommit?: string;
+}
+
+/** A single file with conflict markers, including all three versions */
+export interface ConflictFile {
+  /** Relative path from project root */
+  path: string;
+  /** Content from the common ancestor (merge base). Null for add/add conflicts. */
+  baseContent: string | null;
+  /** Content from the current branch (ours / HEAD) */
+  oursContent: string;
+  /** Content from the incoming branch (theirs) */
+  theirsContent: string;
+  /** Working copy content with conflict markers */
+  markerContent: string;
+  /** Ref name for "ours" side (e.g. "main", "HEAD") */
+  oursRef: string;
+  /** Ref name for "theirs" side (e.g. "feature/retry-logic") */
+  theirsRef: string;
+  /** Number of conflict regions in the file */
+  conflictCount: number;
+}
+
+/** Result of a git operation that may produce conflicts */
+export interface GitOperationResult {
+  success: boolean;
+  /** Conflicted file paths (empty if success is true) */
+  conflicts: string[];
+  /** Human-readable summary of the result */
+  message: string;
 }
 
 export interface GitFileChange {
