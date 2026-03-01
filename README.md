@@ -30,6 +30,7 @@ A native desktop environment for the [Pi Coding Agent](https://www.npmjs.com/pac
 - **Companion Access** — access Pilot from iOS/iPad/browser via HTTPS + WebSocket with PIN/QR pairing
 - **Command Palette** — fuzzy-searchable `⌘K` overlay for every action
 - **Terminal** — embedded PTY terminal with tabs
+- **Desktop** — Docker-based virtual display the agent can control — browser testing, GUI automation, and visual verification with 18 tools (mouse, keyboard, screenshot, clipboard, browser)
 - **Extensions & Skills** — install and manage Pi SDK extensions and skills
 
 See [docs/](docs/INDEX.md) for full documentation.

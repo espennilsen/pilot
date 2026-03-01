@@ -266,7 +266,7 @@ export class PilotSessionManager {
     if (projectPath && this.desktopService) {
       const stillUsed = [...this.tabProjectPaths.values()].some(p => p === projectPath);
       if (!stillUsed) {
-        this.desktopService.stopSandbox(projectPath).catch(() => { /* best effort */ });
+        this.desktopService.stopDesktop(projectPath).catch(() => { /* best effort */ });
       }
     }
   }

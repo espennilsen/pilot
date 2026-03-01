@@ -38,27 +38,27 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
 
   ipcMain.handle(IPC.DESKTOP_START, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
-    return service.startSandbox(projectPath);
+    return service.startDesktop(projectPath);
   });
 
   ipcMain.handle(IPC.DESKTOP_STOP, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
-    await service.stopSandbox(projectPath);
+    await service.stopDesktop(projectPath);
   });
 
   ipcMain.handle(IPC.DESKTOP_STATUS, async (_event, projectPath: string) => {
     if (!service) return null;
-    return service.getSandboxStatus(projectPath);
+    return service.getDesktopStatus(projectPath);
   });
 
   ipcMain.handle(IPC.DESKTOP_EXEC, async (_event, projectPath: string, command: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
-    return service.execInSandbox(projectPath, command);
+    return service.execInDesktop(projectPath, command);
   });
 
   ipcMain.handle(IPC.DESKTOP_SCREENSHOT, async (_event, projectPath: string) => {
     if (!service) throw new Error('Docker sandbox service is not available');
-    return service.screenshotSandbox(projectPath);
+    return service.screenshotDesktop(projectPath);
   });
 
   ipcMain.handle(IPC.DESKTOP_SET_TOOLS_ENABLED, async (_event, projectPath: string, enabled: boolean) => {

@@ -20,7 +20,7 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
   const desktopState = useDesktopStore((s) => s.stateByProject[projectPath]);
   const toolsEnabled = useDesktopStore((s) => s.toolsEnabledByProject[projectPath] ?? false);
   const isLoading = useDesktopStore((s) => s.loadingByProject[projectPath] ?? false);
-  const { startSandbox, stopSandbox, setToolsEnabled } = useDesktopStore();
+  const { startDesktop, stopDesktop, setToolsEnabled } = useDesktopStore();
 
   const status = desktopState?.status ?? 'stopped';
   const config = statusConfig[status] ?? statusConfig.stopped;
@@ -60,7 +60,7 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
         {/* Start/Stop button */}
         {isRunning ? (
           <button
-            onClick={() => stopSandbox(projectPath)}
+            onClick={() => stopDesktop(projectPath)}
             disabled={isBusy}
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
               bg-error/20 text-error hover:bg-error/30 transition-colors disabled:opacity-40"
@@ -70,7 +70,7 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
           </button>
         ) : (
           <button
-            onClick={() => startSandbox(projectPath)}
+            onClick={() => startDesktop(projectPath)}
             disabled={isBusy}
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
               bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-40"

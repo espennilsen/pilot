@@ -21,9 +21,9 @@ interface DesktopStore {
   error: string | null;
 
   // Actions
-  checkDockerAvailable: () => Promise<boolean>;
-  startSandbox: (projectPath: string) => Promise<void>;
-  stopSandbox: (projectPath: string) => Promise<void>;
+  checkDesktopAvailable: () => Promise<boolean>;
+  startDesktop: (projectPath: string) => Promise<void>;
+  stopDesktop: (projectPath: string) => Promise<void>;
   loadStatus: (projectPath: string) => Promise<void>;
   setToolsEnabled: (projectPath: string, enabled: boolean) => Promise<void>;
   loadToolsEnabled: (projectPath: string) => Promise<void>;
@@ -32,7 +32,7 @@ interface DesktopStore {
   handleEvent: (payload: { projectPath: string } & Partial<DesktopState>) => void;
 
   // Selectors (plain functions, not reactive)
-  getSandboxState: (projectPath: string) => DesktopState | null;
+  getDesktopState: (projectPath: string) => DesktopState | null;
   isToolsEnabled: (projectPath: string) => boolean;
   isProjectLoading: (projectPath: string) => boolean;
 
@@ -47,7 +47,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
   loadingByProject: {},
   error: null,
 
-  checkDockerAvailable: async () => {
+  checkDesktopAvailable: async () => {
     try {
       const result = await invoke(IPC.DESKTOP_CHECK) as DesktopCheckResult;
       set({
@@ -61,7 +61,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     }
   },
 
-  startSandbox: async (projectPath: string) => {
+  startDesktop: async (projectPath: string) => {
     set(state => ({
       loadingByProject: { ...state.loadingByProject, [projectPath]: true },
       error: null,
@@ -80,7 +80,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     }
   },
 
-  stopSandbox: async (projectPath: string) => {
+  stopDesktop: async (projectPath: string) => {
     set(state => ({
       loadingByProject: { ...state.loadingByProject, [projectPath]: true },
       error: null,
@@ -174,7 +174,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
   },
 
   // Selectors
-  getSandboxState: (projectPath: string) => get().stateByProject[projectPath] ?? null,
+  getDesktopState: (projectPath: string) => get().stateByProject[projectPath] ?? null,
   isToolsEnabled: (projectPath: string) => get().toolsEnabledByProject[projectPath] ?? false,
   isProjectLoading: (projectPath: string) => get().loadingByProject[projectPath] ?? false,
 

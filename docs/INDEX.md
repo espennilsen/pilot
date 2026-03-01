@@ -32,6 +32,7 @@ This directory contains both AI-readable reference docs (UPPERCASE files) and de
 
 | Document | Description |
 |----------|-------------|
+| [desktop.md](desktop.md) | Desktop virtual display — architecture, Docker container, agent tools, IPC, settings |
 | [architecture.md](architecture.md) | Full architecture overview with code examples and decision rationale |
 | [ipc-reference.md](ipc-reference.md) | Complete IPC channel reference — every channel, direction, args, returns |
 | [services.md](services.md) | Main process services — all classes, methods, responsibilities |
@@ -54,8 +55,10 @@ This directory contains both AI-readable reference docs (UPPERCASE files) and de
 | [user/keyboard-shortcuts.md](user/keyboard-shortcuts.md) | Complete keybindings reference |
 | [user/memory.md](user/memory.md) | Two-tier memory system |
 | [user/companion.md](user/companion.md) | Companion remote access |
+| [user/desktop.md](user/desktop.md) | Desktop virtual display — agent-controlled browser testing and GUI automation |
 | [user/tasks.md](user/tasks.md) | Task management |
 
 ## Changes Log
 
+- 2026-02-24: Added Desktop feature documentation (desktop.md, user/desktop.md)
 - 2026-02-24: Initial documentation generated

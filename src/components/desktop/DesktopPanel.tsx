@@ -112,7 +112,7 @@ export default function DesktopPanel() {
               </p>
             </div>
             <button
-              onClick={() => useDesktopStore.getState().startSandbox(projectPath)}
+              onClick={() => useDesktopStore.getState().startDesktop(projectPath)}
               className="px-4 py-2 bg-accent text-bg-base rounded hover:bg-accent/90 transition-colors text-sm font-medium"
             >
               Start Desktop
