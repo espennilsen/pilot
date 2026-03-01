@@ -29,6 +29,7 @@ import { useSubagentEvents } from './hooks/useSubagentEvents';
 import { useEditorEvents } from './hooks/useEditorEvents';
 import { useWebTabEvents } from './hooks/useWebTabEvents';
 import { useMcpEvents } from './hooks/useMcpEvents';
+import { useSandboxDockerEvents } from './hooks/useSandboxDockerEvents';
 import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
@@ -121,6 +122,9 @@ function App() {
 
   // Listen for MCP server status events
   useMcpEvents();
+
+  // Listen for Docker sandbox lifecycle events
+  useSandboxDockerEvents();
 
   // Apply theme (data-theme attribute on <html>, notify main process)
   useTheme();

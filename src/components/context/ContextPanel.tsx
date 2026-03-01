@@ -1,4 +1,4 @@
-import { FolderOpen, PanelRightClose, PanelRightOpen, FolderTree, GitBranch, FileDiff, Bot } from 'lucide-react';
+import { FolderOpen, PanelRightClose, PanelRightOpen, FolderTree, GitBranch, FileDiff, Bot, Monitor } from 'lucide-react';
 import { useUIStore, type ContextPanelTab } from '../../stores/ui-store';
 import { Tooltip } from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
@@ -9,6 +9,7 @@ import FileTree from './FileTree';
 import { StagedDiffQueue } from '../sandbox/StagedDiffQueue';
 import GitPanel from '../git/GitPanel';
 import AgentsPanel from '../subagents/AgentsPanel';
+import SandboxPanel from '../sandbox-docker/SandboxPanel';
 
 export default function ContextPanel() {
   const { contextPanelVisible, contextPanelWidth, contextPanelTab, setContextPanelTab, toggleContextPanel } = useUIStore();
@@ -79,6 +80,16 @@ export default function ContextPanel() {
             {agentCount > 0 && (
               <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-accent rounded-full" />
             )}
+          </button>
+        </Tooltip>
+
+        {/* Sandbox */}
+        <Tooltip content="Sandbox" position="left">
+          <button
+            className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+            onClick={() => handleTabClick('sandbox')}
+          >
+            <Monitor className="w-4 h-4" />
           </button>
         </Tooltip>
 
@@ -156,6 +167,16 @@ export default function ContextPanel() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setContextPanelTab('sandbox')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-sm ${
+            effectiveTab === 'sandbox'
+              ? 'text-accent bg-bg-base border-b-2 border-accent'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-base/50'
+          }`}
+        >
+          Sandbox
+        </button>
       </div>
 
       {/* Content */}
@@ -181,6 +202,8 @@ export default function ContextPanel() {
           <GitPanel />
         ) : effectiveTab === 'agents' ? (
           <AgentsPanel />
+        ) : effectiveTab === 'sandbox' ? (
+          <SandboxPanel />
         ) : (
           <StagedDiffQueue />
         )}
