@@ -26,6 +26,8 @@ import { registerCompanionIpc } from '../ipc/companion';
 import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
+import { registerSandboxDockerIpc } from '../ipc/sandbox-docker';
+import { SandboxDockerService } from '../services/sandbox-docker-service';
 import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
@@ -50,6 +52,7 @@ let companionServer: CompanionServer | null = null;
 let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
+let sandboxDockerService: SandboxDockerService | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -305,6 +308,11 @@ app.whenReady().then(async () => {
   registerSubagentIpc(sessionManager.subagentManager);
   registerMcpIpc(mcpManager);
   registerAttachmentIpc();
+
+  // Docker sandbox
+  sandboxDockerService = new SandboxDockerService();
+  registerSandboxDockerIpc(sandboxDockerService);
+  sandboxDockerService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
 
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');
