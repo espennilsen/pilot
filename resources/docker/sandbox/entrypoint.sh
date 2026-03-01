@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# ── Chromium flags for running inside a container ────────────────────
+# --no-sandbox is required because the container already provides isolation.
+# --disable-gpu avoids GPU driver issues in headless environments.
+export CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage"
+
 # Start virtual framebuffer
 Xvfb "$DISPLAY" -screen 0 "$RESOLUTION" &
 XVFB_PID=$!
@@ -17,6 +22,8 @@ x11vnc -display "$DISPLAY" -forever -shared -nopw -rfbport 5900 &
 websockify --web /usr/share/novnc 6080 localhost:5900 &
 
 echo "Sandbox ready — noVNC on port 6080, VNC on port 5900"
+echo "  Chromium: chromium-browser \$CHROMIUM_FLAGS <url>"
+echo "  Firefox:  firefox <url>"
 
 # Wait for Xvfb (main process) — if it dies, container exits
 wait $XVFB_PID

@@ -270,6 +270,40 @@ export function createSandboxDockerTools(
     },
 
     {
+      name: 'sandbox_open_browser',
+      label: 'Sandbox Open Browser',
+      description: 'Open a URL in a browser inside the sandbox. Launches Chromium by default. The browser runs in the virtual display — use sandbox_screenshot to see the page.',
+      parameters: Type.Object({
+        url: Type.String({ description: 'URL to open (e.g. "https://example.com" or "http://localhost:3000")' }),
+        browser: Type.Optional(Type.Union([
+          Type.Literal('chromium'),
+          Type.Literal('firefox'),
+        ], { description: 'Browser to use. Default: chromium', default: 'chromium' })),
+        wait: Type.Optional(Type.Number({ description: 'Seconds to wait for the page to load before returning. Default: 3', default: 3, minimum: 0, maximum: 30 })),
+      }),
+      async execute(_toolCallId, params) {
+        const browser = params.browser || 'chromium';
+        const wait = params.wait ?? 3;
+        const url = params.url;
+
+        let cmd: string;
+        if (browser === 'firefox') {
+          cmd = `firefox "${url}" &`;
+        } else {
+          cmd = `chromium-browser $CHROMIUM_FLAGS "${url}" &`;
+        }
+
+        await exec(cmd);
+
+        if (wait > 0) {
+          await new Promise(resolve => setTimeout(resolve, wait * 1000));
+        }
+
+        return textResult(`Opened ${url} in ${browser}. Use sandbox_screenshot to see the page.`);
+      },
+    },
+
+    {
       name: 'sandbox_exec',
       label: 'Sandbox Exec',
       description: 'Run an arbitrary shell command inside the sandbox container. Returns stdout and stderr. Use for installing packages, running scripts, launching applications, etc.',
