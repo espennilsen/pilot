@@ -8,8 +8,9 @@
 import Dockerode from 'dockerode';
 import { BrowserWindow } from 'electron';
 import { join } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
-import { createServer } from 'net';
+import { homedir } from 'os';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
 import type { DockerSandboxState, DockerSandboxConfig } from '../../shared/types';
 
@@ -25,12 +26,73 @@ const READY_TIMEOUT_MS = 15_000;
 /** Poll interval (ms) when waiting for noVNC readiness */
 const READY_POLL_MS = 500;
 
+/**
+ * Resolve Docker connection options for the current platform.
+ *
+ * Priority:
+ * 1. `DOCKER_HOST` env var (user/CI override)
+ * 2. Platform-specific defaults:
+ *    - Windows: named pipe `//./pipe/docker_engine`
+ *    - macOS / Linux: probe known socket paths
+ */
+function resolveDockerOptions(): Dockerode.DockerOptions {
+  // 1. Respect DOCKER_HOST env var
+  const dockerHost = process.env.DOCKER_HOST;
+  if (dockerHost) {
+    if (dockerHost.startsWith('unix://')) {
+      return { socketPath: dockerHost.replace('unix://', '') };
+    }
+    if (dockerHost.startsWith('npipe://')) {
+      return { socketPath: dockerHost.replace('npipe://', '') };
+    }
+    if (dockerHost.startsWith('tcp://')) {
+      const url = new URL(dockerHost);
+      return { host: url.hostname, port: Number(url.port) || 2375 };
+    }
+  }
+
+  // 2. Windows: named pipe
+  if (process.platform === 'win32') {
+    return { socketPath: '//./pipe/docker_engine' };
+  }
+
+  // 3. macOS / Linux: probe known socket paths
+  const home = homedir();
+  const candidates = [
+    join(home, '.docker/run/docker.sock'),     // Docker Desktop (macOS & Linux)
+    '/var/run/docker.sock',                     // Linux standard / macOS legacy symlink
+    join(home, '.colima/default/docker.sock'),  // Colima
+    join(home, '.rd/docker.sock'),              // Rancher Desktop
+  ];
+
+  for (const socketPath of candidates) {
+    try {
+      // Use lstatSync to detect the socket even if it's a symlink —
+      // existsSync follows symlinks and returns false for dangling ones.
+      const stat = lstatSync(socketPath);
+      if (stat.isSocket()) {
+        return { socketPath };
+      }
+      // It might be a symlink to a valid socket (existsSync follows the link)
+      if (stat.isSymbolicLink() && existsSync(socketPath)) {
+        return { socketPath };
+      }
+    } catch {
+      // Path doesn't exist — try next
+    }
+  }
+
+  // Fallback: let Dockerode use its default. The error at connection time
+  // will be more informative than throwing here.
+  return {};
+}
+
 export class SandboxDockerService {
   private docker: Dockerode;
   private sandboxes = new Map<string, DockerSandboxState>();
 
   constructor() {
-    this.docker = new Dockerode();
+    this.docker = new Dockerode(resolveDockerOptions());
   }
 
   // ── Public API ───────────────────────────────────────────────────
@@ -348,10 +410,7 @@ export class SandboxDockerService {
     while (Date.now() < deadline) {
       try {
         await new Promise<void>((resolve, reject) => {
-          const socket = createServer();
-          // Try to connect to the port
-          const net = require('net') as typeof import('net');
-          const client = net.createConnection({ port: wsPort, host: '127.0.0.1' }, () => {
+          const client = createConnection({ port: wsPort, host: '127.0.0.1' }, () => {
             client.destroy();
             resolve();
           });

@@ -35,6 +35,6 @@ export function registerSandboxDockerIpc(service: SandboxDockerService) {
 
   ipcMain.handle(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, async (_event, projectPath: string) => {
     const settings = loadProjectSettings(projectPath);
-    return settings.dockerToolsEnabled ?? false;
+    return settings.dockerToolsEnabled ?? null;
   });
 }

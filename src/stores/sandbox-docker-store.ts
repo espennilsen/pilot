@@ -131,10 +131,18 @@ export const useSandboxDockerStore = create<SandboxDockerStore>((set, get) => ({
 
   loadToolsEnabled: async (projectPath: string) => {
     try {
-      const enabled = await invoke(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, projectPath) as boolean;
-      set(state => ({
-        toolsEnabledByProject: { ...state.toolsEnabledByProject, [projectPath]: enabled },
-      }));
+      const enabled = await invoke(IPC.DOCKER_SANDBOX_GET_TOOLS_ENABLED, projectPath) as boolean | null;
+      if (enabled === null) {
+        // No project-level override — remove any stale entry so global setting is used
+        set(state => {
+          const { [projectPath]: _, ...rest } = state.toolsEnabledByProject;
+          return { toolsEnabledByProject: rest };
+        });
+      } else {
+        set(state => ({
+          toolsEnabledByProject: { ...state.toolsEnabledByProject, [projectPath]: enabled },
+        }));
+      }
     } catch {
       // fail silently
     }

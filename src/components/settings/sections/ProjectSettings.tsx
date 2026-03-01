@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSandboxStore } from '../../../stores/sandbox-store';
 import { useSandboxDockerStore } from '../../../stores/sandbox-docker-store';
 import { useAppSettingsStore } from '../../../stores/app-settings-store';
@@ -171,9 +171,9 @@ function DockerSandboxProjectToggle({
   const { loadToolsEnabled, setToolsEnabled } = useSandboxDockerStore();
 
   // Load current project value on mount
-  useState(() => {
+  useEffect(() => {
     if (projectPath) loadToolsEnabled(projectPath);
-  });
+  }, [projectPath, loadToolsEnabled]);
 
   // Determine effective state: project override > global
   const hasProjectOverride = toolsEnabled !== undefined;
