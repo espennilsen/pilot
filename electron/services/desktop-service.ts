@@ -185,6 +185,12 @@ export class DesktopService {
     }
   }
 
+  /** Stop and remove all running desktop containers. Called on app quit. */
+  async stopAll(): Promise<void> {
+    const projects = [...this.desktops.keys()];
+    await Promise.allSettled(projects.map(p => this.stopDesktop(p)));
+  }
+
   /** Stop and remove the desktop container for a project. */
   async stopDesktop(projectPath: string): Promise<void> {
     const state = this.desktops.get(projectPath);

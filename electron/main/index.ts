@@ -548,6 +548,7 @@ app.on('window-all-closed', () => {
 // Cleanup on quit
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
+  desktopService?.stopAll();
   mcpManager?.disposeAll();
   devService?.dispose();
   terminalService?.disposeAll();
