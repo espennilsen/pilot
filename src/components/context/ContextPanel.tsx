@@ -3,7 +3,6 @@ import { useUIStore, type ContextPanelTab } from '../../stores/ui-store';
 import { Tooltip } from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
-import { useSandboxDockerStore } from '../../stores/sandbox-docker-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useSubagentStore } from '../../stores/subagent-store';
@@ -27,12 +26,8 @@ export default function ContextPanel() {
       ).length
     : 0;
 
-  // Docker sandbox: project override > global setting
-  const globalSandboxEnabled = useAppSettingsStore((s) => s.dockerSandboxEnabled);
-  const projectDockerOverride = useSandboxDockerStore(
-    (s) => projectPath ? s.toolsEnabledByProject[projectPath] : undefined
-  );
-  const sandboxEnabled = projectDockerOverride !== undefined ? projectDockerOverride : globalSandboxEnabled;
+  // Docker sandbox tab: visible when the global setting is on
+  const sandboxEnabled = useAppSettingsStore((s) => s.dockerSandboxEnabled);
 
   // If the active tab was 'tasks', fall back to 'files'
   // Also fall back if sandbox tab is selected but sandbox is disabled
