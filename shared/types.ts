@@ -121,6 +121,32 @@ export interface ProjectSandboxSettings {
     allowedPaths: string[];
   };
   yoloMode: boolean;
+  /** Enable Docker sandbox agent tools. Default: false (no tool defs sent to agent). */
+  dockerToolsEnabled?: boolean;
+}
+
+// Docker sandbox — project-scoped containers with virtual display
+/** Status of a project-scoped Docker sandbox container */
+export interface DockerSandboxState {
+  containerId: string;
+  /** noVNC websockify port on host */
+  wsPort: number;
+  /** VNC port on host */
+  vncPort: number;
+  status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
+  /** Unix timestamp (ms) when the container was created */
+  createdAt: number;
+  /** Error message when status is 'error' */
+  error?: string;
+}
+
+/** Persisted to <project>/.pilot/sandbox.json for startup reconciliation */
+export interface DockerSandboxConfig {
+  containerId: string;
+  wsPort: number;
+  vncPort: number;
+  status: string;
+  createdAt: number;
 }
 
 // Staged diff for review
