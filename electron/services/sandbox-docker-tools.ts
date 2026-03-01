@@ -193,7 +193,8 @@ export function createSandboxDockerTools(
         return {
           content: [{
             type: 'image' as const,
-            source: { type: 'base64' as const, media_type: 'image/png' as const, data: base64 },
+            data: base64,
+            mimeType: 'image/png',
           }],
           details: {},
         };
