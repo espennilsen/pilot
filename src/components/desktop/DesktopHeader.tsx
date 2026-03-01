@@ -1,8 +1,9 @@
 /**
  * @file Desktop header — status badge, start/stop buttons, agent tools toggle.
  */
-import { Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ExternalLink, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useDesktopStore } from '../../stores/desktop-store';
+import { useTabStore } from '../../stores/tab-store';
 
 interface DesktopHeaderProps {
   projectPath: string;
@@ -39,6 +40,20 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Open in web tab */}
+        {isRunning && desktopState && (
+          <button
+            onClick={() => {
+              const url = `http://localhost:${desktopState.wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false`;
+              useTabStore.getState().addWebTab(url, projectPath, 'Desktop');
+            }}
+            className="p-1.5 hover:bg-bg-surface rounded transition-colors"
+            title="Open desktop in a tab"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
+          </button>
+        )}
+
         {/* Agent tools toggle */}
         <button
           onClick={() => setToolsEnabled(projectPath, !toolsEnabled)}
