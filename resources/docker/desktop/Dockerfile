@@ -67,4 +67,7 @@ EXPOSE 5900 6080
 RUN useradd -ms /bin/bash pilot
 USER pilot
 
+# Project files are bind-mounted here at runtime
+WORKDIR /workspace
+
 ENTRYPOINT ["/entrypoint.sh"]

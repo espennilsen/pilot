@@ -170,6 +170,8 @@ export class DesktopService {
                 '5900/tcp': [{ HostIp: '127.0.0.1', HostPort: String(vncPort) }],
                 '6080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(wsPort) }],
               },
+              // Mount the project directory into the container at /workspace
+              Binds: [`${projectPath}:/workspace`],
               // Reasonable resource limits
               Memory: 2 * 1024 * 1024 * 1024, // 2 GB
               NanoCpus: 2_000_000_000,         // 2 CPUs
@@ -361,6 +363,7 @@ export class DesktopService {
     const exec = await container.exec({
       Cmd: cmd,
       Env: ['DISPLAY=:99'],
+      WorkingDir: '/workspace',
       AttachStdout: true,
       AttachStderr: true,
     });
@@ -383,6 +386,7 @@ export class DesktopService {
     const exec = await container.exec({
       Cmd: cmd,
       Env: ['DISPLAY=:99'],
+      WorkingDir: '/workspace',
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,

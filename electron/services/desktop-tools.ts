@@ -4,6 +4,9 @@
  * 16 tools covering mouse, keyboard, screen, clipboard, and lifecycle control.
  * Each tool calls execInDesktop() with xdotool/scrot/xclip commands.
  * Tools are only included when desktopToolsEnabled is true for the project.
+ *
+ * The project directory is bind-mounted at /workspace inside the container.
+ * All commands execute with /workspace as the working directory.
  */
 import { Type } from '@sinclair/typebox';
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
@@ -308,7 +311,7 @@ export function createDesktopTools(
     {
       name: 'desktop_exec',
       label: 'Desktop Exec',
-      description: 'Run an arbitrary shell command inside the desktop container. Returns stdout and stderr. Use for installing packages, running scripts, launching applications, etc.',
+      description: 'Run an arbitrary shell command inside the desktop container. The project directory is mounted at /workspace (the default working directory). Returns stdout and stderr. Use for installing packages, running scripts, launching applications, building the project, etc.',
       parameters: Type.Object({
         command: Type.String({ description: 'Shell command to execute' }),
       }),
