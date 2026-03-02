@@ -25,6 +25,7 @@ import { useSandboxEvents } from './hooks/useSandboxEvents';
 import { useWorkspacePersistence, openTabSession, useWiredSessionsStore } from './hooks/useWorkspacePersistence';
 import { useAuthEvents } from './hooks/useAuthEvents';
 import { useFileWatcher } from './hooks/useFileWatcher';
+import { useGitStatusEvents } from './hooks/useGitStatusEvents';
 import { useSubagentEvents } from './hooks/useSubagentEvents';
 import { useEditorEvents } from './hooks/useEditorEvents';
 import { useWebTabEvents } from './hooks/useWebTabEvents';
@@ -109,6 +110,9 @@ function App() {
 
   // Watch filesystem for external changes
   useFileWatcher();
+
+  // Listen for git status changes from other windows / companion
+  useGitStatusEvents();
 
   // Listen for subagent events from main process
   useSubagentEvents();

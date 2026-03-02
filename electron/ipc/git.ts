@@ -1,18 +1,12 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { GitService } from '../services/git-service';
+import { broadcastToRenderer } from '../utils/broadcast';
 import type { GitLogOptions } from '../../shared/types';
 
-/** Push git status change to all renderer windows + companion clients. */
+/** Notify all renderer windows + companion clients that git status changed. */
 function pushStatusChanged(projectPath?: string): void {
-  const payload = { projectPath };
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(IPC.GIT_STATUS_CHANGED, payload);
-  }
-  try {
-    const { companionBridge } = require('../services/companion-ipc-bridge');
-    companionBridge.forwardEvent(IPC.GIT_STATUS_CHANGED, payload);
-  } catch { /* companion not available */ }
+  broadcastToRenderer(IPC.GIT_STATUS_CHANGED, { projectPath });
 }
 
 const gitServices = new Map<string, GitService>();
@@ -60,10 +54,12 @@ export function registerGitIpc() {
 
   ipcMain.handle(IPC.GIT_CHECKOUT, async (_event, branch: string, projectPath?: string) => {
     await getGitService(projectPath).checkout(branch);
+    pushStatusChanged(projectPath);
   });
 
   ipcMain.handle(IPC.GIT_CREATE_BRANCH, async (_event, name: string, from?: string, projectPath?: string) => {
     await getGitService(projectPath).createBranch(name, from);
+    pushStatusChanged(projectPath);
   });
 
   ipcMain.handle(IPC.GIT_STAGE, async (_event, paths: string[], projectPath?: string) => {
@@ -76,10 +72,12 @@ export function registerGitIpc() {
 
   ipcMain.handle(IPC.GIT_COMMIT, async (_event, message: string, projectPath?: string) => {
     await getGitService(projectPath).commit(message);
+    pushStatusChanged(projectPath);
   });
 
   ipcMain.handle(IPC.GIT_PUSH, async (_event, remote?: string, branch?: string, projectPath?: string) => {
     await getGitService(projectPath).push(remote, branch);
+    pushStatusChanged(projectPath);
   });
 
   ipcMain.handle(IPC.GIT_PULL, async (_event, remote?: string, branch?: string, projectPath?: string) => {
