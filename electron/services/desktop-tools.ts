@@ -25,6 +25,11 @@ export function createDesktopTools(
     return service.execInDesktop(projectPath, cmd);
   }
 
+  /** Helper: exec with direct Cmd array — no shell interpolation */
+  async function execCmd(args: string[]): Promise<string> {
+    return service.execInDesktopCmd(projectPath, args);
+  }
+
   /** Helper: build a simple text response */
   function textResult(text: string) {
     return { content: [{ type: 'text' as const, text }], details: {} };
@@ -42,7 +47,7 @@ export function createDesktopTools(
         y: Type.Number({ description: 'Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool mousemove --sync ${params.x} ${params.y} click 1`);
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y), 'click', '1']);
         return textResult(`Clicked at (${params.x}, ${params.y})`);
       },
     },
@@ -56,7 +61,7 @@ export function createDesktopTools(
         y: Type.Number({ description: 'Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool mousemove --sync ${params.x} ${params.y} click --repeat 2 1`);
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y), 'click', '--repeat', '2', '1']);
         return textResult(`Double-clicked at (${params.x}, ${params.y})`);
       },
     },
@@ -70,7 +75,7 @@ export function createDesktopTools(
         y: Type.Number({ description: 'Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool mousemove --sync ${params.x} ${params.y} click 3`);
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y), 'click', '3']);
         return textResult(`Right-clicked at (${params.x}, ${params.y})`);
       },
     },
@@ -84,7 +89,7 @@ export function createDesktopTools(
         y: Type.Number({ description: 'Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool mousemove --sync ${params.x} ${params.y} click 2`);
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y), 'click', '2']);
         return textResult(`Middle-clicked at (${params.x}, ${params.y})`);
       },
     },
@@ -98,7 +103,7 @@ export function createDesktopTools(
         y: Type.Number({ description: 'Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool mousemove --sync ${params.x} ${params.y}`);
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y)]);
         return textResult(`Moved cursor to (${params.x}, ${params.y})`);
       },
     },
@@ -114,10 +119,7 @@ export function createDesktopTools(
         endY: Type.Number({ description: 'Ending Y coordinate' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(
-          `xdotool mousemove --sync ${params.startX} ${params.startY} mousedown 1 ` +
-          `mousemove --sync ${params.endX} ${params.endY} mouseup 1`
-        );
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.startX), String(params.startY), 'mousedown', '1', 'mousemove', '--sync', String(params.endX), String(params.endY), 'mouseup', '1']);
         return textResult(`Dragged from (${params.startX}, ${params.startY}) to (${params.endX}, ${params.endY})`);
       },
     },
@@ -142,10 +144,7 @@ export function createDesktopTools(
         // xdotool: button 4=up, 5=down, 6=left, 7=right
         const buttonMap = { up: 4, down: 5, left: 6, right: 7 } as const;
         const button = buttonMap[params.direction as keyof typeof buttonMap];
-        await exec(
-          `xdotool mousemove --sync ${params.x} ${params.y} ` +
-          `click --repeat ${amount} ${button}`
-        );
+        await execCmd(['xdotool', 'mousemove', '--sync', String(params.x), String(params.y), 'click', '--repeat', String(amount), String(button)]);
         return textResult(`Scrolled ${params.direction} ${amount}x at (${params.x}, ${params.y})`);
       },
     },
@@ -160,10 +159,7 @@ export function createDesktopTools(
         text: Type.String({ description: 'Text to type' }),
       }),
       async execute(_toolCallId, params) {
-        // Use xdotool type with -- to prevent flag interpretation
-        // Escape single quotes for shell safety
-        const escaped = params.text.replace(/'/g, "'\\''");
-        await exec(`xdotool type -- '${escaped}'`);
+        await execCmd(['xdotool', 'type', '--', params.text]);
         return textResult(`Typed ${params.text.length} character(s)`);
       },
     },
@@ -180,8 +176,7 @@ export function createDesktopTools(
         if (!/^[a-zA-Z0-9+_ -]+$/.test(params.keys)) {
           throw new Error(`Invalid key specification: "${params.keys}" — only alphanumeric characters, +, _, - and space are allowed`);
         }
-        const safeKeys = params.keys.replace(/'/g, "'\\''");
-        await exec(`xdotool key '${safeKeys}'`);
+        await execCmd(['xdotool', 'key', params.keys]);
         return textResult(`Pressed ${params.keys}`);
       },
     },
@@ -228,7 +223,7 @@ export function createDesktopTools(
       }),
       async execute(_toolCallId, params) {
         const escaped = params.text.replace(/'/g, "'\\''");
-        await exec(`echo '${escaped}' | xclip -selection clipboard`);
+        await exec(`printf '%s' '${escaped}' | xclip -selection clipboard`);
         return textResult('Clipboard updated');
       },
     },
@@ -269,7 +264,7 @@ export function createDesktopTools(
       }),
       async execute(_toolCallId, params) {
         const seconds = Math.min(Math.max(0, params.seconds), MAX_WAIT_SECONDS);
-        await exec(`sleep ${seconds}`);
+        await execCmd(['sleep', String(seconds)]);
         return textResult(`Waited ${seconds}s`);
       },
     },
@@ -304,7 +299,7 @@ export function createDesktopTools(
           await new Promise(resolve => setTimeout(resolve, wait * 1000));
         }
 
-        return textResult(`Opened ${url} in ${browser}. Use desktop_screenshot to see the page.`);
+        return textResult(`Opened ${params.url} in ${browser}. Use desktop_screenshot to see the page.`);
       },
     },
 

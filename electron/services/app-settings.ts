@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { homedir } from 'os';
 import {
   PILOT_APP_SETTINGS_FILE,
   DEFAULT_PI_AGENT_DIR,
@@ -102,9 +103,31 @@ export function loadAppSettings(): PilotAppSettings {
 
 export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSettings {
   const current = loadAppSettings();
+
+  // Validate incoming fields — reject unexpected types to prevent a compromised renderer
+  // from injecting dangerous values (e.g. piAgentDir: '/etc').
+  const validated: Partial<PilotAppSettings> = {};
+  if (settings.piAgentDir !== undefined) {
+    if (typeof settings.piAgentDir === 'string' && (settings.piAgentDir.startsWith('~') || settings.piAgentDir.startsWith(homedir()))) {
+      validated.piAgentDir = settings.piAgentDir;
+    }
+  }
+  if (typeof settings.terminalApp === 'string' || settings.terminalApp === null) validated.terminalApp = settings.terminalApp;
+  if (typeof settings.editorCli === 'string' || settings.editorCli === null) validated.editorCli = settings.editorCli;
+  if (typeof settings.onboardingComplete === 'boolean') validated.onboardingComplete = settings.onboardingComplete;
+  if (typeof settings.developerMode === 'boolean') validated.developerMode = settings.developerMode;
+  if (typeof settings.companionPort === 'number') validated.companionPort = settings.companionPort;
+  if (typeof settings.companionProtocol === 'string') validated.companionProtocol = settings.companionProtocol;
+  if (typeof settings.companionAutoStart === 'boolean') validated.companionAutoStart = settings.companionAutoStart;
+  if (typeof settings.desktopEnabled === 'boolean') validated.desktopEnabled = settings.desktopEnabled;
+  if (typeof settings.systemPrompt === 'string' || settings.systemPrompt === undefined) validated.systemPrompt = settings.systemPrompt;
+  if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
+  if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;
+  if (Array.isArray(settings.hiddenPaths)) validated.hiddenPaths = settings.hiddenPaths;
+
   const merged: PilotAppSettings = {
     ...current,
-    ...settings,
+    ...validated,
   };
 
   ensurePilotAppDirs();

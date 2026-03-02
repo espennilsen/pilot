@@ -166,15 +166,15 @@ export class DesktopService {
           await container.start();
           break; // Success — exit retry loop
         } catch (portErr: unknown) {
+          // Always clean up partially-created container before retry or rethrow
+          if (container) {
+            try { await container.remove({ force: true }); } catch { /* best effort */ }
+            container = undefined;
+          }
           const msg = portErr instanceof Error ? portErr.message : String(portErr);
           const isPortConflict = msg.includes('port is already allocated') || msg.includes('address already in use');
           if (!isPortConflict || attempt === PORT_RETRY_ATTEMPTS) {
             throw portErr; // Not a port conflict or out of retries
-          }
-          // Port conflict — clean up partial container and retry with new ports
-          if (container) {
-            try { await container.remove({ force: true }); } catch { /* best effort */ }
-            container = undefined;
           }
         }
       }
@@ -328,8 +328,13 @@ export class DesktopService {
     return null;
   }
 
-  /** Execute a command inside the desktop container. Returns stdout. */
+  /** Execute a shell command inside the desktop container. Returns stdout. */
   async execInDesktop(projectPath: string, command: string): Promise<string> {
+    return this.execInDesktopCmd(projectPath, ['bash', '-c', command]);
+  }
+
+  /** Execute a command inside the desktop container using a direct Cmd array (no shell). */
+  async execInDesktopCmd(projectPath: string, cmd: string[]): Promise<string> {
     const state = this.desktops.get(projectPath);
     if (!state || state.status !== 'running') {
       throw new Error('No running desktop for this project');
@@ -337,7 +342,7 @@ export class DesktopService {
 
     const container = this.docker.getContainer(state.containerId);
     const exec = await container.exec({
-      Cmd: ['bash', '-c', command],
+      Cmd: cmd,
       Env: ['DISPLAY=:99'],
       AttachStdout: true,
       AttachStderr: true,
@@ -397,41 +402,58 @@ export class DesktopService {
         filters: { label: ['pilot.desktop=true'] },
       });
 
+      // Group containers by project to detect duplicates from previous crashes
+      const byProject = new Map<string, typeof containers>();
       for (const containerInfo of containers) {
         const projectPath = containerInfo.Labels['pilot.project'];
         if (!projectPath) continue;
+        const group = byProject.get(projectPath) ?? [];
+        group.push(containerInfo);
+        byProject.set(projectPath, group);
+      }
 
-        if (containerInfo.State === 'running') {
-          // Extract host ports from the container info
-          const ports = containerInfo.Ports ?? [];
+      for (const [projectPath, group] of byProject) {
+        // Sort by creation time descending — keep the newest
+        group.sort((a, b) => b.Created - a.Created);
+        const [keep, ...duplicates] = group;
+
+        // Remove duplicate containers
+        for (const dup of duplicates) {
+          try {
+            const c = this.docker.getContainer(dup.Id);
+            await c.remove({ force: true });
+          } catch { /* best effort */ }
+        }
+
+        if (keep.State === 'running') {
+          const ports = keep.Ports ?? [];
           const vncMapping = ports.find(p => p.PrivatePort === 5900);
           const wsMapping = ports.find(p => p.PrivatePort === 6080);
 
           const state: DesktopState = {
-            containerId: containerInfo.Id,
+            containerId: keep.Id,
             wsPort: wsMapping?.PublicPort ?? 0,
             vncPort: vncMapping?.PublicPort ?? 0,
             status: 'running',
-            createdAt: new Date(containerInfo.Created * 1000).getTime(),
+            createdAt: new Date(keep.Created * 1000).getTime(),
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
-        } else if (containerInfo.State === 'exited' || containerInfo.State === 'created') {
-          // Stopped container — track it so the user can restart
+        } else if (keep.State === 'exited' || keep.State === 'created') {
           const state: DesktopState = {
-            containerId: containerInfo.Id,
+            containerId: keep.Id,
             wsPort: 0,
             vncPort: 0,
             status: 'stopped',
-            createdAt: new Date(containerInfo.Created * 1000).getTime(),
+            createdAt: new Date(keep.Created * 1000).getTime(),
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
         } else {
           // Dead/removing/paused — clean up
           try {
-            const container = this.docker.getContainer(containerInfo.Id);
-            await container.remove({ force: true });
+            const c = this.docker.getContainer(keep.Id);
+            await c.remove({ force: true });
           } catch { /* best effort */ }
           this.removePersisted(projectPath);
         }

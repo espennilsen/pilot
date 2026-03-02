@@ -240,21 +240,23 @@ export class PilotSessionManager {
   }
 
   dispose(tabId: string): void {
-    // Clean up subagents for this tab first
-    this.subagentManager.cleanup(tabId);
+    // Each step is guarded so a failure in one doesn't skip the rest
+    try { this.subagentManager.cleanup(tabId); } catch { /* best effort */ }
+    try { this.mcpManager?.stopAllForTab(tabId).catch(() => {}); } catch { /* best effort */ }
 
-    // Release MCP server references for this tab
-    this.mcpManager?.stopAllForTab(tabId).catch(() => {});
-
-    // Check if this was the last tab for its project — stop sandbox if so
+    // Check if this was the last tab for its project — stop desktop if so
     const projectPath = this.tabProjectPaths.get(tabId);
 
-    const unsub = this.unsubscribers.get(tabId);
-    unsub?.();
+    try {
+      const unsub = this.unsubscribers.get(tabId);
+      unsub?.();
+    } catch { /* best effort */ }
     this.unsubscribers.delete(tabId);
 
-    const session = this.sessions.get(tabId);
-    session?.dispose();
+    try {
+      const session = this.sessions.get(tabId);
+      session?.dispose();
+    } catch { /* best effort */ }
     this.sessions.delete(tabId);
 
     this.stagedDiffs.clearTab(tabId);
@@ -262,7 +264,7 @@ export class PilotSessionManager {
     this.lastUserMessages.delete(tabId);
     this.tabSandboxOptions.delete(tabId);
 
-    // Stop Docker sandbox when no more tabs reference this project
+    // Stop Docker desktop when no more tabs reference this project
     if (projectPath && this.desktopService) {
       const stillUsed = [...this.tabProjectPaths.values()].some(p => p === projectPath);
       if (!stillUsed) {
@@ -295,8 +297,10 @@ export class PilotSessionManager {
   /**
    * Add or remove Docker sandbox tools from a live session.
    *
-   * Accesses the private _toolRegistry on AgentSession (a Map<string, ToolDefinition>)
-   * to inject/remove tools at runtime, then calls setActiveToolsByName to apply.
+   * TODO: This accesses the private _toolRegistry on AgentSession via an `any` cast.
+   * This is fragile — any SDK refactor that renames or restructures this property
+   * will silently break tool injection at runtime. Replace with a public
+   * session.addTools() / session.removeTools() API when the SDK exposes one.
    */
   updateDesktopTools(tabId: string, enabled: boolean): void {
     const session = this.sessions.get(tabId);
