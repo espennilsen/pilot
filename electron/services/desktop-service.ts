@@ -9,7 +9,7 @@ import Dockerode from 'dockerode';
 import { join } from 'path';
 import { homedir } from 'os';
 import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
 import { broadcastToRenderer } from '../utils/broadcast';
@@ -137,6 +137,9 @@ export class DesktopService {
       let vncPort = 0;
       let wsPort = 0;
 
+      // Generate a per-container VNC password for authentication
+      const vncPassword = randomBytes(12).toString('base64url');
+
       for (let attempt = 1; attempt <= PORT_RETRY_ATTEMPTS; attempt++) {
         [vncPort, wsPort] = await Promise.all([
           this.findAvailablePort(),
@@ -146,7 +149,7 @@ export class DesktopService {
         try {
           container = await this.docker.createContainer({
             Image: image,
-            Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
+            Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`, `VNC_PASSWORD=${vncPassword}`],
             Labels: {
               'pilot.desktop': 'true',
               'pilot.project': projectPath,
@@ -189,6 +192,7 @@ export class DesktopService {
         vncPort,
         status: 'starting',
         createdAt: Date.now(),
+        vncPassword,
       };
       this.desktops.set(projectPath, state);
 
@@ -305,6 +309,7 @@ export class DesktopService {
           vncPort: config.vncPort,
           status: 'running',
           createdAt: config.createdAt,
+          vncPassword: config.vncPassword,
         };
         this.desktops.set(projectPath, state);
         return state;
@@ -317,6 +322,7 @@ export class DesktopService {
         vncPort: 0,
         status: 'stopped',
         createdAt: config.createdAt,
+        vncPassword: config.vncPassword,
       };
       this.desktops.set(projectPath, state);
       return state;
@@ -349,6 +355,31 @@ export class DesktopService {
     });
 
     const stream = await exec.start({ Detach: false, Tty: false });
+    return this.collectStream(stream);
+  }
+
+  /**
+   * Execute a command inside the desktop container, piping data to its stdin.
+   * Uses Docker exec's native stdin attachment — no shell escaping needed.
+   */
+  async execInDesktopStdin(projectPath: string, cmd: string[], stdinData: string): Promise<string> {
+    const state = this.desktops.get(projectPath);
+    if (!state || state.status !== 'running') {
+      throw new Error('No running desktop for this project');
+    }
+
+    const container = this.docker.getContainer(state.containerId);
+    const exec = await container.exec({
+      Cmd: cmd,
+      Env: ['DISPLAY=:99'],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    const stream = await exec.start({ Detach: false, Tty: false, hijack: true });
+    stream.write(stdinData);
+    stream.end();
     return this.collectStream(stream);
   }
 
@@ -430,22 +461,30 @@ export class DesktopService {
           const vncMapping = ports.find(p => p.PrivatePort === 5900);
           const wsMapping = ports.find(p => p.PrivatePort === 6080);
 
+          // Recover VNC password from persisted config (baked in container env)
+          const persistedConfig = this.loadPersistedConfig(projectPath);
+
           const state: DesktopState = {
             containerId: keep.Id,
             wsPort: wsMapping?.PublicPort ?? 0,
             vncPort: vncMapping?.PublicPort ?? 0,
             status: 'running',
             createdAt: new Date(keep.Created * 1000).getTime(),
+            vncPassword: persistedConfig?.vncPassword,
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
         } else if (keep.State === 'exited' || keep.State === 'created') {
+          // Recover VNC password from persisted config
+          const persistedConfig = this.loadPersistedConfig(projectPath);
+
           const state: DesktopState = {
             containerId: keep.Id,
             wsPort: 0,
             vncPort: 0,
             status: 'stopped',
             createdAt: new Date(keep.Created * 1000).getTime(),
+            vncPassword: persistedConfig?.vncPassword,
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
@@ -488,12 +527,20 @@ export class DesktopService {
       const vncPort = Number(portBindings['5900/tcp']?.[0]?.HostPort) || 0;
       const wsPort = Number(portBindings['6080/tcp']?.[0]?.HostPort) || 0;
 
+      if (vncPort <= 0 || wsPort <= 0) {
+        throw new Error(
+          `Container ${existing.containerId} has invalid port bindings after restart ` +
+          `(VNC: ${vncPort}, WS: ${wsPort}). Stop and start the desktop again.`,
+        );
+      }
+
       const state: DesktopState = {
         containerId: existing.containerId,
         wsPort,
         vncPort,
         status: 'starting',
         createdAt: existing.createdAt,
+        vncPassword: existing.vncPassword,
       };
       this.desktops.set(projectPath, state);
 
@@ -714,6 +761,7 @@ export class DesktopService {
         vncPort: state.vncPort,
         status: state.status,
         createdAt: state.createdAt,
+        vncPassword: state.vncPassword,
       };
       writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2));
     } catch { /* best effort */ }

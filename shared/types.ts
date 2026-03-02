@@ -150,6 +150,8 @@ export interface DesktopState {
   createdAt: number;
   /** Error message when status is 'error' */
   error?: string;
+  /** Per-container VNC password for authentication */
+  vncPassword?: string;
 }
 
 /** Persisted to <project>/.pilot/desktop.json for startup reconciliation */
@@ -159,6 +161,8 @@ export interface DesktopConfig {
   vncPort: number;
   status: string;
   createdAt: number;
+  /** Per-container VNC password for authentication */
+  vncPassword?: string;
 }
 
 // Staged diff for review

@@ -14,8 +14,12 @@ sleep 1
 # Start lightweight window manager
 fluxbox &
 
-# Start VNC server (no password, shared mode)
-x11vnc -display "$DISPLAY" -forever -shared -nopw -rfbport 5900 &
+# Start VNC server with per-container password authentication
+if [ -n "$VNC_PASSWORD" ]; then
+  x11vnc -display "$DISPLAY" -forever -shared -passwd "$VNC_PASSWORD" -rfbport 5900 &
+else
+  x11vnc -display "$DISPLAY" -forever -shared -nopw -rfbport 5900 &
+fi
 
 # Start websockify → exposes VNC over WebSocket for noVNC
 # noVNC static files are at /usr/share/novnc on Ubuntu 24.04

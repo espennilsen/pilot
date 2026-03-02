@@ -222,8 +222,11 @@ export function createDesktopTools(
         text: Type.String({ description: 'Text to copy to clipboard' }),
       }),
       async execute(_toolCallId, params) {
-        const escaped = params.text.replace(/'/g, "'\\''");
-        await exec(`printf '%s' '${escaped}' | xclip -selection clipboard`);
+        await service.execInDesktopStdin(
+          projectPath,
+          ['xclip', '-selection', 'clipboard'],
+          params.text,
+        );
         return textResult('Clipboard updated');
       },
     },
@@ -237,9 +240,10 @@ export function createDesktopTools(
       parameters: Type.Object({}),
       async execute() {
         const state = await service.startDesktop(projectPath);
+        const passwordParam = state.vncPassword ? `&password=${encodeURIComponent(state.vncPassword)}` : '';
         return textResult(
           `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
-          `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true`
+          `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true${passwordParam}`
         );
       },
     },

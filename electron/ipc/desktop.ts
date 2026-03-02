@@ -3,7 +3,9 @@
  */
 import { ipcMain } from 'electron';
 import { resolve } from 'path';
+import { homedir } from 'os';
 import { IPC } from '../../shared/ipc';
+import { isWithinDir } from '../utils/paths';
 import { loadProjectSettings, saveProjectSettings } from '../services/project-settings';
 import type { DesktopService } from '../services/desktop-service';
 import type { PilotSessionManager } from '../services/pi-session-manager';
@@ -26,12 +28,17 @@ function requireBoolean(value: unknown, name: string): boolean {
 }
 
 /**
- * Validate a project path: must be a non-empty string that resolves to an absolute path.
+ * Validate a project path: must be a non-empty string that resolves to an absolute
+ * path within the user's home directory. Rejects arbitrary paths to prevent writes
+ * to sensitive locations (e.g. /etc, /tmp).
  * Returns the resolved absolute path.
  */
 function validateProjectPath(value: unknown): string {
   const raw = requireString(value, 'projectPath');
   const resolved = resolve(raw);
+  if (!isWithinDir(homedir(), resolved)) {
+    throw new Error(`Project path must be within the home directory: ${resolved}`);
+  }
   return resolved;
 }
 
