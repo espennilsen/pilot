@@ -2,11 +2,12 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { GitService } from '../services/git-service';
 import { broadcastToRenderer } from '../utils/broadcast';
-import type { GitLogOptions } from '../../shared/types';
+import type { GitLogOptions, GitStatusChangedPayload } from '../../shared/types';
 
 /** Notify all renderer windows + companion clients that git status changed. */
 function pushStatusChanged(projectPath?: string, branchChanged?: boolean): void {
-  broadcastToRenderer(IPC.GIT_STATUS_CHANGED, { projectPath, branchChanged: branchChanged ?? false });
+  const payload: GitStatusChangedPayload = { projectPath, branchChanged: branchChanged ?? false };
+  broadcastToRenderer(IPC.GIT_STATUS_CHANGED, payload);
 }
 
 const gitServices = new Map<string, GitService>();

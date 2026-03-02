@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useGitStore } from '../stores/git-store';
 import { on } from '../lib/ipc-client';
 import { IPC } from '../../shared/ipc';
+import type { GitStatusChangedPayload } from '../../shared/types';
 
 /**
  * Listens for GIT_STATUS_CHANGED push events from the main process
@@ -20,7 +21,7 @@ export function useGitStatusEvents() {
 
   useEffect(() => {
     const unsub = on(IPC.GIT_STATUS_CHANGED, (...args: unknown[]) => {
-      const payload = args[0] as { projectPath?: string; branchChanged?: boolean } | undefined;
+      const payload = args[0] as GitStatusChangedPayload | undefined;
       // Refresh if the event is for our project or is a global notification
       if (!payload?.projectPath || payload.projectPath === currentProjectPath) {
         refreshStatus();

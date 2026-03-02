@@ -173,6 +173,13 @@ export interface GitOperationState {
   currentCommit?: string;
 }
 
+/** Payload pushed from main → renderer on `GIT_STATUS_CHANGED` events. */
+export interface GitStatusChangedPayload {
+  projectPath?: string;
+  /** True when the operation may have changed the branch list (checkout, createBranch, abort, continue, skip). */
+  branchChanged: boolean;
+}
+
 /** A single file with conflict markers, including all three versions */
 export interface ConflictFile {
   /** Relative path from project root */
