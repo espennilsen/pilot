@@ -176,7 +176,12 @@ export function createDesktopTools(
         keys: Type.String({ description: 'Key or key combo (e.g. "ctrl+c", "Return", "alt+F4")' }),
       }),
       async execute(_toolCallId, params) {
-        await exec(`xdotool key ${params.keys}`);
+        // Validate keys against allowlist: xdotool key names are alphanumeric with +/_ separators
+        if (!/^[a-zA-Z0-9+_ -]+$/.test(params.keys)) {
+          throw new Error(`Invalid key specification: "${params.keys}" — only alphanumeric characters, +, _, - and space are allowed`);
+        }
+        const safeKeys = params.keys.replace(/'/g, "'\\''");
+        await exec(`xdotool key '${safeKeys}'`);
         return textResult(`Pressed ${params.keys}`);
       },
     },
@@ -284,13 +289,13 @@ export function createDesktopTools(
       async execute(_toolCallId, params) {
         const browser = params.browser || 'chromium';
         const wait = params.wait ?? 3;
-        const url = params.url;
+        const safeUrl = params.url.replace(/'/g, "'\\''");
 
         let cmd: string;
         if (browser === 'firefox') {
-          cmd = `firefox "${url}" &`;
+          cmd = `firefox '${safeUrl}' &`;
         } else {
-          cmd = `chromium-browser $CHROMIUM_FLAGS "${url}" &`;
+          cmd = `chromium-browser $CHROMIUM_FLAGS '${safeUrl}' &`;
         }
 
         await exec(cmd);

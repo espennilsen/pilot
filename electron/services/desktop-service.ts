@@ -6,13 +6,13 @@
  * take screenshots via scrot, and interact with the clipboard via xclip.
  */
 import Dockerode from 'dockerode';
-import { BrowserWindow } from 'electron';
 import { join } from 'path';
 import { homedir } from 'os';
 import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { createHash } from 'crypto';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
+import { broadcastToRenderer } from '../utils/broadcast';
 import type { DesktopState, DesktopConfig } from '../../shared/types';
 
 /** Docker image name for the base desktop */
@@ -130,31 +130,58 @@ export class DesktopService {
       await this.ensureImage();
       const image = await this.ensureProjectImage(projectPath);
 
-      const [vncPort, wsPort] = await Promise.all([
-        this.findAvailablePort(),
-        this.findAvailablePort(),
-      ]);
+      // Retry port allocation + container creation to handle TOCTOU races
+      // where a port is freed then claimed by another process before Docker binds it.
+      const PORT_RETRY_ATTEMPTS = 3;
+      let container: Dockerode.Container | undefined;
+      let vncPort = 0;
+      let wsPort = 0;
 
-      const container = await this.docker.createContainer({
-        Image: image,
-        Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
-        Labels: {
-          'pilot.desktop': 'true',
-          'pilot.project': projectPath,
-        },
-        ExposedPorts: { '5900/tcp': {}, '6080/tcp': {} },
-        HostConfig: {
-          PortBindings: {
-            '5900/tcp': [{ HostPort: String(vncPort) }],
-            '6080/tcp': [{ HostPort: String(wsPort) }],
-          },
-          // Reasonable resource limits
-          Memory: 2 * 1024 * 1024 * 1024, // 2 GB
-          NanoCpus: 2_000_000_000,         // 2 CPUs
-        },
-      });
+      for (let attempt = 1; attempt <= PORT_RETRY_ATTEMPTS; attempt++) {
+        [vncPort, wsPort] = await Promise.all([
+          this.findAvailablePort(),
+          this.findAvailablePort(),
+        ]);
 
-      await container.start();
+        try {
+          container = await this.docker.createContainer({
+            Image: image,
+            Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
+            Labels: {
+              'pilot.desktop': 'true',
+              'pilot.project': projectPath,
+            },
+            ExposedPorts: { '5900/tcp': {}, '6080/tcp': {} },
+            HostConfig: {
+              PortBindings: {
+                '5900/tcp': [{ HostIp: '127.0.0.1', HostPort: String(vncPort) }],
+                '6080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(wsPort) }],
+              },
+              // Reasonable resource limits
+              Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+              NanoCpus: 2_000_000_000,         // 2 CPUs
+            },
+          });
+
+          await container.start();
+          break; // Success — exit retry loop
+        } catch (portErr: unknown) {
+          const msg = portErr instanceof Error ? portErr.message : String(portErr);
+          const isPortConflict = msg.includes('port is already allocated') || msg.includes('address already in use');
+          if (!isPortConflict || attempt === PORT_RETRY_ATTEMPTS) {
+            throw portErr; // Not a port conflict or out of retries
+          }
+          // Port conflict — clean up partial container and retry with new ports
+          if (container) {
+            try { await container.remove({ force: true }); } catch { /* best effort */ }
+            container = undefined;
+          }
+        }
+      }
+
+      if (!container) {
+        throw new Error('Failed to create desktop container after port allocation retries');
+      }
 
       const state: DesktopState = {
         containerId: container.id,
@@ -650,14 +677,7 @@ export class DesktopService {
 
   /** Push a desktop event to the renderer (and companion). */
   private pushEvent(projectPath: string, state: Partial<DesktopState>): void {
-    const payload = { projectPath, ...state };
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(IPC.DESKTOP_EVENT, payload);
-    }
-    try {
-      const { companionBridge } = require('./companion-ipc-bridge');
-      companionBridge.forwardEvent(IPC.DESKTOP_EVENT, payload);
-    } catch { /* companion not available */ }
+    broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, ...state });
   }
 
   /** Persist desktop config to <project>/.pilot/desktop.json */
