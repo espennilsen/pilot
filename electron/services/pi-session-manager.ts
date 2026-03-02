@@ -313,6 +313,11 @@ export class PilotSessionManager {
     const registry = (session as any)._toolRegistry;
     if (!registry || !(registry instanceof Map)) {
       console.error('[SessionManager] _toolRegistry missing or wrong type — desktop tool injection failed. The SDK may have changed its internal structure.');
+      broadcastToRenderer(IPC.DESKTOP_EVENT, {
+        projectPath,
+        status: 'error',
+        error: 'Desktop tools update failed — the SDK internal structure may have changed. Restart the session to retry.',
+      });
       return;
     }
 

@@ -31,14 +31,29 @@ function requireBoolean(value: unknown, name: string): boolean {
  * Validate a project path: must be a non-empty string that resolves to an absolute
  * path within the user's home directory. Rejects arbitrary paths to prevent writes
  * to sensitive locations (e.g. /etc, /tmp).
+ *
+ * On Windows the homedir() check is relaxed because projects commonly live on
+ * secondary drives (e.g. D:\projects) outside C:\Users\<user>. Docker's own
+ * mount restrictions prevent arbitrary filesystem access.
+ *
  * Returns the resolved absolute path.
  */
 function validateProjectPath(value: unknown): string {
   const raw = requireString(value, 'projectPath');
   const resolved = resolve(raw);
-  if (!isWithinDir(homedir(), resolved)) {
-    throw new Error(`Project path must be within the home directory: ${resolved}`);
+
+  if (process.platform === 'win32') {
+    // On Windows just ensure it's a valid absolute path — Docker mount
+    // restrictions provide the actual sandboxing.
+    if (!resolve(resolved).match(/^[A-Za-z]:\\/)) {
+      throw new Error(`Project path must be an absolute path: ${resolved}`);
+    }
+  } else {
+    if (!isWithinDir(homedir(), resolved)) {
+      throw new Error(`Project path must be within the home directory: ${resolved}`);
+    }
   }
+
   return resolved;
 }
 

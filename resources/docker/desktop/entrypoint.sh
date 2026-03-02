@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # ── Chromium flags for running inside a container ────────────────────
 # --no-sandbox is required because the container already provides isolation.
@@ -14,11 +14,16 @@ sleep 1
 # Start lightweight window manager
 fluxbox &
 
-# Start VNC server with per-container password authentication
-if [ -n "$VNC_PASSWORD" ]; then
-  x11vnc -display "$DISPLAY" -forever -shared -passwd "$VNC_PASSWORD" -rfbport 5900 &
+# Start VNC server with per-container password authentication.
+# Store the password in a hashed file to keep it out of the process table (`ps aux`),
+# then unset the environment variable so child processes can't read it either.
+if [ -n "${VNC_PASSWORD:-}" ]; then
+  x11vnc -storepasswd "$VNC_PASSWORD" /tmp/vncpasswd
+  unset VNC_PASSWORD
+  x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
 else
-  x11vnc -display "$DISPLAY" -forever -shared -nopw -rfbport 5900 &
+  echo "ERROR: VNC_PASSWORD must be set and non-empty" >&2
+  exit 1
 fi
 
 # Start websockify → exposes VNC over WebSocket for noVNC

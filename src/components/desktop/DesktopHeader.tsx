@@ -55,7 +55,10 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
         {isRunning && desktopState && (
           <button
             onClick={() => {
-              const url = `http://localhost:${desktopState.wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false`;
+              const passwordParam = desktopState.vncPassword
+                ? `&password=${encodeURIComponent(desktopState.vncPassword)}`
+                : '';
+              const url = `http://localhost:${desktopState.wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false${passwordParam}`;
               useTabStore.getState().addWebTab(url, projectPath, 'Desktop');
             }}
             className="p-1.5 hover:bg-bg-surface rounded transition-colors"

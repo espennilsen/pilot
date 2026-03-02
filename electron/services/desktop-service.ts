@@ -6,8 +6,9 @@
  * take screenshots via scrot, and interact with the clipboard via xclip.
  */
 import Dockerode from 'dockerode';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { homedir } from 'os';
+import { isWithinDir } from '../utils/paths';
 import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { createHash, randomBytes } from 'crypto';
 import { createServer, createConnection } from 'net';
@@ -127,6 +128,7 @@ export class DesktopService {
       vncPort: 0,
       status: 'starting',
       createdAt: Date.now(),
+      vncPassword: existing?.vncPassword,
     };
     this.desktops.set(projectPath, sentinel);
     this.pushEvent(projectPath, { status: 'starting' });
@@ -453,6 +455,15 @@ export class DesktopService {
       for (const containerInfo of containers) {
         const projectPath = containerInfo.Labels['pilot.project'];
         if (!projectPath) continue;
+
+        // Validate the label value to prevent writes to arbitrary paths
+        // from crafted Docker labels (e.g. /etc).
+        const resolved = resolve(projectPath);
+        if (!isWithinDir(homedir(), resolved)) {
+          console.warn(`[Desktop] Ignoring container with suspicious pilot.project label: ${projectPath}`);
+          continue;
+        }
+
         const group = byProject.get(projectPath) ?? [];
         group.push(containerInfo);
         byProject.set(projectPath, group);
@@ -821,7 +832,14 @@ export class DesktopService {
     broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, ...state });
   }
 
-  /** Persist desktop config to <project>/.pilot/desktop.json */
+  /**
+   * Persist desktop config to <project>/.pilot/desktop.json
+   *
+   * NOTE: This file contains the VNC password in plaintext. The project's
+   * .gitignore should exclude the entire .pilot/ directory (Pilot's own
+   * .gitignore template does this). If users selectively track files inside
+   * .pilot/ (e.g. only MEMORY.md), they must ensure desktop.json is excluded.
+   */
   private persistConfig(projectPath: string, state: DesktopState): void {
     try {
       const pilotDir = join(projectPath, '.pilot');

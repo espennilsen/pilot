@@ -295,9 +295,9 @@ export function createDesktopTools(
         // Use execCmd with an argument array to avoid shell interpolation.
         // Chromium flags are inlined rather than relying on $CHROMIUM_FLAGS shell expansion.
         if (browser === 'firefox') {
-          await execCmd(['nohup', 'firefox', params.url]);
+          await execCmd(['nohup', 'firefox', '--', params.url]);
         } else {
-          await execCmd(['nohup', 'chromium-browser', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', params.url]);
+          await execCmd(['nohup', 'chromium-browser', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--', params.url]);
         }
 
         if (wait > 0) {
