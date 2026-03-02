@@ -228,7 +228,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await invoke(IPC.GIT_COMMIT, message);
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -238,7 +239,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await invoke(IPC.GIT_PUSH);
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -248,7 +250,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_PULL) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -262,8 +264,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await invoke(IPC.GIT_CHECKOUT, branch);
-      await get().refreshStatus();
-      await get().refreshBranches();
+      // Status + branch refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -273,8 +275,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await invoke(IPC.GIT_CREATE_BRANCH, name);
-      await get().refreshBranches();
-      await get().refreshStatus();
+      // Status + branch refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
+      set({ isLoading: false });
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -332,7 +334,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     try {
       const result = await invoke(IPC.GIT_STASH_APPLY, stashId) as GitOperationResult;
       await get().loadStashes();
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -375,7 +377,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_MERGE, branch) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -391,7 +393,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_REBASE, upstream) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -407,7 +409,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_CHERRY_PICK, commitHash) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -423,7 +425,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_REVERT, commitHash) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       }
@@ -448,9 +450,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
   resolveFile: async (path: string) => {
     try {
       await invoke(IPC.GIT_RESOLVE_FILE, path);
-      // Remove from local conflict list
+      // Remove from local conflict list; status refresh is driven by push event
       set({ conflictedFiles: get().conflictedFiles.filter(f => f.path !== path) });
-      await get().refreshStatus();
     } catch (error) {
       set({ error: String(error) });
     }
@@ -459,8 +460,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
   resolveConflictWithStrategy: async (path: string, strategy: 'ours' | 'theirs' | 'mark-resolved') => {
     try {
       await invoke(IPC.GIT_RESOLVE_CONFLICT_STRATEGY, path, strategy);
+      // Remove from local conflict list; status refresh is driven by push event
       set({ conflictedFiles: get().conflictedFiles.filter(f => f.path !== path) });
-      await get().refreshStatus();
     } catch (error) {
       set({ error: String(error) });
     }
@@ -470,9 +471,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await invoke(IPC.GIT_ABORT_OPERATION);
+      // Clear local conflict state; status + branch refresh is driven by push event
       set({ conflictedFiles: [], isLoading: false });
-      await get().refreshStatus();
-      await get().refreshBranches();
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -482,14 +482,13 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_CONTINUE_OPERATION) as GitOperationResult;
-      await get().refreshStatus();
+      // Status + branch refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       } else {
         set({ conflictedFiles: [] });
       }
       set({ isLoading: false });
-      await get().refreshBranches();
       return result;
     } catch (error) {
       set({ error: String(error), isLoading: false });
@@ -501,7 +500,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await invoke(IPC.GIT_SKIP_COMMIT) as GitOperationResult;
-      await get().refreshStatus();
+      // Status refresh is driven by GIT_STATUS_CHANGED push event via useGitStatusEvents
       if (!result.success) {
         await get().loadConflicts();
       } else {
