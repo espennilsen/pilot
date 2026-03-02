@@ -113,12 +113,22 @@ export class DesktopService {
 
   /** Start a desktop container for a project. Restarts a stopped container if one exists. */
   async startDesktop(projectPath: string): Promise<DesktopState> {
-    // Already running? Return existing state.
+    // Already running or starting? Return existing state.
     const existing = this.desktops.get(projectPath);
     if (existing && (existing.status === 'running' || existing.status === 'starting')) {
       return existing;
     }
 
+    // Write a 'starting' sentinel immediately — before any await — to prevent
+    // a second concurrent call from passing the guard above.
+    const sentinel: DesktopState = {
+      containerId: existing?.containerId ?? '',
+      wsPort: 0,
+      vncPort: 0,
+      status: 'starting',
+      createdAt: Date.now(),
+    };
+    this.desktops.set(projectPath, sentinel);
     this.pushEvent(projectPath, { status: 'starting' });
 
     try {
@@ -464,13 +474,26 @@ export class DesktopService {
           // Recover VNC password from persisted config (baked in container env)
           const persistedConfig = this.loadPersistedConfig(projectPath);
 
+          if (!persistedConfig?.vncPassword) {
+            // Password lost (config deleted, first run after upgrade, etc.) — the running
+            // container expects a password but we can't provide one, so the renderer would
+            // silently fail to authenticate. Force-rebuild the container.
+            console.warn(`[Desktop] VNC password missing from persisted config for running container ${keep.Id.slice(0, 12)} (${projectPath}). Rebuilding container.`);
+            try {
+              const c = this.docker.getContainer(keep.Id);
+              await c.remove({ force: true });
+            } catch { /* best effort */ }
+            this.removePersisted(projectPath);
+            continue;
+          }
+
           const state: DesktopState = {
             containerId: keep.Id,
             wsPort: wsMapping?.PublicPort ?? 0,
             vncPort: vncMapping?.PublicPort ?? 0,
             status: 'running',
             createdAt: new Date(keep.Created * 1000).getTime(),
-            vncPassword: persistedConfig?.vncPassword,
+            vncPassword: persistedConfig.vncPassword,
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);
@@ -478,13 +501,25 @@ export class DesktopService {
           // Recover VNC password from persisted config
           const persistedConfig = this.loadPersistedConfig(projectPath);
 
+          if (!persistedConfig?.vncPassword) {
+            // Password lost — remove the stopped container so a fresh one (with a new
+            // password) will be created on next start.
+            console.warn(`[Desktop] VNC password missing from persisted config for stopped container ${keep.Id.slice(0, 12)} (${projectPath}). Removing container.`);
+            try {
+              const c = this.docker.getContainer(keep.Id);
+              await c.remove({ force: true });
+            } catch { /* best effort */ }
+            this.removePersisted(projectPath);
+            continue;
+          }
+
           const state: DesktopState = {
             containerId: keep.Id,
             wsPort: 0,
             vncPort: 0,
             status: 'stopped',
             createdAt: new Date(keep.Created * 1000).getTime(),
-            vncPassword: persistedConfig?.vncPassword,
+            vncPassword: persistedConfig.vncPassword,
           };
           this.desktops.set(projectPath, state);
           this.persistConfig(projectPath, state);

@@ -26,6 +26,10 @@ const INITIAL_DELAY_MS = 500;
 const MAX_DELAY_MS = 4000;
 
 export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProps) {
+  // TODO: The VNC password is currently passed as a URL query parameter, making it visible
+  // in Electron DevTools (Network tab) and `iframe.src` reads. Consider injecting it after
+  // load via noVNC's JS API (rfb.sendCredentials) using postMessage to keep it out of the URL.
+  // Risk is low (local-only Docker VNC), but would be cleaner. See PR #5 review thread 4.
   const passwordParam = vncPassword ? `&password=${encodeURIComponent(vncPassword)}` : '';
   const noVncUrl = `http://localhost:${wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false${passwordParam}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);

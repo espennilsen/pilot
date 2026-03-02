@@ -1,12 +1,13 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
+import { resolve } from 'path';
 import {
   PILOT_APP_SETTINGS_FILE,
   DEFAULT_PI_AGENT_DIR,
   ensurePilotAppDirs,
 } from './pilot-paths';
 import type { PilotAppSettings } from '../../shared/types';
-import { expandHome } from '../utils/paths';
+import { expandHome, isWithinDir } from '../utils/paths';
 
 export const DEFAULT_HIDDEN_PATHS = [
   'node_modules',
@@ -108,8 +109,11 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   // from injecting dangerous values (e.g. piAgentDir: '/etc').
   const validated: Partial<PilotAppSettings> = {};
   if (settings.piAgentDir !== undefined) {
-    if (typeof settings.piAgentDir === 'string' && (settings.piAgentDir.startsWith('~') || settings.piAgentDir.startsWith(homedir()))) {
-      validated.piAgentDir = settings.piAgentDir;
+    if (typeof settings.piAgentDir === 'string') {
+      const resolved = resolve(expandHome(settings.piAgentDir));
+      if (isWithinDir(homedir(), resolved)) {
+        validated.piAgentDir = settings.piAgentDir;
+      }
     }
   }
   if (typeof settings.terminalApp === 'string' || settings.terminalApp === null) validated.terminalApp = settings.terminalApp;

@@ -310,8 +310,11 @@ export class PilotSessionManager {
     if (!projectPath) return;
 
     // Access the private tool registry — it's a Map at runtime
-    const registry = (session as any)._toolRegistry as Map<string, any> | undefined;
-    if (!registry) return;
+    const registry = (session as any)._toolRegistry;
+    if (!registry || !(registry instanceof Map)) {
+      console.error('[SessionManager] _toolRegistry missing or wrong type — desktop tool injection failed. The SDK may have changed its internal structure.');
+      return;
+    }
 
     const DESKTOP_TOOL_PREFIX = 'desktop_';
     const hasDesktopTools = [...registry.keys()].some(name => name.startsWith(DESKTOP_TOOL_PREFIX));
