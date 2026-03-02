@@ -1,7 +1,7 @@
 /**
  * @file Desktop header — status badge, start/stop/rebuild buttons, agent tools toggle.
  */
-import { ExternalLink, Play, RefreshCw, Square, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ExternalLink, Hammer, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useDesktopStore } from '../../stores/desktop-store';
 import { useTabStore } from '../../stores/tab-store';
 
@@ -27,7 +27,17 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
   const config = statusConfig[status] ?? statusConfig.stopped;
   const isRunning = status === 'running';
   const isStopped = status === 'stopped' && !!desktopState?.containerId;
+  const hasContainer = !!desktopState?.containerId;
   const isBusy = status === 'starting' || status === 'stopping' || isLoading;
+
+  const handleRebuild = () => {
+    const confirmed = window.confirm(
+      'Rebuild desktop?\n\n' +
+      'This will remove the current container and all its state ' +
+      '(installed packages, files, browser data), then rebuild the image from the Dockerfile and start a fresh container.',
+    );
+    if (confirmed) rebuildDesktop(projectPath);
+  };
 
   return (
     <div className="px-3 py-2 border-b border-border bg-bg-elevated flex items-center justify-between gap-2">
@@ -55,16 +65,6 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
           </button>
         )}
 
-        {/* Rebuild button */}
-        <button
-          onClick={() => rebuildDesktop(projectPath)}
-          disabled={isBusy}
-          className="p-1.5 hover:bg-bg-surface rounded transition-colors disabled:opacity-40"
-          title="Rebuild — removes container and image, rebuilds from Dockerfile"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-text-secondary ${isBusy ? 'animate-spin' : ''}`} />
-        </button>
-
         {/* Agent tools toggle */}
         <button
           onClick={() => setToolsEnabled(projectPath, !toolsEnabled)}
@@ -82,6 +82,20 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
             Tools
           </span>
         </button>
+
+        {/* Rebuild button — destructive, requires confirmation */}
+        {hasContainer && (
+          <button
+            onClick={handleRebuild}
+            disabled={isBusy}
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
+              bg-warning/20 text-warning hover:bg-warning/30 transition-colors disabled:opacity-40"
+            title="Rebuild — removes container and image, rebuilds from Dockerfile"
+          >
+            <Hammer className="w-3.5 h-3.5" />
+            Rebuild
+          </button>
+        )}
 
         {/* Start/Stop button */}
         {isRunning ? (
