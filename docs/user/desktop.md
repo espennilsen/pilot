@@ -35,23 +35,59 @@ The Desktop panel lives in the **context panel** on the right side of the Pilot 
 | Status | Meaning |
 |--------|---------|
 | **Running** (green dot) | Container is running, display is live |
-| **Starting…** (amber, pulsing) | Container is being created and the display stack is initialising |
+| **Starting…** (amber, pulsing) | Container is starting up or being resumed |
 | **Stopping…** (amber, pulsing) | Container is being shut down |
-| **Stopped** (grey) | No container running |
+| **Stopped** (grey) | Container exists but is not running — can be resumed |
 | **Error** (red) | Something went wrong — error message is shown |
 
 ### Controls
 
-- **Start** / **Stop** — Launch or shut down the desktop container
-- **Tools toggle** — Enable or disable the agent's desktop tools (takes effect on the next conversation)
+| Button | Description |
+|--------|-------------|
+| **Start** | Create and start a new desktop container |
+| **Resume** | Restart a stopped container (preserves filesystem state) |
+| **Stop** | Stop the container (keeps it for later resume) |
+| ↻ **Rebuild** | Remove container and image, rebuild from Dockerfile, start fresh |
+| ⤴ **Open in tab** | Open the desktop in a full web tab (visible when running) |
+| **Tools** | Enable or disable the agent's desktop tools |
 
-### Live View
+### Observe vs. Take Control
 
-When the desktop is running, you see a live, interactive view of the virtual display embedded directly in the panel. You can:
+By default, the desktop viewer is in **observe mode** — you can see the virtual display but your mouse clicks and keyboard input don't reach it. This prevents you from accidentally interfering while the agent is working.
 
-- **Watch the agent work** in real time — see it click, type, and navigate
-- **Interact yourself** — click, type, and scroll directly in the embedded view
-- **Resize** — the display scales to fit the panel
+To interact with the desktop yourself, click the **Take Control** button in the bottom-right corner of the viewer. Click **Observe** to switch back to passive viewing.
+
+The mode resets to observe whenever the container restarts.
+
+---
+
+## Container Lifecycle
+
+### Starting and Stopping
+
+When you click **Stop**, the container is **stopped but not removed**. Everything inside it — installed packages, downloaded files, browser history, running configurations — is preserved.
+
+When you click **Resume**, the same container is restarted. You pick up exactly where you left off.
+
+This also applies when Pilot quits — containers are stopped on exit and available to resume when you relaunch.
+
+### Rebuilding
+
+Click the ↻ **Rebuild** button when you need a fresh start. This:
+
+1. Stops and removes the existing container (filesystem state is lost)
+2. Deletes the project-specific Docker image
+3. Rebuilds the image from `.pilot/desktop.Dockerfile` (if it exists)
+4. Starts a new container
+
+Use rebuild when:
+- You've changed `.pilot/desktop.Dockerfile` and want to pick up the changes
+- The container's filesystem is in a bad state
+- You want a clean environment
+
+### Opening in a Tab
+
+Click the ⤴ icon to open the desktop in a full **web tab**. This gives you a larger view and lets you keep the context panel on a different tab while watching the desktop.
 
 ---
 
@@ -162,7 +198,7 @@ RUN npm ci
 COPY . .
 ```
 
-The project-specific image is built automatically the next time you start the desktop. It's rebuilt when the Dockerfile changes.
+The project-specific image is built automatically the first time you start the desktop. After editing the Dockerfile, click **Rebuild** (↻) to pick up the changes.
 
 ---
 
@@ -197,8 +233,11 @@ Resource limits: 2 GB memory, 2 CPU cores.
 2. **Display stack**: Inside the container, Xvfb creates a virtual screen → fluxbox manages windows → x11vnc serves VNC → websockify bridges to WebSocket → noVNC renders in the browser
 3. **Agent interaction**: Agent tools call `docker exec` to run xdotool/scrot/xclip commands inside the container
 4. **Screenshots**: Captured via `scrot`, extracted from the container as a tar archive, and sent to the agent as base64 PNG
-5. **Viewer**: The panel embeds an iframe pointing to the container's noVNC HTTP server
-6. **Cleanup**: When you stop the desktop or close all tabs for a project, the container is stopped and removed
+5. **Viewer**: The panel embeds an iframe pointing to the container's noVNC HTTP server, with an observe/take-control overlay
+6. **Stop**: The container is stopped but kept — filesystem state is preserved for resume
+7. **Resume**: The stopped container is restarted; Docker assigns new host ports which the service reads automatically
+8. **Rebuild**: The container and project image are removed, the image is rebuilt from the Dockerfile, and a new container is started
+9. **App quit**: All containers are stopped (not removed) so they can be resumed on next launch
 
 ---
 
@@ -239,7 +278,7 @@ The container started but the display server didn't respond within 15 seconds.
 **Fix:**
 - Check Docker Desktop for the container's logs
 - Ensure your machine has enough resources (2 GB RAM, 2 CPU cores for the container)
-- Try stopping and starting again
+- Try clicking **Rebuild** to start with a fresh container
 
 ### Display shows "Connecting…" indefinitely
 
@@ -248,7 +287,7 @@ The noVNC server inside the container is slow to start or the port is blocked.
 **Fix:**
 - Wait a few more seconds — the viewer retries automatically with exponential backoff
 - Check that no firewall is blocking localhost connections
-- Stop and restart the desktop
+- Stop and resume the desktop
 
 ### Agent can't use desktop tools
 
@@ -259,11 +298,19 @@ Tools are disabled by default and must be explicitly enabled.
 2. Click the **Tools** toggle to enable
 3. Start a **new conversation** (tools are configured at session start)
 
-### Container uses too many resources
+### Container is in a bad state
+
+Installed something that broke the display, or files are corrupted.
 
 **Fix:**
-- Stop the desktop when not in use — containers are automatically cleaned up
-- Use a minimal custom Dockerfile if the base image is too heavy
+- Click **Rebuild** (↻) — this removes the container and image, rebuilds from the Dockerfile, and starts fresh
+
+### Dockerfile changes aren't picked up
+
+The project-specific image is cached. A normal start reuses the existing container.
+
+**Fix:**
+- Click **Rebuild** (↻) to force a fresh image build and new container
 
 ---
 
