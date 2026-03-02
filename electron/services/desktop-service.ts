@@ -261,6 +261,7 @@ export class DesktopService {
       vncPort: 0,
       status: 'stopped',
       createdAt: state.createdAt,
+      vncPassword: state.vncPassword,
     };
     this.desktops.set(projectPath, stoppedState);
     this.persistConfig(projectPath, stoppedState);

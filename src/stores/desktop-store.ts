@@ -173,11 +173,21 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     if (!projectPath) return;
 
     set(state => {
+      // Merge onto the existing state or a safe default skeleton so that
+      // required fields are always present — avoids the previous `as DesktopState`
+      // cast that hid missing fields when the first event was a partial update.
       const existing = state.stateByProject[projectPath];
+      const base: DesktopState = existing ?? {
+        containerId: '',
+        wsPort: 0,
+        vncPort: 0,
+        status: 'starting',
+        createdAt: 0,
+      };
       return {
         stateByProject: {
           ...state.stateByProject,
-          [projectPath]: { ...existing, ...stateUpdate } as DesktopState,
+          [projectPath]: { ...base, ...stateUpdate },
         },
       };
     });

@@ -67,7 +67,7 @@ describe('useDesktopStore', () => {
       expect(useDesktopStore.getState().stateByProject['/project/a']?.status).toBe('running');
     });
 
-    it('removes state when status is stopped', () => {
+    it('preserves state with stopped status (container is kept for resume)', () => {
       useDesktopStore.getState().handleEvent({
         projectPath: '/project/a',
         ...makeDesktopState(),
@@ -77,7 +77,10 @@ describe('useDesktopStore', () => {
         status: 'stopped',
       });
 
-      expect(useDesktopStore.getState().stateByProject['/project/a']).toBeUndefined();
+      const state = useDesktopStore.getState().stateByProject['/project/a'];
+      expect(state).toBeDefined();
+      expect(state?.status).toBe('stopped');
+      expect(state?.containerId).toBe('abc123');
     });
 
     it('ignores events without projectPath', () => {
@@ -103,7 +106,8 @@ describe('useDesktopStore', () => {
         status: 'stopped',
       });
 
-      expect(useDesktopStore.getState().stateByProject['/project/a']).toBeUndefined();
+      expect(useDesktopStore.getState().stateByProject['/project/a']?.status).toBe('stopped');
+      expect(useDesktopStore.getState().stateByProject['/project/a']?.containerId).toBe('aaa');
       expect(useDesktopStore.getState().stateByProject['/project/b']?.containerId).toBe('bbb');
     });
   });
