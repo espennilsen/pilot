@@ -15,6 +15,7 @@ import { Eye, MousePointerClick } from 'lucide-react';
 
 interface DesktopViewerProps {
   wsPort: number;
+  vncPassword?: string;
 }
 
 /** Max number of reload attempts before giving up */
@@ -24,8 +25,9 @@ const MAX_RETRIES = 10;
 const INITIAL_DELAY_MS = 500;
 const MAX_DELAY_MS = 4000;
 
-export default function DesktopViewer({ wsPort }: DesktopViewerProps) {
-  const noVncUrl = `http://localhost:${wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false`;
+export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProps) {
+  const passwordParam = vncPassword ? `&password=${encodeURIComponent(vncPassword)}` : '';
+  const noVncUrl = `http://localhost:${wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false${passwordParam}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [retries, setRetries] = useState(0);
   const [ready, setReady] = useState(false);

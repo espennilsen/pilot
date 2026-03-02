@@ -701,18 +701,41 @@ export class DesktopService {
     throw new Error(`Desktop noVNC did not become ready within ${READY_TIMEOUT_MS / 1000}s`);
   }
 
-  /** Collect all output from a Docker exec stream. */
+  /** Max bytes to buffer from a single Docker exec stream (10 MB). */
+  private static readonly MAX_STREAM_BYTES = 10 * 1024 * 1024;
+
+  /** Collect all output from a Docker exec stream, capped at MAX_STREAM_BYTES. */
   private collectStream(stream: NodeJS.ReadableStream): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
-      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      let totalBytes = 0;
+      let rejected = false;
+
+      stream.on('data', (chunk: Buffer) => {
+        if (rejected) return;
+        totalBytes += chunk.length;
+        if (totalBytes > DesktopService.MAX_STREAM_BYTES) {
+          rejected = true;
+          stream.destroy();
+          reject(new Error(
+            `Command output exceeded ${DesktopService.MAX_STREAM_BYTES / (1024 * 1024)} MB limit — ` +
+            `pipe large output to a file instead`,
+          ));
+          return;
+        }
+        chunks.push(chunk);
+      });
       stream.on('end', () => {
+        if (rejected) return;
         const raw = Buffer.concat(chunks);
         // Docker multiplexed streams have 8-byte headers per frame.
         // Strip them to get clean output.
         resolve(this.demuxDockerStream(raw));
       });
-      stream.on('error', reject);
+      stream.on('error', (err) => {
+        if (rejected) return;
+        reject(err);
+      });
     });
   }
 

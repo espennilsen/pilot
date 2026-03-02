@@ -70,7 +70,7 @@ export default function DesktopPanel() {
       <div className="flex-1 overflow-hidden">
         {/* Running — show noVNC viewer */}
         {status === 'running' && desktopState && (
-          <DesktopViewer wsPort={desktopState.wsPort} />
+          <DesktopViewer wsPort={desktopState.wsPort} vncPassword={desktopState.vncPassword} />
         )}
 
         {/* Starting — show spinner */}

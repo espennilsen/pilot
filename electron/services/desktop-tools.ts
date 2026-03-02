@@ -240,10 +240,10 @@ export function createDesktopTools(
       parameters: Type.Object({}),
       async execute() {
         const state = await service.startDesktop(projectPath);
-        const passwordParam = state.vncPassword ? `&password=${encodeURIComponent(state.vncPassword)}` : '';
         return textResult(
           `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
-          `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true${passwordParam}`
+          `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true\n` +
+          `(VNC authentication is configured — the UI connects automatically)`
         );
       },
     },

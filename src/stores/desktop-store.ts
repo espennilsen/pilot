@@ -172,22 +172,15 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     const { projectPath, ...stateUpdate } = payload;
     if (!projectPath) return;
 
-    if (stateUpdate.status === 'stopped') {
-      set(state => {
-        const { [projectPath]: _, ...rest } = state.stateByProject;
-        return { stateByProject: rest };
-      });
-    } else {
-      set(state => {
-        const existing = state.stateByProject[projectPath];
-        return {
-          stateByProject: {
-            ...state.stateByProject,
-            [projectPath]: { ...existing, ...stateUpdate } as DesktopState,
-          },
-        };
-      });
-    }
+    set(state => {
+      const existing = state.stateByProject[projectPath];
+      return {
+        stateByProject: {
+          ...state.stateByProject,
+          [projectPath]: { ...existing, ...stateUpdate } as DesktopState,
+        },
+      };
+    });
   },
 
   // Selectors
