@@ -587,11 +587,17 @@ export class DesktopService {
       this.pushEvent(projectPath, state);
 
       return { ...state };
-    } catch {
-      // Container is gone or can't be restarted — fall through to create a new one
-      this.desktops.delete(projectPath);
-      this.removePersisted(projectPath);
-      return null;
+    } catch (err) {
+      // Only discard persisted state when the container is truly gone (404).
+      // For transient errors (daemon unavailable, timeout) propagate so the
+      // caller can surface the failure instead of silently losing state.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('404') || msg.includes('no such container')) {
+        this.desktops.delete(projectPath);
+        this.removePersisted(projectPath);
+        return null;
+      }
+      throw err;
     }
   }
 
@@ -674,7 +680,10 @@ export class DesktopService {
 
     this.pushEvent(projectPath, { status: 'starting', error: undefined });
 
-    // Build with the project root as context so the Dockerfile can COPY project files
+    // Build with only the Dockerfile sent to the Docker daemon — no project files
+    // are included in the build context. Custom Dockerfiles should use FROM/RUN/ENV
+    // to customise the image (e.g. install extra packages). COPY of project files
+    // is intentionally unsupported to avoid sending large trees to the daemon.
     const stream = await this.docker.buildImage(
       { context: projectPath, src: ['.pilot/desktop.Dockerfile'] },
       { t: projectImage, dockerfile: '.pilot/desktop.Dockerfile' },

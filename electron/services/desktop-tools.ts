@@ -288,16 +288,14 @@ export function createDesktopTools(
       async execute(_toolCallId, params) {
         const browser = params.browser || 'chromium';
         const wait = params.wait ?? 3;
-        const safeUrl = params.url.replace(/'/g, "'\\''");
 
-        let cmd: string;
+        // Use execCmd with an argument array to avoid shell interpolation.
+        // Chromium flags are inlined rather than relying on $CHROMIUM_FLAGS shell expansion.
         if (browser === 'firefox') {
-          cmd = `firefox '${safeUrl}' &`;
+          await execCmd(['nohup', 'firefox', params.url]);
         } else {
-          cmd = `chromium-browser $CHROMIUM_FLAGS '${safeUrl}' &`;
+          await execCmd(['nohup', 'chromium-browser', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', params.url]);
         }
-
-        await exec(cmd);
 
         if (wait > 0) {
           await new Promise(resolve => setTimeout(resolve, wait * 1000));

@@ -56,6 +56,10 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
   const handleError = () => {
     if (retries >= MAX_RETRIES) return;
 
+    // Clear any existing timer to prevent duplicate retry loops when
+    // onError fires multiple times before the first timer executes.
+    if (timerRef.current) clearTimeout(timerRef.current);
+
     const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, retries), MAX_DELAY_MS);
     timerRef.current = setTimeout(() => {
       setRetries((r) => r + 1);
