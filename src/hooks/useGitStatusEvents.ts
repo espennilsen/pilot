@@ -5,12 +5,13 @@ import { IPC } from '../../shared/ipc';
 
 /**
  * Listens for GIT_STATUS_CHANGED push events from the main process
- * and refreshes git status + branches when the event matches the
- * current project.
+ * and refreshes git status (and optionally branches) when the event
+ * matches the current project.
  *
- * This ensures that status changes triggered by other windows,
- * companion clients, or background operations are reflected in
- * every renderer.
+ * This is the single driver for post-mutation refreshes — store actions
+ * do not call refreshStatus()/refreshBranches() directly after IPC
+ * mutations. This ensures uniform refresh across all windows and avoids
+ * double-refresh on the initiating window.
  */
 export function useGitStatusEvents() {
   const currentProjectPath = useGitStore(s => s.currentProjectPath);
@@ -19,11 +20,13 @@ export function useGitStatusEvents() {
 
   useEffect(() => {
     const unsub = on(IPC.GIT_STATUS_CHANGED, (...args: unknown[]) => {
-      const payload = args[0] as { projectPath?: string } | undefined;
+      const payload = args[0] as { projectPath?: string; branchChanged?: boolean } | undefined;
       // Refresh if the event is for our project or is a global notification
       if (!payload?.projectPath || payload.projectPath === currentProjectPath) {
         refreshStatus();
-        refreshBranches();
+        if (payload?.branchChanged) {
+          refreshBranches();
+        }
       }
     });
     return unsub;

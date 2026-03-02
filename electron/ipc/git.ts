@@ -5,8 +5,8 @@ import { broadcastToRenderer } from '../utils/broadcast';
 import type { GitLogOptions } from '../../shared/types';
 
 /** Notify all renderer windows + companion clients that git status changed. */
-function pushStatusChanged(projectPath?: string): void {
-  broadcastToRenderer(IPC.GIT_STATUS_CHANGED, { projectPath });
+function pushStatusChanged(projectPath?: string, branchChanged?: boolean): void {
+  broadcastToRenderer(IPC.GIT_STATUS_CHANGED, { projectPath, branchChanged: branchChanged ?? false });
 }
 
 const gitServices = new Map<string, GitService>();
@@ -54,12 +54,12 @@ export function registerGitIpc() {
 
   ipcMain.handle(IPC.GIT_CHECKOUT, async (_event, branch: string, projectPath?: string) => {
     await getGitService(projectPath).checkout(branch);
-    pushStatusChanged(projectPath);
+    pushStatusChanged(projectPath, true);
   });
 
   ipcMain.handle(IPC.GIT_CREATE_BRANCH, async (_event, name: string, from?: string, projectPath?: string) => {
     await getGitService(projectPath).createBranch(name, from);
-    pushStatusChanged(projectPath);
+    pushStatusChanged(projectPath, true);
   });
 
   ipcMain.handle(IPC.GIT_STAGE, async (_event, paths: string[], projectPath?: string) => {
@@ -140,12 +140,12 @@ export function registerGitIpc() {
 
   ipcMain.handle(IPC.GIT_ABORT_OPERATION, async (_event, projectPath?: string) => {
     await getGitService(projectPath).abortOperation();
-    pushStatusChanged(projectPath);
+    pushStatusChanged(projectPath, true);
   });
 
   ipcMain.handle(IPC.GIT_CONTINUE_OPERATION, async (_event, projectPath?: string) => {
     const result = await getGitService(projectPath).continueOperation();
-    pushStatusChanged(projectPath);
+    pushStatusChanged(projectPath, true);
     return result;
   });
 
@@ -156,7 +156,7 @@ export function registerGitIpc() {
 
   ipcMain.handle(IPC.GIT_SKIP_COMMIT, async (_event, projectPath?: string) => {
     const result = await getGitService(projectPath).skipRebaseCommit();
-    pushStatusChanged(projectPath);
+    pushStatusChanged(projectPath, true);
     return result;
   });
 
