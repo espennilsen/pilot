@@ -172,8 +172,9 @@ export class DesktopService {
                 '5900/tcp': [{ HostIp: '127.0.0.1', HostPort: String(vncPort) }],
                 '6080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(wsPort) }],
               },
-              // Mount the project directory into the container at /workspace
-              Binds: [`${projectPath}:/workspace`],
+              // Mount the project directory read-only — code changes should go through
+              // Pilot's diff staging system, not via direct writes inside the container.
+              Binds: [`${projectPath}:/workspace:ro`],
               // Reasonable resource limits
               Memory: 2 * 1024 * 1024 * 1024, // 2 GB
               NanoCpus: 2_000_000_000,         // 2 CPUs
@@ -371,7 +372,15 @@ export class DesktopService {
     });
 
     const stream = await exec.start({ Detach: false, Tty: false });
-    return this.collectStream(stream);
+    const { stdout, stderr } = await this.collectStream(stream);
+
+    const info = await exec.inspect();
+    if (info.ExitCode !== 0) {
+      const output = stderr || stdout || '(no output)';
+      throw new Error(`Command exited with code ${info.ExitCode}: ${output}`);
+    }
+
+    return stderr ? `${stdout}\n[stderr] ${stderr}` : stdout;
   }
 
   /**
@@ -397,7 +406,15 @@ export class DesktopService {
     const stream = await exec.start({ Detach: false, Tty: false, hijack: true });
     stream.write(stdinData);
     stream.end();
-    return this.collectStream(stream);
+    const { stdout, stderr } = await this.collectStream(stream);
+
+    const info = await exec.inspect();
+    if (info.ExitCode !== 0) {
+      const output = stderr || stdout || '(no output)';
+      throw new Error(`Command exited with code ${info.ExitCode}: ${output}`);
+    }
+
+    return stderr ? `${stdout}\n[stderr] ${stderr}` : stdout;
   }
 
   /** Take a screenshot of the virtual display. Returns base64-encoded PNG. */
@@ -458,10 +475,20 @@ export class DesktopService {
 
         // Validate the label value to prevent writes to arbitrary paths
         // from crafted Docker labels (e.g. /etc).
+        // On Windows, projects may live on non-home drives (D:\projects),
+        // so only require a valid absolute path — matching validateProjectPath
+        // in electron/ipc/desktop.ts.
         const resolved = resolve(projectPath);
-        if (!isWithinDir(homedir(), resolved)) {
-          console.warn(`[Desktop] Ignoring container with suspicious pilot.project label: ${projectPath}`);
-          continue;
+        if (process.platform === 'win32') {
+          if (!/^[A-Za-z]:\\/.test(resolved)) {
+            console.warn(`[Desktop] Ignoring container with invalid pilot.project label: ${projectPath}`);
+            continue;
+          }
+        } else {
+          if (!isWithinDir(homedir(), resolved)) {
+            console.warn(`[Desktop] Ignoring container with suspicious pilot.project label: ${projectPath}`);
+            continue;
+          }
         }
 
         const group = byProject.get(projectPath) ?? [];
@@ -765,7 +792,7 @@ export class DesktopService {
   private static readonly MAX_STREAM_BYTES = 10 * 1024 * 1024;
 
   /** Collect all output from a Docker exec stream, capped at MAX_STREAM_BYTES. */
-  private collectStream(stream: NodeJS.ReadableStream): Promise<string> {
+  private collectStream(stream: NodeJS.ReadableStream): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
@@ -789,7 +816,7 @@ export class DesktopService {
         if (rejected) return;
         const raw = Buffer.concat(chunks);
         // Docker multiplexed streams have 8-byte headers per frame.
-        // Strip them to get clean output.
+        // Strip them to get clean output, separating stdout from stderr.
         resolve(this.demuxDockerStream(raw));
       });
       stream.on('error', (err) => {
@@ -799,32 +826,42 @@ export class DesktopService {
     });
   }
 
-  /** Strip Docker multiplexed stream headers (8 bytes per frame). */
-  private demuxDockerStream(buffer: Buffer): string {
-    const parts: string[] = [];
+  /**
+   * Strip Docker multiplexed stream headers (8 bytes per frame) and separate
+   * stdout (type 1) from stderr (type 2).
+   */
+  private demuxDockerStream(buffer: Buffer): { stdout: string; stderr: string } {
+    const stdoutParts: string[] = [];
+    const stderrParts: string[] = [];
     let offset = 0;
     while (offset < buffer.length) {
       if (offset + 8 > buffer.length) {
-        // Remaining data is less than a header — treat as raw
-        parts.push(buffer.subarray(offset).toString('utf-8'));
+        // Remaining data is less than a header — treat as raw stdout
+        stdoutParts.push(buffer.subarray(offset).toString('utf-8'));
         break;
       }
       // Byte 0: stream type (0=stdin, 1=stdout, 2=stderr)
       // Bytes 4-7: frame size (big-endian uint32)
+      const streamType = buffer[offset];
       const frameSize = buffer.readUInt32BE(offset + 4);
       if (frameSize === 0) {
         offset += 8;
         continue;
       }
       const frameEnd = offset + 8 + frameSize;
-      if (frameEnd > buffer.length) {
-        parts.push(buffer.subarray(offset + 8).toString('utf-8'));
-        break;
+      const content = frameEnd > buffer.length
+        ? buffer.subarray(offset + 8).toString('utf-8')
+        : buffer.subarray(offset + 8, frameEnd).toString('utf-8');
+
+      if (streamType === 2) {
+        stderrParts.push(content);
+      } else {
+        stdoutParts.push(content);
       }
-      parts.push(buffer.subarray(offset + 8, frameEnd).toString('utf-8'));
-      offset = frameEnd;
+
+      offset = frameEnd > buffer.length ? buffer.length : frameEnd;
     }
-    return parts.join('');
+    return { stdout: stdoutParts.join(''), stderr: stderrParts.join('') };
   }
 
   /** Push a desktop event to the renderer (and companion). */

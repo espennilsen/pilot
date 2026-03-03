@@ -103,12 +103,9 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
     return service.getDesktopStatus(validPath);
   });
 
-  ipcMain.handle(IPC.DESKTOP_EXEC, async (_event, projectPath: unknown, command: unknown) => {
-    if (!service) throw new Error('Docker desktop service is not available');
-    const validPath = validateProjectPath(projectPath);
-    const validCommand = requireString(command, 'command');
-    return service.execInDesktop(validPath, validCommand);
-  });
+  // NOTE: DESKTOP_EXEC is intentionally not exposed as an IPC handler.
+  // Agent tools call service.execInDesktop() directly — no renderer-callable
+  // exec handler is needed, and removing it reduces attack surface.
 
   ipcMain.handle(IPC.DESKTOP_REBUILD, async (_event, projectPath: unknown) => {
     if (!service) throw new Error('Docker desktop service is not available');
