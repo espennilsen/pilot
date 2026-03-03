@@ -61,6 +61,10 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Custom noVNC client that accepts VNC credentials via postMessage instead of
+# URL query parameters — keeps the password out of the browser address bar.
+COPY pilot-vnc.html /usr/share/novnc/pilot-vnc.html
+
 EXPOSE 5900 6080
 
 # ── Non-root user ────────────────────────────────────────────────────

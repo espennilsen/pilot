@@ -209,14 +209,19 @@ function DesktopProjectToggle({
       {hasProjectOverride && (
         <div className="ml-9">
           <button
-            onClick={() => {
-              // Remove the project override by setting to undefined → falls back to global
-              updateSettings(projectPath, tabId, { desktopToolsEnabled: undefined });
-              // Also clear from the desktop store so it re-reads global
-              useDesktopStore.setState((s) => {
-                const { [projectPath]: _, ...rest } = s.toolsEnabledByProject;
-                return { toolsEnabledByProject: rest };
-              });
+            onClick={async () => {
+              try {
+                // Remove the project override by setting to undefined → falls back to global
+                await updateSettings(projectPath, tabId, { desktopToolsEnabled: undefined });
+                // Only clear from the desktop store after the IPC write succeeds,
+                // so the UI stays in sync with the persisted settings file.
+                useDesktopStore.setState((s) => {
+                  const { [projectPath]: _, ...rest } = s.toolsEnabledByProject;
+                  return { toolsEnabledByProject: rest };
+                });
+              } catch (err) {
+                console.error('[ProjectSettings] Failed to reset desktop override:', err);
+              }
             }}
             className="text-xs text-accent hover:text-accent/80 transition-colors"
           >

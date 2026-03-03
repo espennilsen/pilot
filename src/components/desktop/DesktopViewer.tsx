@@ -26,13 +26,10 @@ const INITIAL_DELAY_MS = 500;
 const MAX_DELAY_MS = 4000;
 
 export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProps) {
-  // The VNC password is passed as a URL query parameter. This is noVNC's native
-  // authentication mechanism — the `autoconnect` + `password` params are read by
-  // noVNC's built-in JS on page load. The password is a random per-container token
-  // for a localhost-only VNC server (127.0.0.1 binding enforced by Docker), so
-  // visibility in Electron DevTools is acceptable given the threat model.
-  const passwordParam = vncPassword ? `&password=${encodeURIComponent(vncPassword)}` : '';
-  const noVncUrl = `http://localhost:${wsPort}/vnc.html?autoconnect=true&resize=scale&toolbar=0&view_only=false${passwordParam}`;
+  // Use pilot-vnc.html — a custom minimal noVNC client that receives VNC
+  // credentials via postMessage instead of URL query parameters, keeping
+  // the password out of the address bar and Electron DevTools Frames panel.
+  const noVncUrl = `http://localhost:${wsPort}/pilot-vnc.html`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [retries, setRetries] = useState(0);
   const [ready, setReady] = useState(false);
@@ -48,6 +45,22 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [wsPort]);
+
+  // Send VNC credentials to the iframe via postMessage after it signals readiness.
+  // This avoids putting the password in the URL where it would be visible in
+  // DevTools and URL-capturing logs.
+  useEffect(() => {
+    const origin = `http://localhost:${wsPort}`;
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== origin || event.data?.type !== 'vnc-ready') return;
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'vnc-connect', password: vncPassword },
+        origin,
+      );
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [wsPort, vncPassword]);
 
   const handleLoad = () => {
     setReady(true);

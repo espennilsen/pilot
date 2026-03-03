@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  Minimal noVNC client for Pilot's desktop viewer.
+
+  Unlike the stock vnc.html, this page does NOT read the VNC password from URL
+  query parameters. Instead, the parent frame sends credentials via postMessage
+  after the page loads, keeping the password out of the address bar, DevTools
+  Frames panel, and any URL-capturing logs.
+
+  Protocol:
+    Parent → iframe : { type: 'vnc-connect', password?: string }
+    iframe → Parent : { type: 'vnc-ready' }
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pilot Desktop</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #screen { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="screen"></div>
+  <script type="module">
+    import RFB from './core/rfb.js';
+
+    let rfb = null;
+
+    function connect(password) {
+      if (rfb) {
+        try { rfb.disconnect(); } catch (_) { /* already disconnected */ }
+        rfb = null;
+      }
+
+      const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${window.location.host}/websockify`;
+
+      const options = {};
+      if (password) {
+        options.credentials = { password };
+      }
+
+      rfb = new RFB(document.getElementById('screen'), wsUrl, options);
+      rfb.scaleViewport = true;
+      rfb.resizeSession = false;
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'vnc-connect') {
+        connect(event.data.password);
+      }
+    });
+
+    // Signal to the parent frame that the message listener is ready.
+    window.parent.postMessage({ type: 'vnc-ready' }, '*');
+  </script>
+</body>
+</html>
