@@ -122,15 +122,38 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
         </div>
       )}
 
-      {/* Connection spinner */}
+      {/* Connection spinner / error with retry */}
       {!ready && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 gap-3">
-          <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-text-secondary">
-            {retries >= MAX_RETRIES
-              ? 'Could not connect to desktop display'
-              : 'Connecting to desktop display…'}
-          </p>
+          {retries >= MAX_RETRIES ? (
+            <>
+              <p className="text-sm text-text-secondary">
+                Could not connect to desktop display
+              </p>
+              <button
+                onClick={() => {
+                  setRetries(0);
+                  if (iframeRef.current) {
+                    iframeRef.current.src = '';
+                    requestAnimationFrame(() => {
+                      if (iframeRef.current) iframeRef.current.src = noVncUrl;
+                    });
+                  }
+                }}
+                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary
+                  border border-border rounded hover:bg-bg-surface transition-colors"
+              >
+                Retry Connection
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-text-secondary">
+                Connecting to desktop display…
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

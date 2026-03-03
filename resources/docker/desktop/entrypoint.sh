@@ -34,5 +34,10 @@ echo "Sandbox ready — noVNC on port 6080, VNC on port 5900"
 echo "  Chromium: chromium-browser \$CHROMIUM_FLAGS <url>"
 echo "  Firefox:  firefox <url>"
 
-# Wait for Xvfb (main process) — if it dies, container exits
-wait $XVFB_PID
+# Wait for ANY background process to exit. If Xvfb, x11vnc, or websockify
+# crashes, the container exits immediately instead of continuing in a
+# degraded state (e.g. VNC dead but container still "running").
+# `wait -n` requires bash 4.3+ (Ubuntu 24.04 ships bash 5.2).
+wait -n
+echo "ERROR: A critical background process exited unexpectedly" >&2
+exit 1

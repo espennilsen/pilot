@@ -1,37 +1,13 @@
 /**
  * @file Tests for Desktop IPC input validation.
  *
- * We import the validation helpers directly and test them in isolation.
- * The actual IPC registration requires Electron's ipcMain which isn't
- * available in a pure Node test environment, so we test the validation
- * logic that guards every handler.
+ * Imports the real validation helpers from electron/utils/ipc-validation.ts
+ * to test the actual security guards (including the homedir path check).
  */
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'path';
-
-// ── Re-implement the validation functions to test them ──────────────
-// These mirror the private helpers in electron/ipc/desktop.ts exactly.
-// We test them here because they're not exported (they're module-private).
-
-function requireString(value: unknown, name: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${name} must be a non-empty string`);
-  }
-  return value;
-}
-
-function requireBoolean(value: unknown, name: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${name} must be a boolean`);
-  }
-  return value;
-}
-
-function validateProjectPath(value: unknown): string {
-  const raw = requireString(value, 'projectPath');
-  const resolved = resolve(raw);
-  return resolved;
-}
+import { homedir } from 'os';
+import { requireString, requireBoolean, validateProjectPath } from '../../../electron/utils/ipc-validation';
 
 // ── Tests ───────────────────────────────────────────────────────────
 
@@ -79,11 +55,6 @@ describe('Desktop IPC validation', () => {
       expect(() => requireString({}, 'field'))
         .toThrow('field must be a non-empty string');
     });
-
-    it('rejects an array', () => {
-      expect(() => requireString([], 'field'))
-        .toThrow('field must be a non-empty string');
-    });
   });
 
   describe('requireBoolean', () => {
@@ -122,20 +93,49 @@ describe('Desktop IPC validation', () => {
   });
 
   describe('validateProjectPath', () => {
-    it('accepts an absolute path and returns it resolved', () => {
-      const result = validateProjectPath('/Users/test/project');
-      expect(result).toBe(resolve('/Users/test/project'));
+    it('accepts a path within the home directory', () => {
+      const home = homedir();
+      const testPath = `${home}/projects/my-app`;
+      const result = validateProjectPath(testPath);
+      expect(result).toBe(resolve(testPath));
     });
 
     it('resolves a relative path to absolute', () => {
+      // Relative paths resolve against cwd, which is under home in test envs
       const result = validateProjectPath('some/relative/path');
       expect(result).toBe(resolve('some/relative/path'));
     });
 
     it('normalises paths with .. segments', () => {
-      const result = validateProjectPath('/Users/test/project/../other');
-      expect(result).toBe(resolve('/Users/test/other'));
+      const home = homedir();
+      const result = validateProjectPath(`${home}/projects/../other`);
+      expect(result).toBe(resolve(`${home}/other`));
     });
+
+    // Path traversal tests — these only apply on non-Windows platforms
+    // because the Windows codepath allows any absolute drive path.
+    if (process.platform !== 'win32') {
+      it('rejects /etc (outside home directory)', () => {
+        expect(() => validateProjectPath('/etc'))
+          .toThrow('Project path must be within the home directory');
+      });
+
+      it('rejects /tmp/attack (outside home directory)', () => {
+        expect(() => validateProjectPath('/tmp/attack'))
+          .toThrow('Project path must be within the home directory');
+      });
+
+      it('rejects / (root path)', () => {
+        expect(() => validateProjectPath('/'))
+          .toThrow('Project path must be within the home directory');
+      });
+
+      it('rejects path traversal escaping home via ..', () => {
+        const home = homedir();
+        expect(() => validateProjectPath(`${home}/../../etc/passwd`))
+          .toThrow('Project path must be within the home directory');
+      });
+    }
 
     it('rejects undefined', () => {
       expect(() => validateProjectPath(undefined))

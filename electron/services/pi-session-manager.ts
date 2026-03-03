@@ -297,10 +297,14 @@ export class PilotSessionManager {
   /**
    * Add or remove Docker sandbox tools from a live session.
    *
-   * TODO: This accesses the private _toolRegistry on AgentSession via an `any` cast.
+   * HACK: This accesses the private _toolRegistry on AgentSession via an `any` cast.
    * This is fragile — any SDK refactor that renames or restructures this property
    * will silently break tool injection at runtime. Replace with a public
    * session.addTools() / session.removeTools() API when the SDK exposes one.
+   *
+   * Verified working with @mariozechner/pi-coding-agent@0.55.x.
+   * If the SDK version is bumped, re-verify that _toolRegistry still exists
+   * and is a Map<string, ToolDefinition>.
    */
   updateDesktopTools(tabId: string, enabled: boolean): void {
     const session = this.sessions.get(tabId);
@@ -309,10 +313,14 @@ export class PilotSessionManager {
     const projectPath = this.tabProjectPaths.get(tabId);
     if (!projectPath) return;
 
-    // Access the private tool registry — it's a Map at runtime
+    // Access the private tool registry — verified as a Map in SDK 0.55.x.
+    // The runtime check below ensures a clear failure if the SDK changes.
     const registry = (session as any)._toolRegistry;
     if (!registry || !(registry instanceof Map)) {
-      console.error('[SessionManager] _toolRegistry missing or wrong type — desktop tool injection failed. The SDK may have changed its internal structure.');
+      const msg = '_toolRegistry missing or wrong type — desktop tool injection failed. '
+        + 'The SDK may have changed its internal structure (verified with 0.55.x). '
+        + 'Check if @mariozechner/pi-coding-agent was updated.';
+      console.error(`[SessionManager] ${msg}`);
       broadcastToRenderer(IPC.DESKTOP_EVENT, {
         projectPath,
         status: 'error',

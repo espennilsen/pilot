@@ -545,10 +545,29 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Cleanup on quit
+// Cleanup on quit — async cleanup (container stop) runs in before-quit,
+// synchronous cleanup runs in will-quit.
+let cleanupDone = false;
+
+app.on('before-quit', async (e) => {
+  if (cleanupDone) return; // Already ran — let quit proceed
+  e.preventDefault();
+  cleanupDone = true;
+
+  // Stop Docker containers gracefully before the process exits.
+  // Without this, stopAll()'s returned Promise is discarded and
+  // containers are left running after the app quits.
+  try {
+    await desktopService?.stopAll();
+  } catch {
+    // Best effort — don't block quit if Docker is unresponsive
+  }
+
+  app.quit();
+});
+
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
-  desktopService?.stopAll();
   mcpManager?.disposeAll();
   devService?.dispose();
   terminalService?.disposeAll();
