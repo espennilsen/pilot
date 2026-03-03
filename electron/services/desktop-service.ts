@@ -793,18 +793,40 @@ export class DesktopService {
   /** Max bytes to buffer from a single Docker exec stream (10 MB). */
   private static readonly MAX_STREAM_BYTES = 10 * 1024 * 1024;
 
-  /** Collect all output from a Docker exec stream, capped at MAX_STREAM_BYTES. */
-  private collectStream(stream: NodeJS.ReadableStream): Promise<{ stdout: string; stderr: string }> {
+  /** Default execution timeout for Docker exec streams (120 seconds). */
+  private static readonly DEFAULT_EXEC_TIMEOUT_MS = 120_000;
+
+  /**
+   * Collect all output from a Docker exec stream, capped at MAX_STREAM_BYTES.
+   * A timeout (default 120s) destroys the stream and rejects if the command
+   * does not complete in time — prevents a hung process from stalling the
+   * IPC handler indefinitely.
+   */
+  private collectStream(
+    stream: NodeJS.ReadableStream,
+    timeoutMs = DesktopService.DEFAULT_EXEC_TIMEOUT_MS,
+  ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
-      let rejected = false;
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        stream.destroy();
+        reject(new Error(
+          `Command timed out after ${timeoutMs / 1000}s — ` +
+          `if the command needs more time, run it with nohup and redirect output to a file`,
+        ));
+      }, timeoutMs);
 
       stream.on('data', (chunk: Buffer) => {
-        if (rejected) return;
+        if (settled) return;
         totalBytes += chunk.length;
         if (totalBytes > DesktopService.MAX_STREAM_BYTES) {
-          rejected = true;
+          settled = true;
+          clearTimeout(timer);
           stream.destroy();
           reject(new Error(
             `Command output exceeded ${DesktopService.MAX_STREAM_BYTES / (1024 * 1024)} MB limit — ` +
@@ -815,14 +837,18 @@ export class DesktopService {
         chunks.push(chunk);
       });
       stream.on('end', () => {
-        if (rejected) return;
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         const raw = Buffer.concat(chunks);
         // Docker multiplexed streams have 8-byte headers per frame.
         // Strip them to get clean output, separating stdout from stderr.
         resolve(this.demuxDockerStream(raw));
       });
       stream.on('error', (err) => {
-        if (rejected) return;
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         reject(err);
       });
     });

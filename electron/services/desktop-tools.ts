@@ -292,12 +292,16 @@ export function createDesktopTools(
         const browser = params.browser || 'chromium';
         const wait = params.wait ?? 3;
 
-        // Use execCmd with an argument array to avoid shell interpolation.
-        // Chromium flags are inlined rather than relying on $CHROMIUM_FLAGS shell expansion.
+        // Launch the browser in the background via shell `&`. Without the trailing `&`,
+        // nohup exec()s the browser in the foreground — the Docker exec stream stays open
+        // until the browser exits, which never happens for a GUI process.
+        // The shell escaping of the URL is safe because execInDesktop wraps it in
+        // `bash -c`, and we single-quote the URL to prevent injection.
+        const escapedUrl = params.url.replace(/'/g, `'\\''`);
         if (browser === 'firefox') {
-          await execCmd(['nohup', 'firefox', '--', params.url]);
+          await exec(`nohup firefox -- '${escapedUrl}' > /dev/null 2>&1 &`);
         } else {
-          await execCmd(['nohup', 'chromium-browser', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--', params.url]);
+          await exec(`nohup chromium-browser --no-sandbox --disable-gpu --disable-dev-shm-usage -- '${escapedUrl}' > /dev/null 2>&1 &`);
         }
 
         if (wait > 0) {

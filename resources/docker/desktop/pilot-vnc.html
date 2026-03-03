@@ -10,6 +10,12 @@
   Protocol:
     Parent → iframe : { type: 'vnc-connect', password?: string }
     iframe → Parent : { type: 'vnc-ready' }
+
+  Security:
+    - The parent's origin is passed via the ?parentOrigin= query parameter.
+    - Incoming messages are validated against that origin.
+    - The vnc-ready signal targets the parent origin specifically (falls back to
+      '*' for file:// / opaque origins where targeting is unreliable).
 -->
 <html>
 <head>
@@ -26,6 +32,15 @@
   <div id="screen"></div>
   <script type="module">
     import RFB from './core/rfb.js';
+
+    // Read the expected parent origin from the URL. This is non-sensitive metadata
+    // used to validate postMessage senders and target the vnc-ready signal.
+    const parentOrigin = new URLSearchParams(window.location.search).get('parentOrigin');
+
+    // For file:// origins (Electron production builds), the origin string is "null".
+    // postMessage targetOrigin of "null" is unreliable for opaque origins, so fall
+    // back to '*'. The vnc-ready payload carries no credentials, so this is safe.
+    const targetOrigin = parentOrigin && parentOrigin !== 'null' ? parentOrigin : '*';
 
     let rfb = null;
 
@@ -49,13 +64,16 @@
     }
 
     window.addEventListener('message', (event) => {
+      // Validate sender origin when a parent origin is known. For opaque
+      // origins ("null") we skip the check since they can't be compared.
+      if (parentOrigin && parentOrigin !== 'null' && event.origin !== parentOrigin) return;
       if (event.data?.type === 'vnc-connect') {
         connect(event.data.password);
       }
     });
 
     // Signal to the parent frame that the message listener is ready.
-    window.parent.postMessage({ type: 'vnc-ready' }, '*');
+    window.parent.postMessage({ type: 'vnc-ready' }, targetOrigin);
   </script>
 </body>
 </html>

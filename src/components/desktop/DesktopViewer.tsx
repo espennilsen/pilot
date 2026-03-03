@@ -29,7 +29,10 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
   // Use pilot-vnc.html — a custom minimal noVNC client that receives VNC
   // credentials via postMessage instead of URL query parameters, keeping
   // the password out of the address bar and Electron DevTools Frames panel.
-  const noVncUrl = `http://localhost:${wsPort}/pilot-vnc.html`;
+  // Pass the parent origin so the iframe can validate message senders and
+  // target its vnc-ready signal precisely.
+  const parentOrigin = window.location.origin;
+  const noVncUrl = `http://localhost:${wsPort}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [retries, setRetries] = useState(0);
   const [ready, setReady] = useState(false);
