@@ -163,8 +163,18 @@ export class DesktopService {
 
     try {
       // Try to restart an existing stopped container
-      const restarted = await this.tryRestartContainer(projectPath);
-      if (restarted) return restarted;
+      const restarted = await this.tryRestartContainer(projectPath, signal);
+      if (restarted) {
+        // Check if a rebuild superseded this start while we were restarting.
+        // The restarted container may have already been stopped/removed by
+        // rebuildDesktop — returning it would hand a stale reference to the caller.
+        if (signal.aborted) {
+          await this.docker.getContainer(restarted.containerId)
+            .stop({ t: 2 }).catch(() => {});
+          throw new DesktopSupersededError();
+        }
+        return restarted;
+      }
 
       // Check if a rebuild superseded this start while we were restarting
       if (signal.aborted) throw new DesktopSupersededError();
@@ -662,7 +672,7 @@ export class DesktopService {
    * container info after starting. Returns the new state, or null if
    * no stopped container was found.
    */
-  private async tryRestartContainer(projectPath: string): Promise<DesktopState | null> {
+  private async tryRestartContainer(projectPath: string, signal?: AbortSignal): Promise<DesktopState | null> {
     const existing = this.desktops.get(projectPath);
     if (!existing?.containerId) return null;
 
@@ -696,7 +706,7 @@ export class DesktopService {
       };
       this.desktops.set(projectPath, state);
 
-      await this.waitForReady(wsPort);
+      await this.waitForReady(wsPort, signal);
 
       state.status = 'running';
       this.desktops.set(projectPath, { ...state });
