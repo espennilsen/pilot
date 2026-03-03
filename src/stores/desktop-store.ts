@@ -172,6 +172,20 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     const { projectPath, ...stateUpdate } = payload;
     if (!projectPath) return;
 
+    // Validate port fields before merging — an IPC bug sending 0 or a
+    // non-number would cause DesktopViewer to render a malformed URL
+    // (http://localhost:0/pilot-vnc.html) with no obvious explanation.
+    const isValidPort = (v: unknown): boolean =>
+      typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535;
+    if ('wsPort' in stateUpdate && !isValidPort(stateUpdate.wsPort)) {
+      console.warn(`[DesktopStore] Invalid wsPort in event: ${stateUpdate.wsPort}`);
+      delete stateUpdate.wsPort;
+    }
+    if ('vncPort' in stateUpdate && !isValidPort(stateUpdate.vncPort)) {
+      console.warn(`[DesktopStore] Invalid vncPort in event: ${stateUpdate.vncPort}`);
+      delete stateUpdate.vncPort;
+    }
+
     set(state => {
       // Merge onto the existing state or a safe default skeleton so that
       // required fields are always present — avoids the previous `as DesktopState`

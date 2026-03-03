@@ -18,13 +18,28 @@ export function loadProjectSettings(projectPath: string): ProjectSandboxSettings
   try {
     const raw = readFileSync(settingsPath, 'utf-8');
     const parsed = JSON.parse(raw);
+
+    // Explicit type guards for sandbox-critical fields — a hand-edited or
+    // corrupted settings file must not silently enable yolo mode (e.g. string
+    // "true" is truthy) or widen the allowed-path set (iterating characters
+    // of a string instead of array entries).
+    const jailEnabled = typeof parsed.jail?.enabled === 'boolean'
+      ? parsed.jail.enabled
+      : DEFAULT_SETTINGS.jail.enabled;
+    const allowedPaths = Array.isArray(parsed.jail?.allowedPaths)
+      ? parsed.jail.allowedPaths.filter((p: unknown) => typeof p === 'string')
+      : DEFAULT_SETTINGS.jail.allowedPaths;
+    const yoloMode = typeof parsed.yoloMode === 'boolean'
+      ? parsed.yoloMode
+      : DEFAULT_SETTINGS.yoloMode;
+    const desktopToolsEnabled = typeof parsed.desktopToolsEnabled === 'boolean'
+      ? parsed.desktopToolsEnabled
+      : undefined;
+
     return {
-      jail: {
-        enabled: parsed.jail?.enabled ?? DEFAULT_SETTINGS.jail.enabled,
-        allowedPaths: parsed.jail?.allowedPaths ?? DEFAULT_SETTINGS.jail.allowedPaths,
-      },
-      yoloMode: parsed.yoloMode ?? DEFAULT_SETTINGS.yoloMode,
-      desktopToolsEnabled: parsed.desktopToolsEnabled ?? undefined,
+      jail: { enabled: jailEnabled, allowedPaths },
+      yoloMode,
+      desktopToolsEnabled,
     };
   } catch {
     /* Expected: settings.json may not exist for project */

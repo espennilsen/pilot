@@ -179,10 +179,16 @@ export class DesktopService {
       let vncPort = 0;
       let wsPort = 0;
 
-      // Generate a per-container VNC password for authentication
-      const vncPassword = randomBytes(12).toString('base64url');
+      // Generate a per-container VNC password for authentication.
+      // VNC's RFB auth uses DES which silently truncates to the first 8 characters.
+      // We generate exactly 8 to match effective entropy (48 bits from 6 random bytes).
+      const vncPassword = randomBytes(6).toString('base64url').slice(0, 8);
 
       for (let attempt = 1; attempt <= PORT_RETRY_ATTEMPTS; attempt++) {
+        // Bail early if a rebuild superseded this start — avoids wasting
+        // 2-5s per iteration creating containers that will just be cleaned up.
+        if (signal.aborted) throw new DesktopSupersededError();
+
         [vncPort, wsPort] = await Promise.all([
           this.findAvailablePort(),
           this.findAvailablePort(),
@@ -281,6 +287,8 @@ export class DesktopService {
       this.desktops.set(projectPath, errorState);
       this.pushEvent(projectPath, errorState);
       throw err;
+    } finally {
+      this.startAbortControllers.delete(projectPath);
     }
   }
 

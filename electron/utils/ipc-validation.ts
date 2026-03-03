@@ -40,10 +40,19 @@ export function validateProjectPath(value: unknown): string {
   const resolved = resolve(raw);
 
   if (process.platform === 'win32') {
-    // On Windows just ensure it's a valid absolute path — Docker mount
-    // restrictions provide the actual sandboxing.
     if (!resolved.match(/^[A-Za-z]:\\/)) {
       throw new Error(`Project path must be an absolute path: ${resolved}`);
+    }
+    // Defence-in-depth: block well-known Windows system directories.
+    // Docker mount restrictions provide the primary sandboxing, but rejecting
+    // these at the IPC layer prevents a compromised renderer from attempting
+    // to mount sensitive OS locations.
+    const lower = resolved.toLowerCase().replace(/\\/g, '/');
+    const blocklist = ['c:/windows', 'c:/program files', 'c:/program files (x86)', 'c:/programdata'];
+    for (const blocked of blocklist) {
+      if (lower === blocked || lower.startsWith(blocked + '/')) {
+        throw new Error(`Project path must not be a system directory: ${resolved}`);
+      }
     }
   } else {
     if (!isWithinDir(homedir(), resolved)) {

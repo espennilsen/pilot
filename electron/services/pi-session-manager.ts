@@ -317,9 +317,12 @@ export class PilotSessionManager {
     // The runtime check below ensures a clear failure if the SDK changes.
     const registry = (session as any)._toolRegistry;
     if (!registry || !(registry instanceof Map)) {
-      const msg = '_toolRegistry missing or wrong type — desktop tool injection failed. '
-        + 'The SDK may have changed its internal structure (verified with 0.55.x). '
-        + 'Check if @mariozechner/pi-coding-agent was updated.';
+      let sdkVersion = 'unknown';
+      try { sdkVersion = require('@mariozechner/pi-coding-agent/package.json').version; } catch { /* */ }
+      const msg = `_toolRegistry missing or wrong type — desktop tool injection failed. `
+        + `SDK version: ${sdkVersion} (verified with 0.55.x). `
+        + `The SDK may have changed its internal structure. `
+        + `Check if @mariozechner/pi-coding-agent was updated.`;
       console.error(`[SessionManager] ${msg}`);
       broadcastToRenderer(IPC.DESKTOP_EVENT, {
         projectPath,
