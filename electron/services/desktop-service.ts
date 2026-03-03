@@ -504,28 +504,31 @@ export class DesktopService {
     }
     const tarBuffer = Buffer.concat(chunks);
 
-    // Tar header is 512 bytes, file content follows. Search for the PNG magic
-    // bytes starting at offset 512 to avoid false matches inside the tar header.
-    const TAR_HEADER_SIZE = 512;
-    const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-    const pngStart = tarBuffer.indexOf(pngMagic, TAR_HEADER_SIZE);
-    if (pngStart === -1) {
-      throw new Error('Screenshot capture failed — PNG not found in archive');
+    try {
+      // Tar header is 512 bytes, file content follows. Search for the PNG magic
+      // bytes starting at offset 512 to avoid false matches inside the tar header.
+      const TAR_HEADER_SIZE = 512;
+      const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+      const pngStart = tarBuffer.indexOf(pngMagic, TAR_HEADER_SIZE);
+      if (pngStart === -1) {
+        throw new Error('Screenshot capture failed — PNG not found in archive');
+      }
+
+      // Find end of PNG (IEND chunk + CRC)
+      const iend = Buffer.from([0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
+      const pngEnd = tarBuffer.indexOf(iend, pngStart);
+      if (pngEnd === -1) {
+        throw new Error('Screenshot capture failed — malformed PNG');
+      }
+
+      const pngBuffer = tarBuffer.subarray(pngStart, pngEnd + iend.length);
+      return pngBuffer.toString('base64');
+    } finally {
+      // Clean up the temp file inside the container on both success and error.
+      // Without this, every failed screenshot leaves a uniquely-named file in
+      // /tmp that accumulates over long-running sessions.
+      this.execInDesktop(projectPath, `rm -f ${screenshotPath}`).catch(() => {});
     }
-
-    // Find end of PNG (IEND chunk + CRC)
-    const iend = Buffer.from([0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
-    const pngEnd = tarBuffer.indexOf(iend, pngStart);
-    if (pngEnd === -1) {
-      throw new Error('Screenshot capture failed — malformed PNG');
-    }
-
-    const pngBuffer = tarBuffer.subarray(pngStart, pngEnd + iend.length);
-
-    // Clean up the temp file inside the container (best-effort)
-    this.execInDesktop(projectPath, `rm -f ${screenshotPath}`).catch(() => {});
-
-    return pngBuffer.toString('base64');
   }
 
   /** Reconcile persisted desktop configs on app startup. */
@@ -967,16 +970,19 @@ export class DesktopService {
 
   /** Push a desktop event to the renderer (and companion). */
   private pushEvent(projectPath: string, state: Partial<DesktopState>): void {
-    broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, ...state });
+    // Strip vncPassword before broadcasting — the renderer already receives it
+    // via the DESKTOP_START IPC response and stores it locally. broadcastToRenderer
+    // forwards events to companion clients which should not receive VNC credentials.
+    const { vncPassword: _, ...safeState } = state as Record<string, unknown>;
+    broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, ...safeState });
   }
 
   /**
    * Persist desktop config to <project>/.pilot/desktop.json
    *
-   * NOTE: This file contains the VNC password in plaintext. The project's
-   * .gitignore should exclude the entire .pilot/ directory (Pilot's own
-   * .gitignore template does this). If users selectively track files inside
-   * .pilot/ (e.g. only MEMORY.md), they must ensure desktop.json is excluded.
+   * This file contains the VNC password in plaintext. To prevent accidental
+   * commits, we auto-append `desktop.json` to `.pilot/.gitignore` if it is
+   * not already listed.
    */
   private persistConfig(projectPath: string, state: DesktopState): void {
     try {
@@ -992,6 +998,27 @@ export class DesktopService {
         vncPassword: state.vncPassword,
       };
       writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2));
+
+      // Ensure desktop.json is gitignored — prevents accidental commits of
+      // the VNC password when users selectively track files inside .pilot/.
+      this.ensureGitignoreEntry(pilotDir, 'desktop.json');
+    } catch { /* best effort */ }
+  }
+
+  /** Append an entry to `.gitignore` inside `dir` if not already present. */
+  private ensureGitignoreEntry(dir: string, entry: string): void {
+    try {
+      const gitignorePath = join(dir, '.gitignore');
+      let content = '';
+      if (existsSync(gitignorePath)) {
+        content = readFileSync(gitignorePath, 'utf-8');
+      }
+      // Check if entry is already present (as a whole line)
+      const lines = content.split('\n').map(l => l.trim());
+      if (lines.includes(entry)) return;
+      // Append with a leading newline if the file doesn't end with one
+      const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+      writeFileSync(gitignorePath, `${content}${separator}${entry}\n`);
     } catch { /* best effort */ }
   }
 

@@ -341,6 +341,11 @@ export class PilotSessionManager {
       for (const tool of tools) {
         registry.set(tool.name, tool);
       }
+      // Spot-check: verify injection actually worked. A future SDK refactor
+      // could keep _toolRegistry as a Map but change key/value schema silently.
+      if (!registry.has('desktop_screenshot')) {
+        console.error('[SessionManager] Desktop tool injection spot-check failed — desktop_screenshot not found in registry after injection');
+      }
     } else if (!enabled && hasDesktopTools) {
       // Remove sandbox tools from the registry
       for (const name of [...registry.keys()]) {

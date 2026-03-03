@@ -172,11 +172,13 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     const { projectPath, ...stateUpdate } = payload;
     if (!projectPath) return;
 
-    // Validate port fields before merging — an IPC bug sending 0 or a
-    // non-number would cause DesktopViewer to render a malformed URL
-    // (http://localhost:0/pilot-vnc.html) with no obvious explanation.
+    // Validate port fields before merging — an IPC bug sending a non-number
+    // or out-of-range value would cause DesktopViewer to render a malformed
+    // URL with no obvious explanation. Port 0 is allowed because stopDesktop
+    // intentionally sets wsPort/vncPort to 0 to signal the container is
+    // no longer reachable.
     const isValidPort = (v: unknown): boolean =>
-      typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535;
+      typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 65535;
     if ('wsPort' in stateUpdate && !isValidPort(stateUpdate.wsPort)) {
       console.warn(`[DesktopStore] Invalid wsPort in event: ${stateUpdate.wsPort}`);
       delete stateUpdate.wsPort;

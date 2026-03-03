@@ -75,11 +75,21 @@
       if (parentOrigin !== 'null' && event.origin !== parentOrigin) return;
 
       if (event.data?.type === 'vnc-connect') {
+        // Stop retrying once credentials are received.
+        if (readyInterval) { clearInterval(readyInterval); readyInterval = null; }
         connect(event.data.password);
       }
     });
 
-    // Signal to the parent frame that the message listener is ready.
+    // Retransmit vnc-ready on a short interval until the parent responds
+    // with vnc-connect. This eliminates the timing dependency between the
+    // iframe's module execution and the parent's useEffect registration —
+    // if the one-shot fires before the listener is in place, subsequent
+    // retries ensure the handshake completes.
+    let readyInterval = setInterval(() => {
+      window.parent.postMessage({ type: 'vnc-ready' }, targetOrigin);
+    }, 2000);
+    // Send the first signal immediately (don't wait 2s).
     window.parent.postMessage({ type: 'vnc-ready' }, targetOrigin);
   </script>
 </body>

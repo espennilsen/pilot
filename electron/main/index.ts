@@ -314,7 +314,9 @@ app.whenReady().then(async () => {
   try {
     desktopService = new DesktopService();
     sessionManager.desktopService = desktopService;
-    desktopService.reconcileOnStartup().catch(() => { /* Docker may not be available */ });
+    desktopService.reconcileOnStartup().catch((err) => {
+      console.error('[Desktop] reconcileOnStartup failed:', err);
+    });
   } catch (err) {
     console.error('[Desktop] Failed to initialize service:', err);
   }
