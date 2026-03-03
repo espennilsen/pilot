@@ -92,9 +92,28 @@ function resolveDockerOptions(): Dockerode.DockerOptions {
   return {};
 }
 
+/**
+ * Thrown when a startDesktop call detects it has been superseded by a
+ * rebuildDesktop. The superseded call cleans up its own container and
+ * yields control — no error state is written to this.desktops.
+ */
+class DesktopSupersededError extends Error {
+  constructor() { super('Desktop start superseded by rebuild'); }
+}
+
 export class DesktopService {
   private docker: Dockerode;
   private desktops = new Map<string, DesktopState>();
+
+  /**
+   * Abort controllers for in-flight startDesktop calls, keyed by projectPath.
+   * Used by rebuildDesktop to cancel a concurrent start so it doesn't orphan
+   * a container that no longer appears in this.desktops.
+   */
+  private startAbortControllers = new Map<string, AbortController>();
+
+  /** Monotonic counter for unique screenshot filenames inside containers. */
+  private screenshotCounter = 0;
 
   constructor() {
     this.docker = new Dockerode(resolveDockerOptions());
@@ -133,10 +152,21 @@ export class DesktopService {
     this.desktops.set(projectPath, sentinel);
     this.pushEvent(projectPath, { status: 'starting' });
 
+    // Cancel any previous in-flight start and create a new abort controller.
+    // rebuildDesktop aborts this signal to prevent the current start from
+    // writing state after the rebuild has cleared it — avoiding orphaned containers.
+    this.startAbortControllers.get(projectPath)?.abort();
+    const abortController = new AbortController();
+    this.startAbortControllers.set(projectPath, abortController);
+    const { signal } = abortController;
+
     try {
       // Try to restart an existing stopped container
       const restarted = await this.tryRestartContainer(projectPath);
       if (restarted) return restarted;
+
+      // Check if a rebuild superseded this start while we were restarting
+      if (signal.aborted) throw new DesktopSupersededError();
 
       // No existing container — create a new one
       await this.ensureImage();
@@ -201,6 +231,13 @@ export class DesktopService {
         throw new Error('Failed to create desktop container after port allocation retries');
       }
 
+      // Check if a rebuild superseded this start while we were creating the container.
+      // Clean up the container we just created since the rebuild is in charge now.
+      if (signal.aborted) {
+        await container.remove({ force: true }).catch(() => {});
+        throw new DesktopSupersededError();
+      }
+
       const state: DesktopState = {
         containerId: container.id,
         wsPort,
@@ -212,7 +249,14 @@ export class DesktopService {
       this.desktops.set(projectPath, state);
 
       // Wait for noVNC to be ready
-      await this.waitForReady(wsPort);
+      await this.waitForReady(wsPort, signal);
+
+      // Final abort check — if superseded during waitForReady, clean up
+      if (signal.aborted) {
+        await container.stop({ t: 2 }).catch(() => {});
+        await container.remove({ force: true }).catch(() => {});
+        throw new DesktopSupersededError();
+      }
 
       state.status = 'running';
       this.desktops.set(projectPath, { ...state });
@@ -221,6 +265,10 @@ export class DesktopService {
 
       return { ...state };
     } catch (err: unknown) {
+      // If this start was superseded by a rebuild, don't overwrite the map —
+      // the rebuild's startDesktop is now in charge of the project's state.
+      if (err instanceof DesktopSupersededError) throw err;
+
       const errorMsg = err instanceof Error ? err.message : String(err);
       const errorState: DesktopState = {
         containerId: '',
@@ -279,6 +327,10 @@ export class DesktopService {
    * Docker image (if any), then starts a fresh container from a rebuilt image.
    */
   async rebuildDesktop(projectPath: string): Promise<DesktopState> {
+    // Cancel any in-flight startDesktop so it doesn't orphan a container
+    // by writing state after we've cleared the map entry below.
+    this.startAbortControllers.get(projectPath)?.abort();
+
     const state = this.desktops.get(projectPath);
 
     // Stop and remove existing container
@@ -424,12 +476,18 @@ export class DesktopService {
       throw new Error('No running desktop for this project');
     }
 
+    // Use a unique filename to prevent races when concurrent calls (parallel
+    // subagents, rapid polling) overlap — a second scrot would overwrite the
+    // file while the first is being read via tar archive.
+    const screenshotId = ++this.screenshotCounter;
+    const screenshotPath = `/tmp/screen-${screenshotId}.png`;
+
     // Capture screenshot inside container
-    await this.execInDesktop(projectPath, 'DISPLAY=:99 scrot -o /tmp/screen.png');
+    await this.execInDesktop(projectPath, `DISPLAY=:99 scrot -o ${screenshotPath}`);
 
     // Read the file out via tar archive
     const container = this.docker.getContainer(state.containerId);
-    const archive = await container.getArchive({ path: '/tmp/screen.png' });
+    const archive = await container.getArchive({ path: screenshotPath });
 
     // The archive is a tar stream — extract the single file
     const chunks: Buffer[] = [];
@@ -455,6 +513,10 @@ export class DesktopService {
     }
 
     const pngBuffer = tarBuffer.subarray(pngStart, pngEnd + iend.length);
+
+    // Clean up the temp file inside the container (best-effort)
+    this.execInDesktop(projectPath, `rm -f ${screenshotPath}`).catch(() => {});
+
     return pngBuffer.toString('base64');
   }
 
@@ -762,10 +824,13 @@ export class DesktopService {
   }
 
   /** Poll until noVNC websockify is responding on the given port. */
-  private async waitForReady(wsPort: number): Promise<void> {
+  private async waitForReady(wsPort: number, signal?: AbortSignal): Promise<void> {
     const deadline = Date.now() + READY_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
+      // Bail early if the caller was superseded (e.g. by a rebuild)
+      if (signal?.aborted) return;
+
       try {
         await new Promise<void>((resolve, reject) => {
           const client = createConnection({ port: wsPort, host: '127.0.0.1' }, () => {

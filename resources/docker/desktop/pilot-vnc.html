@@ -64,9 +64,16 @@
     }
 
     window.addEventListener('message', (event) => {
-      // Validate sender origin when a parent origin is known. For opaque
-      // origins ("null") we skip the check since they can't be compared.
-      if (parentOrigin && parentOrigin !== 'null' && event.origin !== parentOrigin) return;
+      // Reject all messages when parentOrigin was not provided. Without a
+      // known parent, this page was loaded directly (not via Pilot's iframe)
+      // and should not accept credentials via postMessage.
+      if (!parentOrigin) return;
+
+      // Validate sender origin when a concrete (non-opaque) origin is known.
+      // For file:// origins ("null") we skip the check since opaque origins
+      // can't be compared reliably.
+      if (parentOrigin !== 'null' && event.origin !== parentOrigin) return;
+
       if (event.data?.type === 'vnc-connect') {
         connect(event.data.password);
       }
