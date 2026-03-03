@@ -290,8 +290,10 @@ export function createDesktopTools(
       }),
       async execute(_toolCallId, params) {
         // Only allow http/https URLs — block file://, data:, javascript:, etc.
+        // Throwing (rather than returning error text) signals a tool failure to the
+        // SDK so the model sees it as an error, not a successful tool call.
         if (!/^https?:\/\//i.test(params.url)) {
-          return textResult(`Error: URL must use http:// or https:// scheme. Got: ${params.url}`);
+          throw new Error(`URL must use http:// or https:// scheme. Got: ${params.url}`);
         }
 
         const browser = params.browser || 'chromium';

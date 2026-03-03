@@ -413,11 +413,17 @@ export class DesktopService {
       };
       this.desktops.set(projectPath, state);
       return state;
-    } catch {
-      // Container is gone
+    } catch (err) {
+      // Only discard persisted state when the container is truly gone (404).
+      // Transient errors (ECONNREFUSED, daemon restart) should preserve
+      // desktop.json so the container isn't permanently orphaned.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('404') || msg.includes('no such container')) {
+        this.removePersisted(projectPath);
+      }
+      return null;
     }
 
-    this.removePersisted(projectPath);
     return null;
   }
 
@@ -614,10 +620,31 @@ export class DesktopService {
             continue;
           }
 
+          const wsPort = wsMapping?.PublicPort ?? 0;
+          const vncPort = vncMapping?.PublicPort ?? 0;
+
+          if (wsPort <= 0 || vncPort <= 0) {
+            // Port bindings missing — the container is running but we can't
+            // connect to it. Mark as stopped so the user can resume normally
+            // (resume re-reads port mappings from a fresh container.inspect).
+            console.warn(`[Desktop] Running container ${keep.Id.slice(0, 12)} has invalid port bindings (VNC: ${vncPort}, WS: ${wsPort}). Marking as stopped.`);
+            const stoppedState: DesktopState = {
+              containerId: keep.Id,
+              wsPort: 0,
+              vncPort: 0,
+              status: 'stopped',
+              createdAt: new Date(keep.Created * 1000).getTime(),
+              vncPassword: persistedConfig.vncPassword,
+            };
+            this.desktops.set(projectPath, stoppedState);
+            this.persistConfig(projectPath, stoppedState);
+            continue;
+          }
+
           const state: DesktopState = {
             containerId: keep.Id,
-            wsPort: wsMapping?.PublicPort ?? 0,
-            vncPort: vncMapping?.PublicPort ?? 0,
+            wsPort,
+            vncPort,
             status: 'running',
             createdAt: new Date(keep.Created * 1000).getTime(),
             vncPassword: persistedConfig.vncPassword,
