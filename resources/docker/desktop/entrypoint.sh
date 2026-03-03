@@ -21,10 +21,11 @@ done
 fluxbox &
 
 # Start VNC server with per-container password authentication.
-# Store the password in a hashed file to keep it out of the process table (`ps aux`),
-# then unset the environment variable so child processes can't read it either.
+# Pipe the password via stdin to avoid exposing it in /proc/<pid>/cmdline
+# during the brief storepasswd exec window. Then unset the env var so
+# child processes can't read it either.
 if [ -n "${VNC_PASSWORD:-}" ]; then
-  x11vnc -storepasswd "$VNC_PASSWORD" /tmp/vncpasswd
+  echo "$VNC_PASSWORD" | x11vnc -storepasswd /dev/stdin /tmp/vncpasswd
   unset VNC_PASSWORD
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
 else

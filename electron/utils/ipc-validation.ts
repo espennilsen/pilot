@@ -25,6 +25,18 @@ export function requireBoolean(value: unknown, name: string): boolean {
 }
 
 /**
+ * Check whether a resolved Windows path falls within well-known system
+ * directories. Returns true if the path is safe, false if it should be
+ * rejected. Shared between `validateProjectPath` (IPC) and
+ * `reconcileOnStartup` (Docker label validation).
+ */
+export function isWindowsPathSafe(resolved: string): boolean {
+  const lower = resolved.toLowerCase().replace(/\\/g, '/');
+  const blocklist = ['c:/windows', 'c:/program files', 'c:/program files (x86)', 'c:/programdata'];
+  return !blocklist.some(b => lower === b || lower.startsWith(b + '/'));
+}
+
+/**
  * Validate a project path: must be a non-empty string that resolves to an absolute
  * path within the user's home directory. Rejects arbitrary paths to prevent writes
  * to sensitive locations (e.g. /etc, /tmp).
@@ -44,15 +56,8 @@ export function validateProjectPath(value: unknown): string {
       throw new Error(`Project path must be an absolute path: ${resolved}`);
     }
     // Defence-in-depth: block well-known Windows system directories.
-    // Docker mount restrictions provide the primary sandboxing, but rejecting
-    // these at the IPC layer prevents a compromised renderer from attempting
-    // to mount sensitive OS locations.
-    const lower = resolved.toLowerCase().replace(/\\/g, '/');
-    const blocklist = ['c:/windows', 'c:/program files', 'c:/program files (x86)', 'c:/programdata'];
-    for (const blocked of blocklist) {
-      if (lower === blocked || lower.startsWith(blocked + '/')) {
-        throw new Error(`Project path must not be a system directory: ${resolved}`);
-      }
+    if (!isWindowsPathSafe(resolved)) {
+      throw new Error(`Project path must not be a system directory: ${resolved}`);
     }
   } else {
     if (!isWithinDir(homedir(), resolved)) {

@@ -9,6 +9,7 @@ import Dockerode from 'dockerode';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { isWithinDir } from '../utils/paths';
+import { isWindowsPathSafe } from '../utils/ipc-validation';
 import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { createHash, randomBytes } from 'crypto';
 import { createServer, createConnection } from 'net';
@@ -549,13 +550,11 @@ export class DesktopService {
         if (!projectPath) continue;
 
         // Validate the label value to prevent writes to arbitrary paths
-        // from crafted Docker labels (e.g. /etc).
-        // On Windows, projects may live on non-home drives (D:\projects),
-        // so only require a valid absolute path — matching validateProjectPath
-        // in electron/ipc/desktop.ts.
+        // from crafted Docker labels (e.g. /etc, C:\Windows).
+        // Uses the same blocklist as validateProjectPath in ipc-validation.ts.
         const resolved = resolve(projectPath);
         if (process.platform === 'win32') {
-          if (!/^[A-Za-z]:\\/.test(resolved)) {
+          if (!/^[A-Za-z]:\\/.test(resolved) || !isWindowsPathSafe(resolved)) {
             console.warn(`[Desktop] Ignoring container with invalid pilot.project label: ${projectPath}`);
             continue;
           }

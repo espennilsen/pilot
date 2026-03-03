@@ -125,7 +125,8 @@ export const IPC = {
   DESKTOP_START: 'desktop:start',
   DESKTOP_STOP: 'desktop:stop',
   DESKTOP_STATUS: 'desktop:status',
-  DESKTOP_EXEC: 'desktop:exec',
+  // Note: no DESKTOP_EXEC — agent tools call service.execInDesktop() directly.
+  // Exposing exec via IPC would widen the attack surface unnecessarily.
   DESKTOP_SCREENSHOT: 'desktop:screenshot',
   DESKTOP_EVENT: 'desktop:event',                     // main → renderer push
   DESKTOP_REBUILD: 'desktop:rebuild',
