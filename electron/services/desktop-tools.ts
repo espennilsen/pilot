@@ -140,10 +140,10 @@ export function createDesktopTools(
           Type.Literal('left'),
           Type.Literal('right'),
         ], { description: 'Scroll direction' }),
-        amount: Type.Optional(Type.Number({ description: 'Number of scroll increments (default: 3)' })),
+        amount: Type.Optional(Type.Number({ description: 'Number of scroll increments (default: 3)', minimum: 1, maximum: 100 })),
       }),
       async execute(_toolCallId, params) {
-        const amount = params.amount ?? 3;
+        const amount = Math.min(Math.max(1, Math.round(params.amount ?? 3)), 100);
         // xdotool: button 4=up, 5=down, 6=left, 7=right
         const buttonMap = { up: 4, down: 5, left: 6, right: 7 } as const;
         const button = buttonMap[params.direction as keyof typeof buttonMap];

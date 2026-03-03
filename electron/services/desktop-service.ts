@@ -438,9 +438,11 @@ export class DesktopService {
     }
     const tarBuffer = Buffer.concat(chunks);
 
-    // Tar header is 512 bytes, file content follows. Find the PNG magic bytes.
+    // Tar header is 512 bytes, file content follows. Search for the PNG magic
+    // bytes starting at offset 512 to avoid false matches inside the tar header.
+    const TAR_HEADER_SIZE = 512;
     const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-    const pngStart = tarBuffer.indexOf(pngMagic);
+    const pngStart = tarBuffer.indexOf(pngMagic, TAR_HEADER_SIZE);
     if (pngStart === -1) {
       throw new Error('Screenshot capture failed — PNG not found in archive');
     }

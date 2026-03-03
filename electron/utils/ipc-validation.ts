@@ -42,7 +42,7 @@ export function validateProjectPath(value: unknown): string {
   if (process.platform === 'win32') {
     // On Windows just ensure it's a valid absolute path — Docker mount
     // restrictions provide the actual sandboxing.
-    if (!resolve(resolved).match(/^[A-Za-z]:\\/)) {
+    if (!resolved.match(/^[A-Za-z]:\\/)) {
       throw new Error(`Project path must be an absolute path: ${resolved}`);
     }
   } else {

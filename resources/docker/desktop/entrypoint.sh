@@ -8,8 +8,14 @@ export CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage"
 
 # Start virtual framebuffer
 Xvfb "$DISPLAY" -screen 0 "$RESOLUTION" &
-XVFB_PID=$!
-sleep 1
+
+# Wait for Xvfb to be ready before starting services that depend on it.
+# Polling with xdpyinfo is more reliable than a fixed sleep — it handles
+# slow VMs and loaded CI runners where 1s may not be enough.
+for i in $(seq 1 20); do
+  xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 && break
+  sleep 0.5
+done
 
 # Start lightweight window manager
 fluxbox &
