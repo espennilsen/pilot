@@ -483,6 +483,11 @@ export class DesktopService {
       AttachStderr: true,
     });
 
+    const MAX_STDIN_BYTES = 10 * 1024 * 1024; // 10 MB — matches MAX_STREAM_BYTES
+    if (Buffer.byteLength(stdinData, 'utf-8') > MAX_STDIN_BYTES) {
+      throw new Error(`stdin data exceeds ${MAX_STDIN_BYTES / (1024 * 1024)} MB limit`);
+    }
+
     const stream = await exec.start({ Detach: false, Tty: false, hijack: true });
     stream.write(stdinData);
     stream.end();
@@ -1067,7 +1072,7 @@ export class DesktopService {
         createdAt: state.createdAt,
         vncPassword: state.vncPassword,
       };
-      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2));
+      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
 
       // Ensure desktop.json is gitignored — prevents accidental commits of
       // the VNC password when users selectively track files inside .pilot/.

@@ -296,6 +296,15 @@ export function createDesktopTools(
           throw new Error(`URL must use http:// or https:// scheme. Got: ${params.url}`);
         }
 
+        // Block cloud metadata SSRF vectors. The container can reach the host
+        // network's link-local metadata service — a prompt-injected agent could
+        // screenshot IAM credentials. Localhost is intentionally allowed for
+        // dev-server use cases.
+        const hostname = new URL(params.url).hostname.toLowerCase();
+        if (/^169\.254\./.test(hostname) || hostname === 'host.docker.internal' || hostname === 'metadata.google.internal') {
+          throw new Error(`URL hostname blocked for security reasons: ${hostname}`);
+        }
+
         const browser = params.browser || 'chromium';
         const wait = Math.min(Math.max(0, params.wait ?? 3), 30);
 
