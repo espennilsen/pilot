@@ -6,7 +6,7 @@
  * take screenshots via scrot, and interact with the clipboard via xclip.
  */
 import Dockerode from 'dockerode';
-import { join, resolve } from 'path';
+import { join, posix, resolve } from 'path';
 import { homedir } from 'os';
 import { isWithinDir } from '../utils/paths';
 import { isWindowsPathSafe } from '../utils/ipc-validation';
@@ -931,8 +931,7 @@ export class DesktopService {
    * Write a small file into a container via tar archive (putArchive).
    * Used to inject secrets (e.g. VNC password) without env vars.
    */
-  private async writeContainerFile(container: Docker.Container, filePath: string, content: string): Promise<void> {
-    const { posix } = require('path');
+  private async writeContainerFile(container: Dockerode.Container, filePath: string, content: string): Promise<void> {
     const fileName = posix.basename(filePath);
     const dir = posix.dirname(filePath);
 

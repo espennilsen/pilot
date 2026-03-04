@@ -7,6 +7,7 @@ ENV RESOLUTION=1280x800x24
 # ── Base: virtual display, VNC, window manager, utilities ────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
+    x11-utils \
     xdotool \
     scrot \
     x11vnc \

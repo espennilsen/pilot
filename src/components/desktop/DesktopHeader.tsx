@@ -69,7 +69,7 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
                       navigator.clipboard.writeText('').catch(() => {});
                     }
                   }).catch(() => {});
-                }, 30_000);
+                }, 10_000);
               }
             }}
             className="p-1.5 hover:bg-bg-surface rounded transition-colors"
