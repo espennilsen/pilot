@@ -181,10 +181,20 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 65535;
     if ('wsPort' in stateUpdate && !isValidPort(stateUpdate.wsPort)) {
       console.warn(`[DesktopStore] Invalid wsPort in event: ${stateUpdate.wsPort}`);
+      // Surface an error so the UI immediately shows the problem instead of
+      // silently exhausting retry attempts against a malformed URL.
+      if (stateUpdate.status === 'running') {
+        stateUpdate.status = 'error';
+        (stateUpdate as Record<string, unknown>).error = `Invalid wsPort: ${stateUpdate.wsPort}`;
+      }
       delete stateUpdate.wsPort;
     }
     if ('vncPort' in stateUpdate && !isValidPort(stateUpdate.vncPort)) {
       console.warn(`[DesktopStore] Invalid vncPort in event: ${stateUpdate.vncPort}`);
+      if (stateUpdate.status === 'running') {
+        stateUpdate.status = 'error';
+        (stateUpdate as Record<string, unknown>).error = `Invalid vncPort: ${stateUpdate.vncPort}`;
+      }
       delete stateUpdate.vncPort;
     }
 

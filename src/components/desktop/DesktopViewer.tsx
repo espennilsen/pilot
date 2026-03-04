@@ -70,6 +70,11 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
     if (timerRef.current) clearTimeout(timerRef.current);
   };
 
+  // Store wsPort in a ref so the retry timer callback always uses the
+  // current value rather than a stale closure from a previous render.
+  const wsPortRef = useRef(wsPort);
+  wsPortRef.current = wsPort;
+
   const handleError = () => {
     if (retries >= MAX_RETRIES) return;
 
@@ -79,11 +84,14 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
 
     const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, retries), MAX_DELAY_MS);
     timerRef.current = setTimeout(() => {
+      // Re-derive the URL from the ref so a port change during the delay
+      // doesn't cause the iframe to reload the previous container's page.
+      const currentUrl = `http://localhost:${wsPortRef.current}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}`;
       setRetries((r) => r + 1);
       if (iframeRef.current) {
         iframeRef.current.src = '';
         requestAnimationFrame(() => {
-          if (iframeRef.current) iframeRef.current.src = noVncUrl;
+          if (iframeRef.current) iframeRef.current.src = currentUrl;
         });
       }
     }, delay);

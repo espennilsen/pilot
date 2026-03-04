@@ -573,12 +573,14 @@ export class DesktopService {
         const resolved = resolve(projectPath);
         if (process.platform === 'win32') {
           if (!/^[A-Za-z]:\\/.test(resolved) || !isWindowsPathSafe(resolved)) {
-            console.warn(`[Desktop] Ignoring container with invalid pilot.project label: ${projectPath}`);
+            console.warn(`[Desktop] Removing container with invalid pilot.project label: ${projectPath}`);
+            try { await this.docker.getContainer(containerInfo.Id).remove({ force: true }); } catch { /* best effort */ }
             continue;
           }
         } else {
           if (!isWithinDir(homedir(), resolved)) {
-            console.warn(`[Desktop] Ignoring container with suspicious pilot.project label: ${projectPath}`);
+            console.warn(`[Desktop] Removing container with suspicious pilot.project label: ${projectPath}`);
+            try { await this.docker.getContainer(containerInfo.Id).remove({ force: true }); } catch { /* best effort */ }
             continue;
           }
         }
@@ -708,7 +710,34 @@ export class DesktopService {
     try {
       const container = this.docker.getContainer(existing.containerId);
       const info = await container.inspect();
-      if (info.State.Running) return null; // Already running — shouldn't happen
+
+      if (info.State.Running) {
+        // Container is already running (e.g. reconcileOnStartup marked it as
+        // stopped due to zero port bindings from a transient Docker issue).
+        // Re-read port bindings and return the live state instead of silently
+        // returning null — which would create a duplicate container.
+        const portBindings = info.NetworkSettings?.Ports ?? {};
+        const vncPort = Number(portBindings['5900/tcp']?.[0]?.HostPort) || 0;
+        const wsPort = Number(portBindings['6080/tcp']?.[0]?.HostPort) || 0;
+        if (vncPort <= 0 || wsPort <= 0) {
+          throw new Error(
+            `Running container ${existing.containerId} has invalid port bindings `
+            + `(VNC: ${vncPort}, WS: ${wsPort}). Stop and start the desktop again.`,
+          );
+        }
+        const state: DesktopState = {
+          containerId: existing.containerId,
+          wsPort,
+          vncPort,
+          status: 'running',
+          createdAt: existing.createdAt,
+          vncPassword: existing.vncPassword,
+        };
+        this.desktops.set(projectPath, { ...state });
+        this.persistConfig(projectPath, state);
+        this.pushEvent(projectPath, state);
+        return { ...state };
+      }
 
       await container.start();
 
