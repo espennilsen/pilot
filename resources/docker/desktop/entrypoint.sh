@@ -26,6 +26,7 @@ fluxbox &
 # child processes can't read it either.
 if [ -n "${VNC_PASSWORD:-}" ]; then
   echo "$VNC_PASSWORD" | x11vnc -storepasswd /dev/stdin /tmp/vncpasswd
+  chmod 600 /tmp/vncpasswd
   unset VNC_PASSWORD
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
 else

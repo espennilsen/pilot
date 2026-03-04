@@ -299,7 +299,11 @@ export class DesktopService {
       this.pushEvent(projectPath, errorState);
       throw err;
     } finally {
-      this.startAbortControllers.delete(projectPath);
+      // Only delete our own controller — a concurrent rebuildDesktop may have
+      // already replaced the map entry with a new controller for its own start.
+      if (this.startAbortControllers.get(projectPath) === abortController) {
+        this.startAbortControllers.delete(projectPath);
+      }
     }
   }
 
@@ -423,8 +427,6 @@ export class DesktopService {
       }
       return null;
     }
-
-    return null;
   }
 
   /** Execute a shell command inside the desktop container. Returns stdout. */
