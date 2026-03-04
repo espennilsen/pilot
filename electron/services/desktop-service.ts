@@ -222,7 +222,12 @@ export class DesktopService {
               },
               // Mount the project directory read-only — code changes should go through
               // Pilot's diff staging system, not via direct writes inside the container.
-              Binds: [`${projectPath}:/workspace:ro`],
+              Mounts: [{
+                Type: 'bind',
+                Source: projectPath,
+                Target: '/workspace',
+                ReadOnly: true,
+              }],
               // Reasonable resource limits
               Memory: 2 * 1024 * 1024 * 1024, // 2 GB
               NanoCpus: 2_000_000_000,         // 2 CPUs
@@ -395,15 +400,27 @@ export class DesktopService {
       const info = await container.inspect();
 
       if (info.State.Running) {
+        // Read live port bindings — Docker may have reassigned ephemeral
+        // ports if the container was restarted externally.
+        const portBindings = info.NetworkSettings?.Ports ?? {};
+        const wsPort = Number(portBindings['6080/tcp']?.[0]?.HostPort) || config.wsPort;
+        const vncPort = Number(portBindings['5900/tcp']?.[0]?.HostPort) || config.vncPort;
+
         const state: DesktopState = {
           containerId: config.containerId,
-          wsPort: config.wsPort,
-          vncPort: config.vncPort,
+          wsPort,
+          vncPort,
           status: 'running',
           createdAt: config.createdAt,
           vncPassword: config.vncPassword,
         };
         this.desktops.set(projectPath, state);
+
+        // Update persisted config if ports drifted
+        if (wsPort !== config.wsPort || vncPort !== config.vncPort) {
+          this.persistConfig(projectPath, state);
+        }
+
         return state;
       }
 
