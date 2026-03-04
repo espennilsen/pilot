@@ -86,7 +86,14 @@
     // iframe's module execution and the parent's useEffect registration —
     // if the one-shot fires before the listener is in place, subsequent
     // retries ensure the handshake completes.
+    let readyRetries = 0;
+    const MAX_READY_RETRIES = 15; // 30s at 2s intervals
     let readyInterval = setInterval(() => {
+      if (++readyRetries >= MAX_READY_RETRIES) {
+        clearInterval(readyInterval);
+        readyInterval = null;
+        return;
+      }
       window.parent.postMessage({ type: 'vnc-ready' }, targetOrigin);
     }, 2000);
     // Send the first signal immediately (don't wait 2s).

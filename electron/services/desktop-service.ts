@@ -171,6 +171,7 @@ export class DesktopService {
         if (signal.aborted) {
           await this.docker.getContainer(restarted.containerId)
             .stop({ t: 2 }).catch(() => {});
+          this.desktops.delete(projectPath);
           throw new DesktopSupersededError();
         }
         return restarted;
@@ -512,18 +513,20 @@ export class DesktopService {
     // Capture screenshot inside container
     await this.execInDesktop(projectPath, `DISPLAY=:99 scrot -o ${screenshotPath}`);
 
-    // Read the file out via tar archive
-    const container = this.docker.getContainer(state.containerId);
-    const archive = await container.getArchive({ path: screenshotPath });
-
-    // The archive is a tar stream — extract the single file
-    const chunks: Buffer[] = [];
-    for await (const chunk of archive as AsyncIterable<Buffer>) {
-      chunks.push(chunk);
-    }
-    const tarBuffer = Buffer.concat(chunks);
-
+    // Read the file out via tar archive and extract the PNG.
+    // The try/finally wraps the entire retrieval so the temp file is cleaned
+    // up even when getArchive() or stream collection fails.
     try {
+      const container = this.docker.getContainer(state.containerId);
+      const archive = await container.getArchive({ path: screenshotPath });
+
+      // The archive is a tar stream — extract the single file
+      const chunks: Buffer[] = [];
+      for await (const chunk of archive as AsyncIterable<Buffer>) {
+        chunks.push(chunk);
+      }
+      const tarBuffer = Buffer.concat(chunks);
+
       // Tar header is 512 bytes, file content follows. Search for the PNG magic
       // bytes starting at offset 512 to avoid false matches inside the tar header.
       const TAR_HEADER_SIZE = 512;

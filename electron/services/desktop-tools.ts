@@ -297,7 +297,7 @@ export function createDesktopTools(
         }
 
         const browser = params.browser || 'chromium';
-        const wait = params.wait ?? 3;
+        const wait = Math.min(Math.max(0, params.wait ?? 3), 30);
 
         // Launch the browser in the background via shell `&`. Without the trailing `&`,
         // nohup exec()s the browser in the foreground — the Docker exec stream stays open
