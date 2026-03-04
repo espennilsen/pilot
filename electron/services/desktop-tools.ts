@@ -159,7 +159,7 @@ export function createDesktopTools(
       label: 'Desktop Type',
       description: 'Type text string into the focused window in the desktop. For special keys, use desktop_key instead.',
       parameters: Type.Object({
-        text: Type.String({ description: 'Text to type' }),
+        text: Type.String({ description: 'Text to type', maxLength: 10000 }),
       }),
       async execute(_toolCallId, params) {
         await execCmd(['xdotool', 'type', '--', params.text]);
@@ -246,8 +246,7 @@ export function createDesktopTools(
           const state = await service.startDesktop(projectPath);
           return textResult(
             `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
-            `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true\n` +
-            `(VNC authentication is configured — the UI connects automatically)`
+            `The Pilot UI connects automatically. Use desktop_screenshot to see the display.`
           );
         } catch (err) {
           // A rebuild raced with this start — the new desktop will be ready shortly.

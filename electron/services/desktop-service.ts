@@ -209,7 +209,9 @@ export class DesktopService {
         try {
           container = await this.docker.createContainer({
             Image: image,
-            Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`, `VNC_PASSWORD=${vncPassword}`],
+            // VNC password is injected via a tmpfs-mounted file (see below),
+            // NOT via Env — env vars are permanently visible in `docker inspect`.
+            Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
             Labels: {
               'pilot.desktop': 'true',
               'pilot.project': projectPath,
@@ -228,11 +230,22 @@ export class DesktopService {
                 Target: '/workspace',
                 ReadOnly: true,
               }],
+              // tmpfs mount for VNC password — in-memory only, never persisted
+              // to the container's filesystem layer or visible in docker inspect env.
+              Tmpfs: { '/run/secrets': 'size=1m,mode=700,uid=1000' },
               // Reasonable resource limits
               Memory: 2 * 1024 * 1024 * 1024, // 2 GB
               NanoCpus: 2_000_000_000,         // 2 CPUs
+              // Block SUID privilege escalation and drop all capabilities —
+              // Xvfb, x11vnc, and noVNC don't need any.
+              SecurityOpt: ['no-new-privileges:true'],
+              CapDrop: ['ALL'],
             },
           });
+
+          // Write VNC password to the tmpfs mount before starting the container.
+          // This avoids passing credentials via env vars (visible in docker inspect).
+          await this.writeContainerFile(container, '/run/secrets/vnc_password', vncPassword);
 
           await container.start();
           break; // Success — exit retry loop
@@ -915,6 +928,42 @@ export class DesktopService {
   }
 
   /**
+   * Write a small file into a container via tar archive (putArchive).
+   * Used to inject secrets (e.g. VNC password) without env vars.
+   */
+  private async writeContainerFile(container: Docker.Container, filePath: string, content: string): Promise<void> {
+    const { posix } = require('path');
+    const fileName = posix.basename(filePath);
+    const dir = posix.dirname(filePath);
+
+    // Build a minimal tar archive: 512-byte header + content padded to 512-byte boundary + 1024-byte EOF
+    const contentBuf = Buffer.from(content, 'utf-8');
+    const headerBuf = Buffer.alloc(512);
+    // File name (0-99)
+    headerBuf.write(fileName, 0, Math.min(fileName.length, 100), 'utf-8');
+    // File mode (100-107)
+    headerBuf.write('0000600\0', 100, 8, 'utf-8');
+    // Owner/group uid/gid (108-123) — 1000 (pilot user)
+    headerBuf.write('0001750\0', 108, 8, 'utf-8');
+    headerBuf.write('0001750\0', 116, 8, 'utf-8');
+    // File size in octal (124-135)
+    headerBuf.write(contentBuf.length.toString(8).padStart(11, '0') + '\0', 124, 12, 'utf-8');
+    // Type flag '0' = regular file (156)
+    headerBuf.write('0', 156, 1, 'utf-8');
+    // Checksum (148-155): sum of all header bytes with checksum field as spaces
+    headerBuf.write('        ', 148, 8, 'utf-8');
+    let checksum = 0;
+    for (let i = 0; i < 512; i++) checksum += headerBuf[i];
+    headerBuf.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'utf-8');
+
+    const padding = Buffer.alloc(512 - (contentBuf.length % 512 || 512));
+    const eof = Buffer.alloc(1024);
+    const tar = Buffer.concat([headerBuf, contentBuf, padding.length < 512 ? padding : Buffer.alloc(0), eof]);
+
+    await container.putArchive(tar, { path: dir });
+  }
+
+  /**
    * Find an available TCP port on localhost.
    *
    * Note: there is an inherent TOCTOU race between closing the probe socket
@@ -1101,11 +1150,11 @@ export class DesktopService {
         createdAt: state.createdAt,
         vncPassword: state.vncPassword,
       };
-      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
-
-      // Ensure desktop.json is gitignored — prevents accidental commits of
-      // the VNC password when users selectively track files inside .pilot/.
+      // Ensure desktop.json is gitignored BEFORE writing the file — prevents
+      // a race where `git add .` could stage the credential if it runs between
+      // the write and the gitignore update.
       this.ensureGitignoreEntry(pilotDir, 'desktop.json');
+      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
     } catch { /* best effort */ }
   }
 

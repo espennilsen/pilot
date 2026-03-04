@@ -20,20 +20,22 @@ xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || {
   echo "ERROR: Xvfb did not become ready within 10s" >&2; exit 1;
 }
 
-# Start lightweight window manager
-fluxbox &
+# Start lightweight window manager — auto-restart on crash so a fluxbox
+# failure doesn't bring down the entire container via wait -n.
+while true; do fluxbox; sleep 1; done &
 
 # Start VNC server with per-container password authentication.
-# Pipe the password via stdin to avoid exposing it in /proc/<pid>/cmdline
-# during the brief storepasswd exec window. Then unset the env var so
-# child processes can't read it either.
-if [ -n "${VNC_PASSWORD:-}" ]; then
-  echo "$VNC_PASSWORD" | x11vnc -storepasswd /dev/stdin /tmp/vncpasswd
+# The password is injected via a tmpfs-mounted file at /run/secrets/vnc_password
+# (written by Pilot before container start). This avoids env vars which are
+# permanently visible in `docker inspect`.
+VNC_SECRET_FILE="/run/secrets/vnc_password"
+if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
+  cat "$VNC_SECRET_FILE" | x11vnc -storepasswd /dev/stdin /tmp/vncpasswd
   chmod 600 /tmp/vncpasswd
-  unset VNC_PASSWORD
+  rm -f "$VNC_SECRET_FILE"
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
 else
-  echo "ERROR: VNC_PASSWORD must be set and non-empty" >&2
+  echo "ERROR: VNC password file not found at $VNC_SECRET_FILE" >&2
   exit 1
 fi
 

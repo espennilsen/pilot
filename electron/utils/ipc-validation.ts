@@ -31,6 +31,11 @@ export function requireBoolean(value: unknown, name: string): boolean {
  * `reconcileOnStartup` (Docker label validation).
  */
 export function isWindowsPathSafe(resolved: string): boolean {
+  // Best-effort blocklist for well-known C: system directories. Windows can be
+  // installed on other drive letters, and system dirs can exist on secondary
+  // drives — this check does not cover those cases. Docker's own mount
+  // restrictions and the home-directory validation in validateProjectPath
+  // provide the primary security boundary on Windows.
   const lower = resolved.toLowerCase().replace(/\\/g, '/');
   const blocklist = ['c:/windows', 'c:/program files', 'c:/program files (x86)', 'c:/programdata'];
   return !blocklist.some(b => lower === b || lower.startsWith(b + '/'));
