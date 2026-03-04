@@ -305,6 +305,10 @@ export class PilotSessionManager {
    * Verified working with @mariozechner/pi-coding-agent@0.55.x.
    * If the SDK version is bumped, re-verify that _toolRegistry still exists
    * and is a Map<string, ToolDefinition>.
+   *
+   * TODO: Request a public registerTool/unregisterTool API from
+   * @mariozechner/pi-coding-agent so we can drop the private-field access.
+   * Tracked in: https://github.com/nicepkg/pi-coding-agent/issues/TBD
    */
   updateDesktopTools(tabId: string, enabled: boolean): void {
     const session = this.sessions.get(tabId);

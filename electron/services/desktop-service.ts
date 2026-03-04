@@ -817,7 +817,7 @@ export class DesktopService {
 
     // Build the image
     const stream = await this.docker.buildImage(
-      { context: contextPath, src: ['Dockerfile', 'entrypoint.sh'] },
+      { context: contextPath, src: ['Dockerfile', 'entrypoint.sh', 'pilot-vnc.html'] },
       { t: DESKTOP_IMAGE },
     );
 
