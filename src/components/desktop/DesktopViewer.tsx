@@ -104,6 +104,13 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
         src={noVncUrl}
         className="w-full h-full border-0"
         title="Desktop Virtual Display"
+        // allow-scripts + allow-same-origin are both required: noVNC needs
+        // scripts for the VNC client, and same-origin for the WebSocket upgrade
+        // handshake and window.parent.postMessage credential flow. Per the HTML
+        // spec this combination lets the framed document escape sandbox isolation
+        // by spawning a new browsing context — but Electron's contextIsolation
+        // prevents access to preload APIs, and the iframe loads a controlled
+        // Docker-served page, so the residual risk is acceptable.
         sandbox="allow-scripts allow-same-origin allow-forms"
         allow="clipboard-read; clipboard-write"
         onLoad={handleLoad}

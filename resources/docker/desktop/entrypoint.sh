@@ -16,6 +16,9 @@ for i in $(seq 1 20); do
   xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 && break
   sleep 0.5
 done
+xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || {
+  echo "ERROR: Xvfb did not become ready within 10s" >&2; exit 1;
+}
 
 # Start lightweight window manager
 fluxbox &
