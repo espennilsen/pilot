@@ -242,12 +242,20 @@ export function createDesktopTools(
       description: 'Start the desktop virtual display for this project. Must be called before using other desktop tools. Returns connection info.',
       parameters: Type.Object({}),
       async execute() {
-        const state = await service.startDesktop(projectPath);
-        return textResult(
-          `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
-          `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true\n` +
-          `(VNC authentication is configured — the UI connects automatically)`
-        );
+        try {
+          const state = await service.startDesktop(projectPath);
+          return textResult(
+            `Desktop started — VNC port ${state.vncPort}, noVNC port ${state.wsPort}\n` +
+            `noVNC URL: http://localhost:${state.wsPort}/vnc.html?autoconnect=true\n` +
+            `(VNC authentication is configured — the UI connects automatically)`
+          );
+        } catch (err) {
+          // A rebuild raced with this start — the new desktop will be ready shortly.
+          if (err instanceof Error && err.message.includes('superseded')) {
+            return textResult('Desktop is being rebuilt — it will be ready shortly. Try again in a few seconds.');
+          }
+          throw err;
+        }
       },
     },
 

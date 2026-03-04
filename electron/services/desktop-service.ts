@@ -791,6 +791,11 @@ export class DesktopService {
 
       await this.waitForReady(wsPort, signal);
 
+      // If a rebuild superseded this restart while we were waiting,
+      // don't broadcast a false 'running' state — the caller will
+      // detect the abort and discard the result.
+      if (signal?.aborted) return null;
+
       state.status = 'running';
       this.desktops.set(projectPath, { ...state });
       this.persistConfig(projectPath, state);

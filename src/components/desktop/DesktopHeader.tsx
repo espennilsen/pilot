@@ -62,6 +62,14 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
               useTabStore.getState().addWebTab(url, projectPath, 'Desktop');
               if (desktopState.vncPassword) {
                 navigator.clipboard.writeText(desktopState.vncPassword).catch(() => {});
+                // Clear the password from the clipboard after 30s to limit exposure
+                setTimeout(() => {
+                  navigator.clipboard.readText().then(text => {
+                    if (text === desktopState.vncPassword) {
+                      navigator.clipboard.writeText('').catch(() => {});
+                    }
+                  }).catch(() => {});
+                }, 30_000);
               }
             }}
             className="p-1.5 hover:bg-bg-surface rounded transition-colors"
