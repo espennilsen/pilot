@@ -299,17 +299,13 @@ export function createDesktopTools(
         const browser = params.browser || 'chromium';
         const wait = Math.min(Math.max(0, params.wait ?? 3), 30);
 
-        // Launch the browser in the background via shell `&`. Without the trailing `&`,
-        // nohup exec()s the browser in the foreground — the Docker exec stream stays open
-        // until the browser exits, which never happens for a GUI process.
-        // The shell escaping of the URL is safe because execInDesktop wraps it in
-        // `bash -c`, and we single-quote the URL to prevent injection.
-        const escapedUrl = params.url.replace(/'/g, `'\\''`);
-        if (browser === 'firefox') {
-          await exec(`nohup firefox -- '${escapedUrl}' > /dev/null 2>&1 &`);
-        } else {
-          await exec(`nohup chromium-browser --no-sandbox --disable-gpu --disable-dev-shm-usage -- '${escapedUrl}' > /dev/null 2>&1 &`);
-        }
+        // Launch the browser in the background via shell `&`. The URL is passed
+        // as a positional parameter ($1) so it is never parsed as shell syntax —
+        // this avoids injection via crafted quote sequences in the URL.
+        const script = browser === 'firefox'
+          ? `nohup firefox -- "$1" > /dev/null 2>&1 &`
+          : `nohup chromium-browser --no-sandbox --disable-gpu --disable-dev-shm-usage -- "$1" > /dev/null 2>&1 &`;
+        await service.execInDesktopCmd(projectPath, ['bash', '-c', script, '--', params.url]);
 
         if (wait > 0) {
           await new Promise(resolve => setTimeout(resolve, wait * 1000));

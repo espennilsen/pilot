@@ -549,12 +549,14 @@ app.on('window-all-closed', () => {
 
 // Cleanup on quit — async cleanup (container stop) runs in before-quit,
 // synchronous cleanup runs in will-quit.
-let cleanupDone = false;
+let cleanupStarted = false;
+let cleanupFinished = false;
 
 app.on('before-quit', async (e) => {
-  if (cleanupDone) return; // Already ran — let quit proceed
-  e.preventDefault();
-  cleanupDone = true;
+  if (cleanupFinished) return; // Cleanup complete — let quit proceed
+  e.preventDefault(); // Always prevent quit while cleanup is pending
+  if (cleanupStarted) return; // Already in progress — wait for it
+  cleanupStarted = true;
 
   // Stop Docker containers gracefully before the process exits.
   // Without this, stopAll()'s returned Promise is discarded and
@@ -565,6 +567,7 @@ app.on('before-quit', async (e) => {
     // Best effort — don't block quit if Docker is unresponsive
   }
 
+  cleanupFinished = true;
   app.quit();
 });
 

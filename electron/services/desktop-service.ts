@@ -909,7 +909,14 @@ export class DesktopService {
     return projectImage;
   }
 
-  /** Find an available TCP port on localhost. */
+  /**
+   * Find an available TCP port on localhost.
+   *
+   * Note: there is an inherent TOCTOU race between closing the probe socket
+   * and Docker binding the port — another process can claim it in between.
+   * The retry loop in startDesktop (3 attempts with fresh ports) mitigates
+   * this for all practical scenarios.
+   */
   private findAvailablePort(): Promise<number> {
     return new Promise((resolve, reject) => {
       const server = createServer();
