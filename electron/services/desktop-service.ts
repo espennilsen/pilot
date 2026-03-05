@@ -230,9 +230,6 @@ export class DesktopService {
                 Target: '/workspace',
                 ReadOnly: true,
               }],
-              // tmpfs mount for VNC password — in-memory only, never persisted
-              // to the container's filesystem layer or visible in docker inspect env.
-              Tmpfs: { '/run/secrets': 'size=1m,mode=700,uid=1000' },
               // Reasonable resource limits
               Memory: 2 * 1024 * 1024 * 1024, // 2 GB
               NanoCpus: 2_000_000_000,         // 2 CPUs
@@ -243,8 +240,9 @@ export class DesktopService {
             },
           });
 
-          // Write VNC password to the tmpfs mount before starting the container.
-          // This avoids passing credentials via env vars (visible in docker inspect).
+          // Write VNC password to the container's overlay layer before starting.
+          // This avoids env vars (visible in docker inspect). The entrypoint reads
+          // the file and deletes it immediately — exposure window is minimal.
           await this.writeContainerFile(container, '/run/secrets/vnc_password', vncPassword);
 
           await container.start();
@@ -955,9 +953,10 @@ export class DesktopService {
     for (let i = 0; i < 512; i++) checksum += headerBuf[i];
     headerBuf.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'utf-8');
 
-    const padding = Buffer.alloc(512 - (contentBuf.length % 512 || 512));
+    const remainder = contentBuf.length % 512;
+    const padding = remainder > 0 ? Buffer.alloc(512 - remainder) : Buffer.alloc(0);
     const eof = Buffer.alloc(1024);
-    const tar = Buffer.concat([headerBuf, contentBuf, padding.length < 512 ? padding : Buffer.alloc(0), eof]);
+    const tar = Buffer.concat([headerBuf, contentBuf, padding, eof]);
 
     await container.putArchive(tar, { path: dir });
   }

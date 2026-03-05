@@ -70,6 +70,10 @@ EXPOSE 5900 6080
 
 # ── Non-root user ────────────────────────────────────────────────────
 RUN useradd -ms /bin/bash pilot
+
+# Directory for secrets injected via putArchive before container start.
+# Owned by pilot so the entrypoint can read and delete the password file.
+RUN mkdir -p /run/secrets && chown pilot:pilot /run/secrets && chmod 700 /run/secrets
 USER pilot
 
 # Project files are bind-mounted here at runtime
