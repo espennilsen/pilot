@@ -40,6 +40,15 @@ export default function DesktopPanel() {
     );
   }
 
+  // Desktop availability not yet checked — show spinner
+  if (isDesktopAvailable === null) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // Desktop not available
   if (isDesktopAvailable === false) {
     return (

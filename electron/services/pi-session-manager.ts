@@ -328,11 +328,9 @@ export class PilotSessionManager {
         + `The SDK may have changed its internal structure. `
         + `Check if @mariozechner/pi-coding-agent was updated.`;
       console.error(`[SessionManager] ${msg}`);
-      broadcastToRenderer(IPC.DESKTOP_EVENT, {
-        projectPath,
-        status: 'error',
-        error: 'Desktop tools update failed — the SDK internal structure may have changed. Restart the session to retry.',
-      });
+      // Don't broadcast status: 'error' here — that would overwrite healthy
+      // container state in the renderer and swap the VNC viewer for an error
+      // screen. The container is fine; only tool injection failed.
       return;
     }
 

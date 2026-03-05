@@ -70,7 +70,7 @@ COPY pilot-vnc.html /usr/share/novnc/pilot-vnc.html
 EXPOSE 5900 6080
 
 # ── Non-root user ────────────────────────────────────────────────────
-RUN useradd -ms /bin/bash pilot
+RUN groupadd -g 1000 pilot && useradd -u 1000 -g 1000 -ms /bin/bash pilot
 
 # Directory for secrets injected via putArchive before container start.
 # Owned by pilot so the entrypoint can read and delete the password file.
