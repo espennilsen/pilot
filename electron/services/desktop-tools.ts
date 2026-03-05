@@ -327,7 +327,7 @@ export function createDesktopTools(
       label: 'Desktop Exec',
       description: 'Run an arbitrary shell command inside the desktop container. The project directory is mounted read-only at /workspace (the default working directory). Returns stdout and stderr. Use for installing packages, running scripts, launching applications, viewing files, etc. To modify project files, use the regular file editing tools in Pilot — they go through diff review. Commands that do not complete within 120 seconds are terminated on the host side, but the process may keep running inside the container. For long-running commands, use `nohup <cmd> > /tmp/output.log 2>&1 &` and check the log file afterwards.',
       parameters: Type.Object({
-        command: Type.String({ description: 'Shell command to execute' }),
+        command: Type.String({ description: 'Shell command to execute', maxLength: 100_000 }),
       }),
       async execute(_toolCallId, params) {
         const output = await exec(params.command);

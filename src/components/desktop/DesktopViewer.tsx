@@ -10,7 +10,7 @@
  * the TCP port is open. If the iframe fails to load, we retry automatically
  * with exponential back-off until the page is ready.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, MousePointerClick } from 'lucide-react';
 
 interface DesktopViewerProps {
@@ -32,7 +32,18 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
   // Pass the parent origin so the iframe can validate message senders and
   // target its vnc-ready signal precisely.
   const parentOrigin = window.location.origin;
-  const noVncUrl = `http://localhost:${wsPort}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}`;
+
+  // Generate a one-time token per mount. The token is embedded in the iframe
+  // URL and must be echoed back in vnc-ready messages — this authenticates the
+  // sender even when origin comparison is unavailable (file:// / opaque origins).
+  const postMessageToken = useMemo(
+    () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join(''),
+    // Regenerate when the port changes (new container session)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wsPort],
+  );
+
+  const noVncUrl = `http://localhost:${wsPort}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}&token=${postMessageToken}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [retries, setRetries] = useState(0);
   const [ready, setReady] = useState(false);
@@ -58,14 +69,17 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
     const origin = `http://localhost:${wsPort}`;
     const handler = (event: MessageEvent) => {
       if (event.origin !== origin || event.data?.type !== 'vnc-ready') return;
+      // Verify the iframe echoed back our one-time token — this authenticates
+      // the sender even when origin comparison is unavailable (file:// origins).
+      if (event.data?.token !== postMessageToken) return;
       iframeRef.current?.contentWindow?.postMessage(
-        { type: 'vnc-connect', password: vncPassword },
+        { type: 'vnc-connect', password: vncPassword, token: postMessageToken },
         origin,
       );
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [wsPort, vncPassword]);
+  }, [wsPort, vncPassword, postMessageToken]);
 
   const handleLoad = () => {
     setReady(true);
@@ -92,7 +106,7 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
     timerRef.current = setTimeout(() => {
       // Re-derive the URL from the ref so a port change during the delay
       // doesn't cause the iframe to reload the previous container's page.
-      const currentUrl = `http://localhost:${wsPortRef.current}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}`;
+      const currentUrl = `http://localhost:${wsPortRef.current}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}&token=${postMessageToken}`;
       setRetries((r) => {
         if (r >= MAX_RETRIES) return r; // race-proof guard
         return r + 1;

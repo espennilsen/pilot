@@ -12,6 +12,7 @@ import { isWithinDir } from '../utils/paths';
 import { isWindowsPathSafe } from '../utils/ipc-validation';
 import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, realpathSync } from 'fs';
 import { createHash, randomBytes } from 'crypto';
+import { execFile } from 'child_process';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
 import { broadcastToRenderer } from '../utils/broadcast';
@@ -788,9 +789,13 @@ export class DesktopService {
       // /run/secrets/vnc_password (and the derived /tmp/vncpasswd) on first
       // boot, so a bare `container.start()` would cause the entrypoint to
       // exit immediately with "VNC password file not found".
-      if (existing.vncPassword) {
-        await this.writeContainerFile(container, '/run/secrets/vnc_password', existing.vncPassword);
+      if (!existing.vncPassword) {
+        throw new Error(
+          'Cannot restart container: VNC password missing from state. '
+          + 'Stop and start the desktop again to generate a new password.',
+        );
       }
+      await this.writeContainerFile(container, '/run/secrets/vnc_password', existing.vncPassword);
 
       await container.start();
 
@@ -1176,13 +1181,21 @@ export class DesktopService {
         console.warn('[DesktopService] Failed to update .gitignore — skipping desktop.json write to prevent credential exposure');
         return;
       }
-      // NOTE: `mode: 0o600` is silently ignored on Windows — Node.js does not
-      // translate POSIX permissions to NTFS ACLs. The VNC password in this file
-      // is readable by any local user on Windows. A proper fix would use DPAPI
-      // or the Windows credential store, but that's deferred given the password
-      // is ephemeral (random, per-container) and Docker Desktop on Windows is a
-      // secondary platform for this feature.
-      writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
+      const filePath = join(pilotDir, 'desktop.json');
+      writeFileSync(filePath, JSON.stringify(config, null, 2), { mode: 0o600 });
+
+      // On Windows, mode: 0o600 is silently ignored — restrict the file ACL
+      // via icacls so only the current user can read it. Best-effort: failure
+      // is logged but does not block the caller.
+      if (process.platform === 'win32') {
+        const username = process.env.USERNAME || process.env.USER || '';
+        if (username) {
+          // Remove inherited permissions, then grant full control to current user only
+          execFile('icacls', [filePath, '/inheritance:r', '/grant:r', `${username}:F`], (err) => {
+            if (err) console.warn('[DesktopService] icacls failed — desktop.json may be world-readable:', err.message);
+          });
+        }
+      }
     } catch { /* best effort */ }
   }
 

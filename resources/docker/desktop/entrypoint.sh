@@ -33,7 +33,7 @@ if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
   x11vnc -storepasswd "$(cat "$VNC_SECRET_FILE")" /tmp/vncpasswd
   chmod 600 /tmp/vncpasswd
   rm -f "$VNC_SECRET_FILE"
-  x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
+  x11vnc -display "$DISPLAY" -forever -noshared -rfbauth /tmp/vncpasswd -rfbport 5900 &
   # Wait for x11vnc to bind port 5900 (confirms it has initialised and read
   # the password file) before deleting. Mirrors the Xvfb readiness pattern above.
   for i in $(seq 1 20); do
