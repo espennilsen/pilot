@@ -209,7 +209,8 @@ export class DesktopService {
         try {
           container = await this.docker.createContainer({
             Image: image,
-            // VNC password is injected via a tmpfs-mounted file (see below),
+            // VNC password is written via putArchive into the container overlay
+            // before start, then deleted by the entrypoint on first boot.
             // NOT via Env — env vars are permanently visible in `docker inspect`.
             Env: [`RESOLUTION=${DEFAULT_RESOLUTION}`],
             Labels: {
@@ -588,7 +589,7 @@ export class DesktopService {
       // Clean up the temp file inside the container on both success and error.
       // Without this, every failed screenshot leaves a uniquely-named file in
       // /tmp that accumulates over long-running sessions.
-      this.execInDesktop(projectPath, `rm -f ${screenshotPath}`).catch(() => {});
+      await this.execInDesktop(projectPath, `rm -f ${screenshotPath}`).catch(() => {});
     }
   }
 

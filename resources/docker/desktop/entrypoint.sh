@@ -34,6 +34,7 @@ if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
   chmod 600 /tmp/vncpasswd
   rm -f "$VNC_SECRET_FILE"
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
+  rm -f /tmp/vncpasswd  # x11vnc reads the hash into memory at startup; file no longer needed
 else
   echo "ERROR: VNC password file not found at $VNC_SECRET_FILE" >&2
   exit 1
