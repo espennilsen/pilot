@@ -34,7 +34,13 @@ if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
   chmod 600 /tmp/vncpasswd
   rm -f "$VNC_SECRET_FILE"
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
-  rm -f /tmp/vncpasswd  # x11vnc reads the hash into memory at startup; file no longer needed
+  # Wait for x11vnc to bind port 5900 (confirms it has initialised and read
+  # the password file) before deleting. Mirrors the Xvfb readiness pattern above.
+  for i in $(seq 1 20); do
+    nc -z localhost 5900 && break
+    sleep 0.5
+  done
+  rm -f /tmp/vncpasswd
 else
   echo "ERROR: VNC password file not found at $VNC_SECRET_FILE" >&2
   exit 1

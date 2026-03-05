@@ -1160,14 +1160,19 @@ export class DesktopService {
       };
       // Ensure desktop.json is gitignored BEFORE writing the file — prevents
       // a race where `git add .` could stage the credential if it runs between
-      // the write and the gitignore update.
-      this.ensureGitignoreEntry(pilotDir, 'desktop.json');
+      // the write and the gitignore update. If the gitignore update fails,
+      // skip writing the config to avoid staging the VNC password.
+      if (!this.ensureGitignoreEntry(pilotDir, 'desktop.json')) {
+        console.warn('[DesktopService] Failed to update .gitignore — skipping desktop.json write to prevent credential exposure');
+        return;
+      }
       writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
     } catch { /* best effort */ }
   }
 
-  /** Append an entry to `.gitignore` inside `dir` if not already present. */
-  private ensureGitignoreEntry(dir: string, entry: string): void {
+  /** Append an entry to `.gitignore` inside `dir` if not already present.
+   *  Returns `true` if the entry is confirmed present, `false` on failure. */
+  private ensureGitignoreEntry(dir: string, entry: string): boolean {
     try {
       const gitignorePath = join(dir, '.gitignore');
       let content = '';
@@ -1176,11 +1181,15 @@ export class DesktopService {
       }
       // Check if entry is already present (as a whole line)
       const lines = content.split('\n').map(l => l.trim());
-      if (lines.includes(entry)) return;
+      if (lines.includes(entry)) return true;
       // Append with a leading newline if the file doesn't end with one
       const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
       writeFileSync(gitignorePath, `${content}${separator}${entry}\n`);
-    } catch { /* best effort */ }
+      return true;
+    } catch (err) {
+      console.error('[DesktopService] Failed to update .gitignore:', err);
+      return false;
+    }
   }
 
   /** Load persisted desktop config. Returns null if not found. */
