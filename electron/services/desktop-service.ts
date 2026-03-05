@@ -554,8 +554,14 @@ export class DesktopService {
       const archive = await container.getArchive({ path: screenshotPath });
 
       // The archive is a tar stream — extract the single file
+      const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024; // 10 MB — matches MAX_STREAM_BYTES
       const chunks: Buffer[] = [];
+      let totalBytes = 0;
       for await (const chunk of archive as AsyncIterable<Buffer>) {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_SCREENSHOT_BYTES) {
+          throw new Error(`Screenshot archive exceeds ${MAX_SCREENSHOT_BYTES / (1024 * 1024)} MB limit`);
+        }
         chunks.push(chunk);
       }
       const tarBuffer = Buffer.concat(chunks);
@@ -776,6 +782,9 @@ export class DesktopService {
       }
 
       await container.start();
+
+      // Bail early if a rebuild superseded this restart while we were starting
+      if (signal?.aborted) return null;
 
       // Read the new port mappings assigned by Docker
       const started = await container.inspect();

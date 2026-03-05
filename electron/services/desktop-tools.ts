@@ -176,7 +176,7 @@ export function createDesktopTools(
       }),
       async execute(_toolCallId, params) {
         // Validate keys against allowlist: xdotool key names are alphanumeric with +/_ separators
-        if (!/^[a-zA-Z0-9+_ -]+$/.test(params.keys)) {
+        if (!/^[a-zA-Z0-9+_\- ]+$/.test(params.keys)) {
           throw new Error(`Invalid key specification: "${params.keys}" — only alphanumeric characters, +, _, - and space are allowed`);
         }
         await execCmd(['xdotool', 'key', params.keys]);
