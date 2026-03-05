@@ -5,8 +5,25 @@
  * without re-implementing the logic in tests.
  */
 import { resolve } from 'path';
+import { realpathSync } from 'fs';
 import { homedir } from 'os';
 import { isWithinDir } from './paths';
+
+/**
+ * Resolve a path to its canonical form, following symlinks.
+ * Falls back to lexical `resolve()` if the path does not exist yet.
+ */
+function safeRealpath(raw: string): string {
+  const lexical = resolve(raw);
+  try {
+    return realpathSync(lexical);
+  } catch {
+    // Path doesn't exist yet — fall back to lexical resolution.
+    // This is acceptable: Docker will fail to mount a non-existent path,
+    // so there's no symlink to exploit.
+    return lexical;
+  }
+}
 
 /** Validate that a value is a non-empty string. Throws with a descriptive message. */
 export function requireString(value: unknown, name: string): string {
@@ -54,7 +71,11 @@ export function isWindowsPathSafe(resolved: string): boolean {
  */
 export function validateProjectPath(value: unknown): string {
   const raw = requireString(value, 'projectPath');
-  const resolved = resolve(raw);
+  // Use realpathSync to follow symlinks — a symlink inside $HOME pointing
+  // outside it (e.g. ~/projects/evil → /etc) must be caught before Docker
+  // bind-mounts the real target. Falls back to lexical resolve() if the
+  // path doesn't exist yet (Docker will fail to mount it anyway).
+  const resolved = safeRealpath(raw);
 
   if (process.platform === 'win32') {
     if (!resolved.match(/^[A-Za-z]:\\/)) {

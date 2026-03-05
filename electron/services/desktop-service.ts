@@ -10,7 +10,7 @@ import { join, posix, resolve } from 'path';
 import { homedir } from 'os';
 import { isWithinDir } from '../utils/paths';
 import { isWindowsPathSafe } from '../utils/ipc-validation';
-import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, realpathSync } from 'fs';
 import { createHash, randomBytes } from 'crypto';
 import { createServer, createConnection } from 'net';
 import { IPC } from '../../shared/ipc';
@@ -613,7 +613,9 @@ export class DesktopService {
         // Validate the label value to prevent writes to arbitrary paths
         // from crafted Docker labels (e.g. /etc, C:\Windows).
         // Uses the same blocklist as validateProjectPath in ipc-validation.ts.
-        const resolved = resolve(projectPath);
+        // Follow symlinks so a label like ~/projects/evil → /etc is caught.
+        let resolved: string;
+        try { resolved = realpathSync(resolve(projectPath)); } catch { resolved = resolve(projectPath); }
         if (process.platform === 'win32') {
           if (!/^[A-Za-z]:\\/.test(resolved) || !isWindowsPathSafe(resolved)) {
             console.warn(`[Desktop] Removing container with invalid pilot.project label: ${projectPath}`);
@@ -780,6 +782,14 @@ export class DesktopService {
         this.persistConfig(projectPath, state);
         this.pushEvent(projectPath, state);
         return { ...state };
+      }
+
+      // Re-inject the VNC password before starting. The entrypoint deletes
+      // /run/secrets/vnc_password (and the derived /tmp/vncpasswd) on first
+      // boot, so a bare `container.start()` would cause the entrypoint to
+      // exit immediately with "VNC password file not found".
+      if (existing.vncPassword) {
+        await this.writeContainerFile(container, '/run/secrets/vnc_password', existing.vncPassword);
       }
 
       await container.start();
@@ -1166,6 +1176,12 @@ export class DesktopService {
         console.warn('[DesktopService] Failed to update .gitignore — skipping desktop.json write to prevent credential exposure');
         return;
       }
+      // NOTE: `mode: 0o600` is silently ignored on Windows — Node.js does not
+      // translate POSIX permissions to NTFS ACLs. The VNC password in this file
+      // is readable by any local user on Windows. A proper fix would use DPAPI
+      // or the Windows credential store, but that's deferred given the password
+      // is ephemeral (random, per-container) and Docker Desktop on Windows is a
+      // secondary platform for this feature.
       writeFileSync(join(pilotDir, 'desktop.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
     } catch { /* best effort */ }
   }
