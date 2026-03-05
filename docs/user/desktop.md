@@ -258,6 +258,12 @@ Resource limits: 2 GB memory, 2 CPU cores.
 | `.pilot/desktop.json` | Runtime container state (auto-managed, do not edit) |
 | `.pilot/desktop.Dockerfile` | Custom Docker image (optional) |
 
+### Windows Security Note
+
+On macOS and Linux, `.pilot/desktop.json` is written with restrictive file permissions (`600`) so only your user account can read it. On Windows, these POSIX permissions are silently ignored — the file is readable by any local user on the machine.
+
+This file contains an ephemeral VNC password (random, per-container) used to authenticate with the virtual display. If you're on a shared Windows machine, be aware that other local users could read this password and connect to your desktop container while it's running.
+
 ---
 
 ## Troubleshooting
