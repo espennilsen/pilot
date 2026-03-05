@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     iputils-ping \
     dnsutils \
+    netcat-openbsd \
     # File handling
     unzip \
     jq \
