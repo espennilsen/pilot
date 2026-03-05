@@ -337,6 +337,26 @@ export class PilotSessionManager {
       return;
     }
 
+    // Validate the map's value schema — not just its type. If the SDK still
+    // uses a Map but changes the value shape (e.g. wraps tools in metadata),
+    // the instanceof check above passes but injection silently corrupts the
+    // registry. Sample a single entry and verify it matches ToolDefinition.
+    if (registry.size > 0) {
+      const sample = registry.values().next().value;
+      if (!sample || typeof sample.name !== 'string' || typeof sample.execute !== 'function') {
+        let sdkVersion = 'unknown';
+        try { sdkVersion = require('@mariozechner/pi-coding-agent/package.json').version; } catch { /* */ }
+        const msg = `Desktop tool injection failed — _toolRegistry value schema changed. `
+          + `Expected {name: string, execute: function}, got: ${JSON.stringify(Object.keys(sample ?? {}))}. `
+          + `SDK version: ${sdkVersion}.`;
+        console.error(`[SessionManager] ${msg}`);
+        if (projectPath) {
+          broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: msg });
+        }
+        return;
+      }
+    }
+
     const DESKTOP_TOOL_PREFIX = 'desktop_';
     const hasDesktopTools = [...registry.keys()].some(name => name.startsWith(DESKTOP_TOOL_PREFIX));
 

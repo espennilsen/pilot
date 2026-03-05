@@ -38,6 +38,8 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
   const [ready, setReady] = useState(false);
   const [interactive, setInteractive] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const retriesRef = useRef(retries);
+  retriesRef.current = retries;
 
   // Reset state when port changes (new container)
   useEffect(() => {
@@ -76,18 +78,25 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
   wsPortRef.current = wsPort;
 
   const handleError = () => {
-    if (retries >= MAX_RETRIES) return;
-
     // Clear any existing timer to prevent duplicate retry loops when
     // onError fires multiple times before the first timer executes.
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, retries), MAX_DELAY_MS);
+    // Use a ref to read the current retry count without depending on the
+    // render-time closure — avoids scheduling a retry past MAX_RETRIES
+    // when multiple onError events fire between renders.
+    const currentRetries = retriesRef.current;
+    if (currentRetries >= MAX_RETRIES) return;
+
+    const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, currentRetries), MAX_DELAY_MS);
     timerRef.current = setTimeout(() => {
       // Re-derive the URL from the ref so a port change during the delay
       // doesn't cause the iframe to reload the previous container's page.
       const currentUrl = `http://localhost:${wsPortRef.current}/pilot-vnc.html?parentOrigin=${encodeURIComponent(parentOrigin)}`;
-      setRetries((r) => r + 1);
+      setRetries((r) => {
+        if (r >= MAX_RETRIES) return r; // race-proof guard
+        return r + 1;
+      });
       if (iframeRef.current) {
         iframeRef.current.src = '';
         requestAnimationFrame(() => {

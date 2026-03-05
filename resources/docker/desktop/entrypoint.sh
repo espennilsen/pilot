@@ -30,7 +30,7 @@ while true; do fluxbox; sleep 1; done &
 # permanently visible in `docker inspect`.
 VNC_SECRET_FILE="/run/secrets/vnc_password"
 if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
-  x11vnc -storepasswd /tmp/vncpasswd < "$VNC_SECRET_FILE"
+  x11vnc -storepasswd "$(cat "$VNC_SECRET_FILE")" /tmp/vncpasswd
   chmod 600 /tmp/vncpasswd
   rm -f "$VNC_SECRET_FILE"
   x11vnc -display "$DISPLAY" -forever -shared -rfbauth /tmp/vncpasswd -rfbport 5900 &
