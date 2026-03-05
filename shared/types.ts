@@ -152,6 +152,8 @@ export interface DesktopState {
   error?: string;
   /** Per-container VNC password for authentication */
   vncPassword?: string;
+  /** Warning when desktop tools could not be injected into the agent session */
+  toolsWarning?: string;
 }
 
 /** Persisted to <project>/.pilot/desktop.json for startup reconciliation */

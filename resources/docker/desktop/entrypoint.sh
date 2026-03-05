@@ -40,6 +40,9 @@ if [ -f "$VNC_SECRET_FILE" ] && [ -s "$VNC_SECRET_FILE" ]; then
     nc -z localhost 5900 && break
     sleep 0.5
   done
+  nc -z localhost 5900 || {
+    echo "ERROR: x11vnc did not bind port 5900 within 10s" >&2; exit 1;
+  }
   rm -f /tmp/vncpasswd
 else
   echo "ERROR: VNC password file not found at $VNC_SECRET_FILE" >&2

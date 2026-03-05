@@ -323,14 +323,17 @@ export class PilotSessionManager {
     if (!registry || !(registry instanceof Map)) {
       let sdkVersion = 'unknown';
       try { sdkVersion = require('@mariozechner/pi-coding-agent/package.json').version; } catch { /* */ }
-      const msg = `_toolRegistry missing or wrong type — desktop tool injection failed. `
+      const msg = `Desktop tool injection failed — SDK internal API changed. `
         + `SDK version: ${sdkVersion} (verified with 0.55.x). `
-        + `The SDK may have changed its internal structure. `
-        + `Check if @mariozechner/pi-coding-agent was updated.`;
+        + `Update Pilot or check for a newer SDK version.`;
       console.error(`[SessionManager] ${msg}`);
-      // Don't broadcast status: 'error' here — that would overwrite healthy
-      // container state in the renderer and swap the VNC viewer for an error
-      // screen. The container is fine; only tool injection failed.
+      // Broadcast a warning so the UI can surface the problem. We intentionally
+      // do NOT set status: 'error' — that would overwrite healthy container
+      // state and swap the VNC viewer for an error screen. The container is
+      // fine; only tool injection failed.
+      if (projectPath) {
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: msg });
+      }
       return;
     }
 
@@ -346,7 +349,12 @@ export class PilotSessionManager {
       // Spot-check: verify injection actually worked. A future SDK refactor
       // could keep _toolRegistry as a Map but change key/value schema silently.
       if (!registry.has('desktop_screenshot')) {
-        console.error('[SessionManager] Desktop tool injection spot-check failed — desktop_screenshot not found in registry after injection');
+        const spotMsg = 'Desktop tool injection spot-check failed — tools may not work correctly.';
+        console.error(`[SessionManager] ${spotMsg}`);
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: spotMsg });
+      } else {
+        // Clear any previous warning on successful injection
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: undefined });
       }
     } else if (!enabled && hasDesktopTools) {
       // Remove sandbox tools from the registry

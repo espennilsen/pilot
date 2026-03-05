@@ -1,7 +1,7 @@
 /**
  * @file Desktop header — status badge, start/stop/rebuild buttons, agent tools toggle.
  */
-import { ExternalLink, Hammer, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Hammer, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useDesktopStore } from '../../stores/desktop-store';
 import { useTabStore } from '../../stores/tab-store';
 
@@ -20,6 +20,7 @@ const statusConfig = {
 export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
   const desktopState = useDesktopStore((s) => s.stateByProject[projectPath]);
   const toolsEnabled = useDesktopStore((s) => s.toolsEnabledByProject[projectPath] ?? false);
+  const toolsWarning = useDesktopStore((s) => s.stateByProject[projectPath]?.toolsWarning);
   const isLoading = useDesktopStore((s) => s.loadingByProject[projectPath] ?? false);
   const { startDesktop, stopDesktop, rebuildDesktop, setToolsEnabled } = useDesktopStore();
 
@@ -95,6 +96,9 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
           <span className={toolsEnabled ? 'text-accent' : 'text-text-secondary'}>
             Tools
           </span>
+          {toolsWarning && (
+            <AlertTriangle className="w-3.5 h-3.5 text-warning" title={toolsWarning} />
+          )}
         </button>
 
         {/* Rebuild button — destructive, requires confirmation */}
