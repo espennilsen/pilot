@@ -35,6 +35,10 @@ export async function overlayGrid(base64Png: string, options: GridOptions = {}):
     labelBgColor = 'rgba(0, 0, 0, 0.6)',
   } = options;
 
+  if (gridSize <= 0) {
+    throw new Error('gridSize must be > 0');
+  }
+
   // Decode the base64 PNG to get image dimensions
   const pngBuffer = Buffer.from(base64Png, 'base64');
   const image = sharp(pngBuffer);
