@@ -277,6 +277,8 @@ export interface RebaseTodoEntry {
   date: number;
   /** New message for reword action (set by user before executing) */
   newMessage?: string;
+  /** Combined message for squash groups (set on the target entry from the UI) */
+  squashMessage?: string;
 }
 
 export interface InteractiveRebaseRequest {
