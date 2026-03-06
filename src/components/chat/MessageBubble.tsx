@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ToolCallInfo } from '../../stores/chat-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
@@ -6,6 +6,55 @@ import Markdown from '../../lib/markdown';
 import { attachmentUrl } from '../../lib/attachment-url';
 import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
+
+/**
+ * Markdown renderer optimised for streaming. During rapid text_delta events,
+ * the full Markdown parser is expensive to run on every single character.
+ * This component throttles re-renders of the Markdown component while keeping
+ * text visible immediately via a raw text fallback for the latest chunk.
+ */
+function StreamingMarkdown({ text }: { text: string }) {
+  const [renderedText, setRenderedText] = useState(text);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTextRef = useRef(text);
+
+  useEffect(() => {
+    latestTextRef.current = text;
+
+    // Throttle Markdown re-renders to every 80ms during streaming
+    if (!timerRef.current) {
+      timerRef.current = setTimeout(() => {
+        setRenderedText(latestTextRef.current);
+        timerRef.current = null;
+      }, 80);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [text]);
+
+  // Always flush on unmount (streaming ends → component swaps to regular Markdown)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  // Render the throttled markdown, plus any trailing text that hasn't been rendered yet
+  const tail = text.slice(renderedText.length);
+  return (
+    <>
+      <Markdown text={renderedText} />
+      {tail && <span className="whitespace-pre-wrap">{tail}</span>}
+    </>
+  );
+}
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -106,7 +155,11 @@ function AssistantMessage({ message }: MessageBubbleProps) {
       
       {/* Message content */}
       <div className="text-text-primary prose prose-invert max-w-none">
-        {message.content && <Markdown text={message.content} />}
+        {message.content && (
+          message.isStreaming
+            ? <StreamingMarkdown text={message.content} />
+            : <Markdown text={message.content} />
+        )}
         {message.isStreaming && <StreamingCursor />}
       </div>
     </div>

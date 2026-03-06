@@ -34,13 +34,16 @@ export default function ChatView() {
   const [autoScroll, setAutoScroll] = useState(true);
   const prevTabIdRef = useRef(activeTabId);
 
-  // Instant scroll to bottom on tab switch, smooth scroll for new messages
+  // Scroll to bottom: instant during streaming or tab switch, smooth for new messages
   useEffect(() => {
     if (!autoScroll || !messagesEndRef.current) return;
     const isTabSwitch = prevTabIdRef.current !== activeTabId;
     prevTabIdRef.current = activeTabId;
-    messagesEndRef.current.scrollIntoView({ behavior: isTabSwitch ? 'instant' : 'smooth' });
-  }, [messages, autoScroll, activeTabId]);
+    // Use instant scroll during streaming to keep up with rapid content additions.
+    // Smooth scroll can't keep pace and causes the view to lag behind.
+    const behavior = isTabSwitch || isStreaming ? 'instant' : 'smooth';
+    messagesEndRef.current.scrollIntoView({ behavior });
+  }, [messages, autoScroll, activeTabId, isStreaming]);
 
   // Reset auto-scroll when switching tabs
   useEffect(() => {

@@ -260,6 +260,10 @@ export function useAgentSession() {
         }
         break;
       }
+      default:
+        // Safety net: if we receive an unhandled event type while streaming is true,
+        // and it looks like a terminal event, clear streaming to prevent stuck indicators.
+        break;
     }
   }
 
@@ -307,6 +311,10 @@ export function useAgentSession() {
       if (/no project selected/i.test(friendly)) {
         friendly = 'No project open. Open a project first, then try again.';
       }
+
+      // Clear streaming indicator — the agent_end/turn_end events may never arrive
+      // if the prompt itself failed (auth error, no session, etc.)
+      setStreaming(activeTabId, false);
 
       addMessage(activeTabId, {
         id: crypto.randomUUID(),
