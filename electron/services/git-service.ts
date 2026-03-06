@@ -462,101 +462,86 @@ export class GitService {
    * editor-generated todo file with our pre-built one, then running `git rebase -i`.
    */
   async executeInteractiveRebase(request: InteractiveRebaseRequest): Promise<GitOperationResult> {
-    // Build the todo file content in git-rebase-todo format
-    const todoLines = request.entries
-      .map(entry => {
-        if (entry.action === 'drop') {
-          return `drop ${entry.hash} ${entry.message}`;
-        }
-        return `${entry.action} ${entry.hash} ${entry.message}`;
-      })
-      .join('\n');
-
-    // Build the reword messages script: after the main todo, git will open
-    // an editor for each 'reword' commit. We handle that by using
-    // GIT_SEQUENCE_EDITOR for the todo and EDITOR for reword messages.
-    const rewordEntries = request.entries.filter(e => e.action === 'reword' && e.newMessage);
-
-    // Use GIT_SEQUENCE_EDITOR to inject our todo list without opening an editor.
-    // The sequence editor receives the todo file path as $1.
-    // We use a cross-platform approach: write the todo to a temp file and
-    // use a simple copy command as the "editor".
     const os = await import('os');
     const fs = await import('fs/promises');
     const path = await import('path');
 
+    const todoLines = request.entries
+      .map(entry => `${entry.action} ${entry.hash} ${entry.message}`)
+      .join('\n');
+
     const tmpDir = os.tmpdir();
-    const todoFile = path.join(tmpDir, `pilot-rebase-todo-${Date.now()}`);
-    // Track all temp files for cleanup in finally block
-    const tmpFiles: string[] = [todoFile];
+    const timestamp = Date.now();
+    const todoFile = path.join(tmpDir, `pilot-rebase-todo-${timestamp}`);
+    const manifestFile = path.join(tmpDir, `pilot-rebase-manifest-${timestamp}.json`);
+    const editorScript = path.join(tmpDir, `pilot-rebase-editor-${timestamp}.js`);
+    const tmpFiles = [todoFile, manifestFile, editorScript];
 
     await fs.writeFile(todoFile, todoLines + '\n', 'utf-8');
 
-    // Build the sequence editor command — copies our todo file over git's todo file
-    const seqEditor = process.platform === 'win32'
-      ? `cmd /c copy /y "${todoFile.replace(/\//g, '\\')}" "$1"`
-      : `cp "${todoFile}" "$1"`;
+    // ── Build editor manifest ────────────────────────────────────────
+    // GIT_EDITOR is invoked for:
+    //   1. Each `reword` commit (to edit the commit message)
+    //   2. Each squash group with ≥1 `squash` member (combined-message editor;
+    //      fixup-only groups skip the editor)
+    // We walk the todo and emit manifest entries in invocation order.
+    const manifest: Array<{ message: string | null }> = [];
+    const entries = request.entries;
 
-    // For reword commits, we need to handle the EDITOR calls.
-    // If there are rewords, we create a helper script that writes the correct
-    // message based on the commit being reworded.
-    let editorEnv: Record<string, string> = {};
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
 
-    if (rewordEntries.length > 0) {
-      // Create a script that reads the current COMMIT_EDITMSG and replaces it
-      // with the new message based on which reword we're on.
-      const rewordMessages = rewordEntries.map(e => ({
-        hash: e.hash,
-        message: e.newMessage!,
-      }));
+      if (entry.action === 'reword') {
+        manifest.push({ message: entry.newMessage ?? null });
+      }
 
-      const rewordDataFile = path.join(tmpDir, `pilot-reword-data-${Date.now()}.json`);
-      tmpFiles.push(rewordDataFile);
-      await fs.writeFile(rewordDataFile, JSON.stringify(rewordMessages), 'utf-8');
-
-      if (process.platform === 'win32') {
-        // Windows: use a node script as the editor
-        const rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.js`);
-        tmpFiles.push(rewordScriptFile);
-        const script = `
-const fs = require('fs');
-const data = JSON.parse(fs.readFileSync(${JSON.stringify(rewordDataFile)}, 'utf-8'));
-const msgFile = process.argv[2];
-if (data.length > 0) {
-  const entry = data.shift();
-  fs.writeFileSync(msgFile, entry.message, 'utf-8');
-  fs.writeFileSync(${JSON.stringify(rewordDataFile)}, JSON.stringify(data), 'utf-8');
-}`;
-        await fs.writeFile(rewordScriptFile, script, 'utf-8');
-        editorEnv = { GIT_EDITOR: `node "${rewordScriptFile}"` };
-      } else {
-        // Unix: use a shell script as the editor
-        const rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.sh`);
-        tmpFiles.push(rewordScriptFile);
-        const script = `#!/bin/sh
-DATAFILE="${rewordDataFile}"
-MSGFILE="$1"
-NODE_SCRIPT='
-const fs = require("fs");
-const data = JSON.parse(fs.readFileSync(process.argv[2], "utf-8"));
-if (data.length > 0) {
-  const entry = data.shift();
-  fs.writeFileSync(process.argv[3], entry.message, "utf-8");
-  fs.writeFileSync(process.argv[2], JSON.stringify(data), "utf-8");
-}
-'
-node -e "$NODE_SCRIPT" "$DATAFILE" "$MSGFILE"
-`;
-        await fs.writeFile(rewordScriptFile, script, { mode: 0o755 });
-        editorEnv = { GIT_EDITOR: rewordScriptFile };
+      // After a non-squash/fixup/drop entry, check for a trailing squash group.
+      if (entry.action !== 'squash' && entry.action !== 'fixup' && entry.action !== 'drop') {
+        let hasSquashMember = false;
+        let j = i + 1;
+        while (j < entries.length && (entries[j].action === 'squash' || entries[j].action === 'fixup')) {
+          if (entries[j].action === 'squash') hasSquashMember = true;
+          j++;
+        }
+        if (hasSquashMember) {
+          manifest.push({ message: entry.squashMessage ?? null });
+        }
       }
     }
 
-    // Execute the interactive rebase
+    await fs.writeFile(manifestFile, JSON.stringify(manifest), 'utf-8');
+
+    // ── Write editor script ──────────────────────────────────────────
+    // Standalone .js file — avoids shell quoting and node -e argv issues.
+    // Git invokes: node "/path/to/editor.js" "/path/to/COMMIT_EDITMSG"
+    const editorCode = `'use strict';
+const fs = require('fs');
+const manifestPath = ${JSON.stringify(manifestFile)};
+const msgFile = process.argv[2];
+try {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  if (manifest.length === 0) process.exit(0);
+  const action = manifest.shift();
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest), 'utf-8');
+  if (action.message != null) {
+    fs.writeFileSync(msgFile, action.message, 'utf-8');
+  }
+} catch {
+  process.exit(0);
+}
+`;
+    await fs.writeFile(editorScript, editorCode, 'utf-8');
+
+    // ── Sequence editor: copies our todo over git's todo ─────────────
+    // Git runs: system("$GIT_SEQUENCE_EDITOR \"$path\"") — appends path as last arg.
+    const seqEditor = process.platform === 'win32'
+      ? `node -e "require('fs').copyFileSync('${todoFile.replace(/\\/g, '\\\\')}', process.argv[1])"`
+      : `cp "${todoFile}"`;
+
     const env = {
       ...process.env,
       GIT_SEQUENCE_EDITOR: seqEditor,
-      ...editorEnv,
+      GIT_EDITOR: `node "${editorScript}"`,
     };
 
     try {
@@ -573,7 +558,6 @@ node -e "$NODE_SCRIPT" "$DATAFILE" "$MSGFILE"
       }
       throw err;
     } finally {
-      // Clean up all temp files regardless of success or failure
       await Promise.all(tmpFiles.map(f => fs.unlink(f).catch(() => {})));
     }
   }

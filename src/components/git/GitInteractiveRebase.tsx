@@ -3,11 +3,13 @@
  *
  * Allows users to reorder commits via drag-and-drop and assign actions
  * (pick, reword, edit, squash, fixup, drop) before executing the rebase.
+ * Squash/fixup commits are visually grouped with the target commit above,
+ * and users can edit the combined commit message for squash groups.
  */
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   GripVertical, Play, X, ChevronDown, AlertTriangle,
-  ArrowUp, ArrowDown, MessageSquare,
+  ArrowUp, ArrowDown, MessageSquare, Layers,
 } from 'lucide-react';
 import { useGitStore } from '../../stores/git-store';
 import type { RebaseTodoEntry, RebaseAction } from '../../../shared/types';
@@ -43,6 +45,38 @@ function getActionBgColor(action: RebaseAction): string {
   }
 }
 
+/** Identifies groups of commits that will be squashed together. */
+interface SquashGroup {
+  /** Index of the target commit (pick/reword/edit) that absorbs the squashes */
+  targetIndex: number;
+  /** Indices of all commits in the group (target + squash/fixup) */
+  memberIndices: number[];
+}
+
+/** Compute squash groups from the entries list. */
+function computeSquashGroups(entries: RebaseTodoEntry[]): SquashGroup[] {
+  const groups: SquashGroup[] = [];
+  let currentGroup: SquashGroup | null = null;
+
+  for (let i = 0; i < entries.length; i++) {
+    const action = entries[i].action;
+    if (action === 'squash' || action === 'fixup') {
+      if (currentGroup) {
+        currentGroup.memberIndices.push(i);
+      }
+    } else {
+      if (currentGroup && currentGroup.memberIndices.length > 1) {
+        groups.push(currentGroup);
+      }
+      currentGroup = { targetIndex: i, memberIndices: [i] };
+    }
+  }
+  if (currentGroup && currentGroup.memberIndices.length > 1) {
+    groups.push(currentGroup);
+  }
+  return groups;
+}
+
 interface EntryRowProps {
   entry: RebaseTodoEntry;
   index: number;
@@ -55,12 +89,15 @@ interface EntryRowProps {
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragEnd: () => void;
   isDragTarget: boolean;
+  isSquashMember: boolean;
+  isSquashGroupEnd: boolean;
 }
 
 function EntryRow({
   entry, index, totalCount,
   onActionChange, onRewordMessage, onMoveUp, onMoveDown,
   onDragStart, onDragOver, onDragEnd, isDragTarget,
+  isSquashMember, isSquashGroupEnd,
 }: EntryRowProps) {
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showRewordInput, setShowRewordInput] = useState(false);
@@ -94,15 +131,23 @@ function EntryRow({
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => onDragOver(e, index)}
       onDragEnd={onDragEnd}
-      className={`group flex flex-col border-b border-border/30 transition-colors ${
+      className={`group flex flex-col transition-colors ${
         getActionBgColor(entry.action)
-      } ${isDragTarget ? 'border-t-2 border-t-accent' : ''}`}
+      } ${isDragTarget ? 'border-t-2 border-t-accent' : ''} ${
+        isSquashMember ? '' : 'border-b border-border/30'
+      } ${isSquashGroupEnd ? 'border-b border-border/30' : ''}`}
     >
       <div className="flex items-center gap-1 px-2 py-1.5">
-        {/* Drag handle */}
-        <div className="cursor-grab active:cursor-grabbing text-text-secondary hover:text-text-primary flex-shrink-0">
-          <GripVertical className="w-3.5 h-3.5" />
-        </div>
+        {/* Squash group indicator */}
+        {isSquashMember ? (
+          <div className="flex flex-col items-center flex-shrink-0 w-3.5">
+            <div className="w-px h-full bg-info/40" />
+          </div>
+        ) : (
+          <div className="cursor-grab active:cursor-grabbing text-text-secondary hover:text-text-primary flex-shrink-0">
+            <GripVertical className="w-3.5 h-3.5" />
+          </div>
+        )}
 
         {/* Move up/down buttons */}
         <div className="flex flex-col flex-shrink-0">
@@ -166,7 +211,7 @@ function EntryRow({
           {entry.message}
         </span>
 
-        {/* Reword button (if action is reword) */}
+        {/* Reword button */}
         {entry.action === 'reword' && (
           <button
             onClick={() => setShowRewordInput(!showRewordInput)}
@@ -195,11 +240,79 @@ function EntryRow({
   );
 }
 
+/** Editable combined message panel for a squash group. */
+function SquashGroupMessage({
+  group,
+  entries,
+  onSquashMessageChange,
+}: {
+  group: SquashGroup;
+  entries: RebaseTodoEntry[];
+  onSquashMessageChange: (targetIndex: number, message: string) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const targetEntry = entries[group.targetIndex];
+
+  // Build default combined message from all group members
+  const defaultMessage = group.memberIndices
+    .filter(i => entries[i].action !== 'fixup')
+    .map(i => entries[i].message)
+    .join('\n\n');
+
+  const currentMessage = targetEntry.squashMessage ?? defaultMessage;
+  const hasSquash = group.memberIndices.some(i => entries[i].action === 'squash');
+  const fixupCount = group.memberIndices.filter(i => entries[i].action === 'fixup').length;
+  const squashMemberCount = group.memberIndices.length - 1;
+
+  return (
+    <div className="mx-2 mb-1 border border-info/20 rounded bg-info/5">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-info/10 rounded transition-colors"
+      >
+        <Layers className="w-3.5 h-3.5 text-info flex-shrink-0" />
+        <span className="text-info font-medium">
+          Squash group: {squashMemberCount} commit{squashMemberCount !== 1 ? 's' : ''} → {targetEntry.hashShort}
+        </span>
+        <span className="text-text-secondary ml-auto">
+          {fixupCount > 0 && `${fixupCount} fixup `}
+          {hasSquash && 'combined message'}
+        </span>
+        <ChevronDown className={`w-3 h-3 text-text-secondary transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="px-2 pb-2">
+          {hasSquash ? (
+            <>
+              <label className="text-xs text-text-secondary mb-1 block">
+                Combined commit message (squash merges all messages):
+              </label>
+              <textarea
+                value={currentMessage}
+                onChange={(e) => onSquashMessageChange(group.targetIndex, e.target.value)}
+                rows={Math.min(group.memberIndices.length + 2, 8)}
+                className="w-full px-2 py-1.5 text-sm bg-bg-base border border-border rounded focus:border-info focus:outline-none text-text-primary font-mono resize-y"
+                placeholder="Combined commit message..."
+              />
+            </>
+          ) : (
+            <p className="text-xs text-text-secondary py-1">
+              All members use <span className="font-mono text-info">fixup</span> — only the target commit&apos;s message will be kept.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GitInteractiveRebase() {
   const {
     interactiveRebaseEntries,
     interactiveRebaseOnto,
     updateInteractiveRebaseEntries,
+    updateSquashMessage,
     executeInteractiveRebase,
     cancelInteractiveRebase,
     isLoading,
@@ -210,6 +323,23 @@ export default function GitInteractiveRebase() {
   const [confirmExecute, setConfirmExecute] = useState(false);
 
   const entries = interactiveRebaseEntries;
+
+  const squashGroups = useMemo(() => computeSquashGroups(entries), [entries]);
+
+  const squashMembership = useMemo(() => {
+    const membership = new Map<number, { isSquashMember: boolean; isGroupEnd: boolean; group: SquashGroup }>();
+    for (const group of squashGroups) {
+      for (let i = 0; i < group.memberIndices.length; i++) {
+        const idx = group.memberIndices[i];
+        membership.set(idx, {
+          isSquashMember: idx !== group.targetIndex,
+          isGroupEnd: i === group.memberIndices.length - 1,
+          group,
+        });
+      }
+    }
+    return membership;
+  }, [squashGroups]);
 
   const handleActionChange = useCallback((index: number, action: RebaseAction) => {
     const updated = entries.map((e, i) => i === index ? { ...e, action } : e);
@@ -268,12 +398,12 @@ export default function GitInteractiveRebase() {
     cancelInteractiveRebase();
   }, [cancelInteractiveRebase]);
 
-  // Summary stats
   const pickCount = entries.filter(e => e.action === 'pick').length;
   const rewordCount = entries.filter(e => e.action === 'reword').length;
   const squashCount = entries.filter(e => e.action === 'squash' || e.action === 'fixup').length;
   const dropCount = entries.filter(e => e.action === 'drop').length;
   const editCount = entries.filter(e => e.action === 'edit').length;
+  const hasOrphanedSquash = entries.length > 0 && (entries[0].action === 'squash' || entries[0].action === 'fixup');
 
   if (entries.length === 0) return null;
 
@@ -287,14 +417,12 @@ export default function GitInteractiveRebase() {
             onto {interactiveRebaseOnto}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleCancel}
-            className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-surface rounded transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <button
+          onClick={handleCancel}
+          className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-surface rounded transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Summary bar */}
@@ -305,26 +433,58 @@ export default function GitInteractiveRebase() {
         {editCount > 0 && <span className="text-warning">{editCount} edit</span>}
         {squashCount > 0 && <span className="text-info">{squashCount} squash/fixup</span>}
         {dropCount > 0 && <span className="text-error">{dropCount} drop</span>}
+        {squashGroups.length > 0 && (
+          <span className="text-info">
+            <Layers className="w-3 h-3 inline mr-0.5" />
+            {squashGroups.length} group{squashGroups.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
+
+      {/* Orphaned squash/fixup warning */}
+      {hasOrphanedSquash && (
+        <div className="px-3 py-2 bg-error/10 border-b border-error/20 flex items-center gap-2 text-xs text-error">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>
+            First commit cannot be squash/fixup — there is no previous commit to squash into.
+          </span>
+        </div>
+      )}
 
       {/* Commit list */}
       <div className="flex-1 overflow-y-auto">
-        {entries.map((entry, idx) => (
-          <EntryRow
-            key={entry.hash}
-            entry={entry}
-            index={idx}
-            totalCount={entries.length}
-            onActionChange={handleActionChange}
-            onRewordMessage={handleRewordMessage}
-            onMoveUp={handleMoveUp}
-            onMoveDown={handleMoveDown}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            isDragTarget={dragOverIndex === idx && dragIndex !== idx}
-          />
-        ))}
+        {entries.map((entry, idx) => {
+          const membership = squashMembership.get(idx);
+          const isLastInGroup = membership?.isGroupEnd ?? false;
+          const isSquashMember = membership?.isSquashMember ?? false;
+
+          return (
+            <div key={entry.hash}>
+              <EntryRow
+                entry={entry}
+                index={idx}
+                totalCount={entries.length}
+                onActionChange={handleActionChange}
+                onRewordMessage={handleRewordMessage}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                isDragTarget={dragOverIndex === idx && dragIndex !== idx}
+                isSquashMember={isSquashMember}
+                isSquashGroupEnd={isLastInGroup}
+              />
+              {isLastInGroup && membership?.group && (
+                <SquashGroupMessage
+                  group={membership.group}
+                  entries={entries}
+                  onSquashMessageChange={updateSquashMessage}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Warning for edit action */}
@@ -347,7 +507,7 @@ export default function GitInteractiveRebase() {
         </button>
         <button
           onClick={handleExecute}
-          disabled={isLoading}
+          disabled={isLoading || hasOrphanedSquash}
           className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded transition-colors disabled:opacity-50 ${
             confirmExecute
               ? 'bg-warning text-bg-base hover:bg-warning/90'

@@ -66,6 +66,7 @@ interface GitStore {
   // Interactive rebase actions
   prepareInteractiveRebase: (onto: string) => Promise<void>;
   updateInteractiveRebaseEntries: (entries: RebaseTodoEntry[]) => void;
+  updateSquashMessage: (targetIndex: number, message: string) => void;
   executeInteractiveRebase: () => Promise<GitOperationResult>;
   cancelInteractiveRebase: () => void;
 }
@@ -534,6 +535,12 @@ export const useGitStore = create<GitStore>((set, get) => ({
 
   updateInteractiveRebaseEntries: (entries: RebaseTodoEntry[]) => {
     set({ interactiveRebaseEntries: entries });
+  },
+
+  updateSquashMessage: (targetIndex: number, message: string) => {
+    const entries = get().interactiveRebaseEntries;
+    const updated = entries.map((e, i) => i === targetIndex ? { ...e, squashMessage: message } : e);
+    set({ interactiveRebaseEntries: updated });
   },
 
   executeInteractiveRebase: async () => {
