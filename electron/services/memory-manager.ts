@@ -345,7 +345,8 @@ If nothing worth remembering, respond: {"memories": []}`;
       // TOCTOU window — any concurrent appendMemory/saveMemoryFile
       // writes are preserved.
       const filePath = this.resolveFilePath(scope, projectPath);
-      const freshContent = await fs.readFile(filePath, 'utf-8');
+      const freshContent = await this.loadFile(filePath);
+      if (!freshContent) continue; // file deleted between snapshot and re-read
       const lines = freshContent.split('\n');
       const matchIdx = lines.findIndex(line =>
         line.toLowerCase().includes(text.toLowerCase()) && line.startsWith('- ')
