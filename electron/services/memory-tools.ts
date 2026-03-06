@@ -26,7 +26,7 @@ export function createMemoryTools(
         )
       ),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       const scope = params.scope ?? 'all';
       const files = await memoryManager.getMemoryFiles(projectPath);
       const sections: string[] = [];
@@ -61,7 +61,7 @@ export function createMemoryTools(
         Type.String({ description: 'Category heading, e.g. "User Preferences", "Technical Context", "Decisions". Default: General' })
       ),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       const scope = params.scope ?? 'project';
       const category = params.category ?? 'General';
       await memoryManager.appendMemory(params.text, scope, projectPath, category);
@@ -79,7 +79,7 @@ export function createMemoryTools(
     parameters: Type.Object({
       text: Type.String({ description: 'Text to match against existing memories (case-insensitive partial match)' }),
     }),
-    execute: async (params) => {
+    execute: async (_toolCallId, params) => {
       const removed = await memoryManager.removeMemory(params.text, projectPath);
       return removed
         ? `Removed memory matching: ${params.text}`
