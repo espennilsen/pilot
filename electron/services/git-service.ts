@@ -477,45 +477,48 @@ export class GitService {
     // GIT_SEQUENCE_EDITOR for the todo and EDITOR for reword messages.
     const rewordEntries = request.entries.filter(e => e.action === 'reword' && e.newMessage);
 
-    try {
-      // Use GIT_SEQUENCE_EDITOR to inject our todo list without opening an editor.
-      // The sequence editor receives the todo file path as $1.
-      // We use a cross-platform approach: write the todo to a temp file and
-      // use a simple copy command as the "editor".
-      const os = await import('os');
-      const fs = await import('fs/promises');
-      const path = await import('path');
+    // Use GIT_SEQUENCE_EDITOR to inject our todo list without opening an editor.
+    // The sequence editor receives the todo file path as $1.
+    // We use a cross-platform approach: write the todo to a temp file and
+    // use a simple copy command as the "editor".
+    const os = await import('os');
+    const fs = await import('fs/promises');
+    const path = await import('path');
 
-      const tmpDir = os.tmpdir();
-      const todoFile = path.join(tmpDir, `pilot-rebase-todo-${Date.now()}`);
-      await fs.writeFile(todoFile, todoLines + '\n', 'utf-8');
+    const tmpDir = os.tmpdir();
+    const todoFile = path.join(tmpDir, `pilot-rebase-todo-${Date.now()}`);
+    // Track all temp files for cleanup in finally block
+    const tmpFiles: string[] = [todoFile];
 
-      // Build the sequence editor command — copies our todo file over git's todo file
-      const seqEditor = process.platform === 'win32'
-        ? `cmd /c copy /y "${todoFile.replace(/\//g, '\\')}" "$1"`
-        : `cp "${todoFile}" "$1"`;
+    await fs.writeFile(todoFile, todoLines + '\n', 'utf-8');
 
-      // For reword commits, we need to handle the EDITOR calls.
-      // If there are rewords, we create a helper script that writes the correct
-      // message based on the commit being reworded.
-      let editorEnv: Record<string, string> = {};
-      let rewordScriptFile: string | undefined;
+    // Build the sequence editor command — copies our todo file over git's todo file
+    const seqEditor = process.platform === 'win32'
+      ? `cmd /c copy /y "${todoFile.replace(/\//g, '\\')}" "$1"`
+      : `cp "${todoFile}" "$1"`;
 
-      if (rewordEntries.length > 0) {
-        // Create a script that reads the current COMMIT_EDITMSG and replaces it
-        // with the new message based on which reword we're on.
-        const rewordMessages = rewordEntries.map(e => ({
-          hash: e.hash,
-          message: e.newMessage!,
-        }));
+    // For reword commits, we need to handle the EDITOR calls.
+    // If there are rewords, we create a helper script that writes the correct
+    // message based on the commit being reworded.
+    let editorEnv: Record<string, string> = {};
 
-        const rewordDataFile = path.join(tmpDir, `pilot-reword-data-${Date.now()}.json`);
-        await fs.writeFile(rewordDataFile, JSON.stringify(rewordMessages), 'utf-8');
+    if (rewordEntries.length > 0) {
+      // Create a script that reads the current COMMIT_EDITMSG and replaces it
+      // with the new message based on which reword we're on.
+      const rewordMessages = rewordEntries.map(e => ({
+        hash: e.hash,
+        message: e.newMessage!,
+      }));
 
-        if (process.platform === 'win32') {
-          // Windows: use a node script as the editor
-          rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.js`);
-          const script = `
+      const rewordDataFile = path.join(tmpDir, `pilot-reword-data-${Date.now()}.json`);
+      tmpFiles.push(rewordDataFile);
+      await fs.writeFile(rewordDataFile, JSON.stringify(rewordMessages), 'utf-8');
+
+      if (process.platform === 'win32') {
+        // Windows: use a node script as the editor
+        const rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.js`);
+        tmpFiles.push(rewordScriptFile);
+        const script = `
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync(${JSON.stringify(rewordDataFile)}, 'utf-8'));
 const msgFile = process.argv[2];
@@ -524,12 +527,13 @@ if (data.length > 0) {
   fs.writeFileSync(msgFile, entry.message, 'utf-8');
   fs.writeFileSync(${JSON.stringify(rewordDataFile)}, JSON.stringify(data), 'utf-8');
 }`;
-          await fs.writeFile(rewordScriptFile, script, 'utf-8');
-          editorEnv = { GIT_EDITOR: `node "${rewordScriptFile}"` };
-        } else {
-          // Unix: use a shell script as the editor
-          rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.sh`);
-          const script = `#!/bin/sh
+        await fs.writeFile(rewordScriptFile, script, 'utf-8');
+        editorEnv = { GIT_EDITOR: `node "${rewordScriptFile}"` };
+      } else {
+        // Unix: use a shell script as the editor
+        const rewordScriptFile = path.join(tmpDir, `pilot-reword-${Date.now()}.sh`);
+        tmpFiles.push(rewordScriptFile);
+        const script = `#!/bin/sh
 DATAFILE="${rewordDataFile}"
 MSGFILE="$1"
 NODE_SCRIPT='
@@ -543,24 +547,20 @@ if (data.length > 0) {
 '
 node -e "$NODE_SCRIPT" "$DATAFILE" "$MSGFILE"
 `;
-          await fs.writeFile(rewordScriptFile, script, { mode: 0o755 });
-          editorEnv = { GIT_EDITOR: rewordScriptFile };
-        }
+        await fs.writeFile(rewordScriptFile, script, { mode: 0o755 });
+        editorEnv = { GIT_EDITOR: rewordScriptFile };
       }
+    }
 
-      // Execute the interactive rebase
-      const env = {
-        ...process.env,
-        GIT_SEQUENCE_EDITOR: seqEditor,
-        ...editorEnv,
-      };
+    // Execute the interactive rebase
+    const env = {
+      ...process.env,
+      GIT_SEQUENCE_EDITOR: seqEditor,
+      ...editorEnv,
+    };
 
+    try {
       await this.git.env(env).rebase(['-i', request.onto]);
-
-      // Clean up temp files
-      await fs.unlink(todoFile).catch(() => {});
-      if (rewordScriptFile) await fs.unlink(rewordScriptFile).catch(() => {});
-
       return { success: true, conflicts: [], message: 'Interactive rebase completed successfully' };
     } catch (err: unknown) {
       const conflicts = await this.getConflictedPaths();
@@ -572,6 +572,9 @@ node -e "$NODE_SCRIPT" "$DATAFILE" "$MSGFILE"
         };
       }
       throw err;
+    } finally {
+      // Clean up all temp files regardless of success or failure
+      await Promise.all(tmpFiles.map(f => fs.unlink(f).catch(() => {})));
     }
   }
 

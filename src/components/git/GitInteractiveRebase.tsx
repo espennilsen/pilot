@@ -4,7 +4,7 @@
  * Allows users to reorder commits via drag-and-drop and assign actions
  * (pick, reword, edit, squash, fixup, drop) before executing the rebase.
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   GripVertical, Play, X, ChevronDown, AlertTriangle,
   ArrowUp, ArrowDown, MessageSquare,
@@ -75,6 +75,18 @@ function EntryRow({
       setShowRewordInput(false);
     }
   };
+
+  // Close action dropdown on click outside
+  useEffect(() => {
+    if (!showActionMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowActionMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showActionMenu]);
 
   return (
     <div
