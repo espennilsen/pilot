@@ -21,27 +21,24 @@ function StreamingMarkdown({ text }: { text: string }) {
   useEffect(() => {
     latestTextRef.current = text;
 
-    // Throttle Markdown re-renders to every 80ms during streaming
+    // Throttle Markdown re-renders to every 80ms during streaming.
+    // Don't clear the timer here — letting it fire naturally gives true
+    // throttle semantics (fires every 80ms). Clearing on each text change
+    // would turn this into a debounce (only fires after 80ms of silence).
     if (!timerRef.current) {
       timerRef.current = setTimeout(() => {
         setRenderedText(latestTextRef.current);
         timerRef.current = null;
       }, 80);
     }
-
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    };
   }, [text]);
 
-  // Always flush on unmount (streaming ends → component swaps to regular Markdown)
+  // Flush on unmount (streaming ends → component swaps to regular Markdown)
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);
