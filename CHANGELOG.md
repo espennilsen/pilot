@@ -6,6 +6,10 @@ All notable changes to Pilot are documented here, grouped by date.
 
 ### Added
 - **Desktop virtual display** — Docker-based virtual desktop the agent can control for browser testing, GUI automation, and visual verification; 18 agent tools (mouse, keyboard, screenshot, clipboard, browser, exec); live noVNC viewer in context panel; per-project and global tools toggle; custom project Dockerfiles (`.pilot/desktop.Dockerfile`); auto-cleanup on tab close; startup reconciliation for surviving containers
+- **Desktop coordinate grid overlay** — optional grid overlay on screenshots for precise coordinate targeting
+- **Interactive rebase UI** — right-click any commit in history to start an interactive rebase; drag-and-drop reordering, action picker (pick/reword/edit/squash/fixup/drop), inline message editing, squash group visualization with combined message editor, and two-click confirmation
+- **AI-assisted git conflict resolution** — conflict banner with continue/skip/abort, per-file resolution strategies (ours/theirs/manual), "Ask Agent" button that pre-fills a resolution prompt with conflict context
+- **Memory tools improvements** — agent memory tools with search, better UX, and category normalization
 
 ## 2026-02-28
 
