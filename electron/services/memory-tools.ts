@@ -3,6 +3,73 @@ import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
 import type { MemoryManager } from './memory-manager';
 
 /**
+ * Normalize category names to prevent fragmentation.
+ * Maps common variations to canonical categories.
+ */
+function normalizeCategory(category: string): string {
+  const normalized = category.trim();
+  const lower = normalized.toLowerCase();
+
+  // User Preferences
+  if (
+    lower === 'preferences' ||
+    lower === 'user prefs' ||
+    lower === 'user preferences' ||
+    lower === 'preference'
+  ) {
+    return 'User Preferences';
+  }
+
+  // Technical Context
+  if (
+    lower === 'tech context' ||
+    lower === 'technical' ||
+    lower === 'stack' ||
+    lower === 'technical context' ||
+    lower === 'technology'
+  ) {
+    return 'Technical Context';
+  }
+
+  // Decisions
+  if (
+    lower === 'decision' ||
+    lower === 'decisions' ||
+    lower === 'architecture decisions' ||
+    lower === 'architectural decisions' ||
+    lower === 'architecture'
+  ) {
+    return 'Decisions';
+  }
+
+  // Patterns & Conventions
+  if (
+    lower === 'patterns' ||
+    lower === 'conventions' ||
+    lower === 'style' ||
+    lower === 'patterns & conventions' ||
+    lower === 'patterns and conventions' ||
+    lower === 'coding style'
+  ) {
+    return 'Patterns & Conventions';
+  }
+
+  // Project Notes
+  if (
+    lower === 'project notes' ||
+    lower === 'project' ||
+    lower === 'notes'
+  ) {
+    return 'Project Notes';
+  }
+
+  // Default to General (but preserve original capitalization for custom categories)
+  if (lower === 'general') return 'General';
+
+  return normalized;
+}
+
+/**
  * Creates agent-facing memory tools for reading and writing MEMORY.md files.
  * Registered as customTools in createAgentSession().
  */
@@ -16,8 +83,14 @@ export function createMemoryTools(
   const memoryRead: ToolDefinition = {
     name: 'pilot_memory_read',
     label: 'Memory',
-    description:
-      'Read stored memories. Returns global and project memory contents. Use to check what has already been remembered before adding new entries.',
+    description: `Read stored memories from global and/or project-specific MEMORY.md files.
+
+**When to use:**
+- ALWAYS check existing memories BEFORE adding new ones to avoid duplicates
+- When the user references something from a previous session
+- When you need context about user preferences or project decisions
+
+**Returns:** Markdown-formatted memory entries organized by category.`,
     parameters: Type.Object({
       scope: Type.Optional(
         Type.Union(
@@ -47,10 +120,30 @@ export function createMemoryTools(
   const memoryAdd: ToolDefinition = {
     name: 'pilot_memory_add',
     label: 'Memory',
-    description:
-      'Save a memory entry. Use for user preferences, project decisions, conventions, and facts worth remembering across sessions. Avoid one-time task details.',
+    description: `Save a memory entry to persist knowledge across sessions.
+
+**What makes a GOOD memory:**
+✅ "User prefers Tailwind CSS over CSS modules"
+✅ "Project uses pnpm workspaces, not npm"
+✅ "Always ask before running git push"
+✅ "API endpoints follow /api/v1/{resource} pattern"
+✅ "User's name is Espen — use in commit messages"
+
+**What makes a BAD memory (don't save these):**
+❌ "Fixed bug in auth.ts line 42" (too specific, not reusable)
+❌ "User asked to add a button" (one-time task, not a preference)
+❌ "File src/app.tsx exists" (obvious, clogs memory)
+❌ "I am writing TypeScript" (trivial, not worth remembering)
+
+**Scope guidance:**
+- \`global\`: User preferences, coding style, general practices (applies to ALL projects)
+- \`project\`: Project-specific facts, tech stack, API patterns, team conventions
+
+**Category guidance:** Use standard categories when possible: "User Preferences", "Technical Context", "Decisions", "Patterns & Conventions", "Project Notes". Custom categories are allowed but will be normalized to reduce fragmentation.
+
+**IMPORTANT:** Always call \`pilot_memory_read\` FIRST to check for duplicates before adding.`,
     parameters: Type.Object({
-      text: Type.String({ description: 'The memory to save — one concise line' }),
+      text: Type.String({ description: 'The memory to save — one concise line. Be specific and actionable.' }),
       scope: Type.Optional(
         Type.Union(
           [Type.Literal('global'), Type.Literal('project')],
@@ -58,12 +151,12 @@ export function createMemoryTools(
         )
       ),
       category: Type.Optional(
-        Type.String({ description: 'Category heading, e.g. "User Preferences", "Technical Context", "Decisions". Default: General' })
+        Type.String({ description: 'Category heading (will be normalized). Recommended: "User Preferences", "Technical Context", "Decisions", "Patterns & Conventions", "Project Notes". Default: General' })
       ),
     }),
     execute: async (_toolCallId, params) => {
       const scope = params.scope ?? 'project';
-      const category = params.category ?? 'General';
+      const category = normalizeCategory(params.category ?? 'General');
       await memoryManager.appendMemory(params.text, scope, projectPath, category);
       return `Saved to ${scope} memory under "${category}": ${params.text}`;
     },
@@ -74,18 +167,61 @@ export function createMemoryTools(
   const memoryRemove: ToolDefinition = {
     name: 'pilot_memory_remove',
     label: 'Memory',
-    description:
-      'Remove a memory entry by matching its text. Use when a memory is outdated, wrong, or the user asks to forget something.',
+    description: `Remove a memory entry by matching its text.
+
+**When to use:**
+- User explicitly asks to forget something
+- A memory is outdated or incorrect
+- User corrects a previous preference
+
+**Matching behavior:** Case-insensitive partial match. For example, searching for "tailwind" will match "User prefers Tailwind CSS over CSS modules".
+
+**Returns:** The exact text that was removed, or a message if nothing matched.`,
     parameters: Type.Object({
       text: Type.String({ description: 'Text to match against existing memories (case-insensitive partial match)' }),
     }),
     execute: async (_toolCallId, params) => {
       const removed = await memoryManager.removeMemory(params.text, projectPath);
       return removed
-        ? `Removed memory matching: ${params.text}`
+        ? `Removed: "${removed}"`
         : `No memory found matching: ${params.text}`;
     },
   };
 
-  return [memoryRead, memoryAdd, memoryRemove];
+  // ─── pilot_memory_search ─────────────────────────────────────────────
+
+  const memorySearch: ToolDefinition = {
+    name: 'pilot_memory_search',
+    label: 'Memory',
+    description: `Search memories by keyword or phrase without reading all entries.
+
+**When to use:**
+- Looking for a specific fact without loading all memories
+- Checking if something is already remembered (lighter than full read)
+- Finding memories related to a specific topic or keyword
+
+**Returns:** Matching entries with scope and category context.`,
+    parameters: Type.Object({
+      query: Type.String({ description: 'Keyword or phrase to search for (case-insensitive)' }),
+      scope: Type.Optional(
+        Type.Union(
+          [Type.Literal('all'), Type.Literal('global'), Type.Literal('project')],
+          { description: 'Which memories to search. Default: all' }
+        )
+      ),
+    }),
+    execute: async (_toolCallId, params) => {
+      const scope = params.scope ?? 'all';
+      const results = await memoryManager.searchMemories(params.query, projectPath, scope);
+
+      if (results.length === 0) {
+        return `No memories found matching: ${params.query}`;
+      }
+
+      const lines = results.map(r => `[${r.scope}/${r.category}] ${r.text}`);
+      return `Found ${results.length} matching ${results.length === 1 ? 'memory' : 'memories'}:\n\n${lines.join('\n')}`;
+    },
+  };
+
+  return [memoryRead, memoryAdd, memoryRemove, memorySearch];
 }
