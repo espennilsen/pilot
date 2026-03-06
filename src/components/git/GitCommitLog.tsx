@@ -3,7 +3,8 @@ import { Clock, User, GitBranch } from 'lucide-react';
 import { useGitStore } from '../../stores/git-store';
 
 export default function GitCommitLog() {
-  const { commitLog, loadCommitLog, prepareInteractiveRebase, isInteractiveRebasePreparing, isLoading } = useGitStore();
+  const { commitLog, loadCommitLog, prepareInteractiveRebase, isInteractiveRebasePreparing, isLoading, status } = useGitStore();
+  const hasOperationInProgress = status?.operationInProgress != null;
   const [maxCount, setMaxCount] = useState(50);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; commitHash: string } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -173,11 +174,12 @@ export default function GitCommitLog() {
         >
           <button
             onClick={() => handleInteractiveRebase(contextMenu.commitHash)}
-            disabled={isInteractiveRebasePreparing}
+            disabled={isInteractiveRebasePreparing || hasOperationInProgress}
             className="w-full text-left px-3 py-1.5 text-sm hover:bg-bg-surface flex items-center gap-2 disabled:opacity-50"
+            title={hasOperationInProgress ? `A ${status!.operationInProgress!.type} is in progress — resolve it first` : undefined}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            {isInteractiveRebasePreparing ? 'Loading…' : 'Interactive rebase from here…'}
+            {isInteractiveRebasePreparing ? 'Loading…' : hasOperationInProgress ? `Blocked: ${status!.operationInProgress!.type} in progress` : 'Interactive rebase from here…'}
           </button>
         </div>
       )}

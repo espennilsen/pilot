@@ -442,6 +442,12 @@ export class GitService {
    * Returns a todo list the UI can reorder and assign actions to.
    */
   async prepareInteractiveRebase(onto: string): Promise<RebaseTodoEntry[]> {
+    // Block if another operation is already in progress
+    const existingOp = this.getOperationState();
+    if (existingOp) {
+      throw new Error(`Cannot start interactive rebase: a ${existingOp.type} is already in progress. Resolve it first.`);
+    }
+
     // Get commits from (onto, HEAD] — these are the ones that will be replayed
     const logOutput = await this.git.log([`${onto}..HEAD`, '--reverse']);
 
@@ -465,6 +471,18 @@ export class GitService {
     const os = await import('os');
     const fs = await import('fs/promises');
     const path = await import('path');
+
+    // ── Block if another operation is already in progress ────────────
+    // Instead of silently aborting, return an error so the user can
+    // decide via the conflict banner (Resume / Abort).
+    const existingOp = this.getOperationState();
+    if (existingOp) {
+      return {
+        success: false,
+        conflicts: [],
+        message: `Cannot start interactive rebase: a ${existingOp.type} is already in progress. Use the git panel to resume or abort it first.`,
+      };
+    }
 
     const todoLines = request.entries
       .map(entry => `${entry.action} ${entry.hash} ${entry.message}`)
