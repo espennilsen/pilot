@@ -321,7 +321,9 @@ If nothing worth remembering, respond: {"memories": []}`;
   /**
    * Remove a memory by fuzzy matching its text.
    * Returns the removed text if found, null otherwise.
-   * Uses getMemoryFiles() to stay in sync with the canonical file list.
+   * Uses getMemoryFiles() for the initial search to stay in sync with
+   * the canonical file list, but re-reads the target file immediately
+   * before writing to avoid TOCTOU data loss from concurrent writes.
    */
   async removeMemory(text: string, projectPath: string): Promise<string | null> {
     const memoryFiles = await this.getMemoryFiles(projectPath);
@@ -333,14 +335,24 @@ If nothing worth remembering, respond: {"memories": []}`;
     for (const { content, scope } of scopes) {
       if (!content) continue;
 
-      const lines = content.split('\n');
+      // Check if this file contains a match
+      const hasMatch = content.split('\n').some(line =>
+        line.toLowerCase().includes(text.toLowerCase()) && line.startsWith('- ')
+      );
+      if (!hasMatch) continue;
+
+      // Re-read the file immediately before writing to minimise the
+      // TOCTOU window — any concurrent appendMemory/saveMemoryFile
+      // writes are preserved.
+      const filePath = this.resolveFilePath(scope, projectPath);
+      const freshContent = await fs.readFile(filePath, 'utf-8');
+      const lines = freshContent.split('\n');
       const matchIdx = lines.findIndex(line =>
         line.toLowerCase().includes(text.toLowerCase()) && line.startsWith('- ')
       );
       if (matchIdx !== -1) {
         const removedLine = lines[matchIdx].replace(/^-\s*/, ''); // Strip bullet prefix
         lines.splice(matchIdx, 1);
-        const filePath = this.resolveFilePath(scope, projectPath);
         await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
         return removedLine;
       }
