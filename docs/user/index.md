@@ -30,6 +30,7 @@ Pilot is a desktop application that combines:
 - **[Steering & Follow-up](./steering.md)** — Redirect or queue messages while the agent works
 - **[Memory](./memory.md)** — Two-tier memory system (global + project) and auto-extraction
 - **[Tasks](./tasks.md)** — Task management, kanban board, and agent integration
+- **[Desktop](./desktop.md)** — Virtual display for browser testing and GUI automation
 
 ### User Interface
 - **[Sidebar](./sidebar.md)** — Left sidebar with Sessions, Memory, and Tasks panes

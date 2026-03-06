@@ -1,14 +1,16 @@
-import { FolderOpen, PanelRightClose, PanelRightOpen, FolderTree, GitBranch, FileDiff, Bot } from 'lucide-react';
+import { FolderOpen, PanelRightClose, PanelRightOpen, FolderTree, GitBranch, FileDiff, Bot, Monitor } from 'lucide-react';
 import { useUIStore, type ContextPanelTab } from '../../stores/ui-store';
 import { Tooltip } from '../shared/Tooltip';
 import { useProjectStore } from '../../stores/project-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
+import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useSubagentStore } from '../../stores/subagent-store';
 import FileTree from './FileTree';
 import { StagedDiffQueue } from '../sandbox/StagedDiffQueue';
 import GitPanel from '../git/GitPanel';
 import AgentsPanel from '../subagents/AgentsPanel';
+import DesktopPanel from '../desktop/DesktopPanel';
 
 export default function ContextPanel() {
   const { contextPanelVisible, contextPanelWidth, contextPanelTab, setContextPanelTab, toggleContextPanel } = useUIStore();
@@ -24,8 +26,13 @@ export default function ContextPanel() {
       ).length
     : 0;
 
+  // Desktop tab: visible when the global setting is on
+  const desktopEnabled = useAppSettingsStore((s) => s.desktopEnabled);
+
   // If the active tab was 'tasks', fall back to 'files'
-  const effectiveTab = contextPanelTab === 'tasks' ? 'files' : contextPanelTab;
+  // Also fall back if desktop tab is selected but desktop is disabled
+  let effectiveTab = contextPanelTab === 'tasks' ? 'files' : contextPanelTab;
+  if (effectiveTab === 'desktop' && !desktopEnabled) effectiveTab = 'files';
 
   const handleTabClick = (tab: ContextPanelTab) => {
     if (!contextPanelVisible) toggleContextPanel();
@@ -81,6 +88,18 @@ export default function ContextPanel() {
             )}
           </button>
         </Tooltip>
+
+        {/* Desktop — only shown when enabled globally or per-project */}
+        {desktopEnabled && (
+          <Tooltip content="Desktop" position="left">
+            <button
+              className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+              onClick={() => handleTabClick('desktop')}
+            >
+              <Monitor className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -156,6 +175,18 @@ export default function ContextPanel() {
             </span>
           )}
         </button>
+        {desktopEnabled && (
+          <button
+            onClick={() => setContextPanelTab('desktop')}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-sm ${
+              effectiveTab === 'desktop'
+                ? 'text-accent bg-bg-base border-b-2 border-accent'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-base/50'
+            }`}
+          >
+            Desktop
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -181,6 +212,8 @@ export default function ContextPanel() {
           <GitPanel />
         ) : effectiveTab === 'agents' ? (
           <AgentsPanel />
+        ) : effectiveTab === 'desktop' ? (
+          <DesktopPanel />
         ) : (
           <StagedDiffQueue />
         )}

@@ -26,6 +26,8 @@ import { registerCompanionIpc } from '../ipc/companion';
 import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
+import { registerDesktopIpc } from '../ipc/desktop';
+import { DesktopService } from '../services/desktop-service';
 import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
@@ -50,6 +52,7 @@ let companionServer: CompanionServer | null = null;
 let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
+let desktopService: DesktopService | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -306,6 +309,19 @@ app.whenReady().then(async () => {
   registerMcpIpc(mcpManager);
   registerAttachmentIpc();
 
+  // Docker sandbox — always register IPC handlers so the renderer gets
+  // graceful responses even when Docker is unavailable or init fails.
+  try {
+    desktopService = new DesktopService();
+    sessionManager.desktopService = desktopService;
+    desktopService.reconcileOnStartup().catch((err) => {
+      console.error('[Desktop] reconcileOnStartup failed:', err);
+    });
+  } catch (err) {
+    console.error('[Desktop] Failed to initialize service:', err);
+  }
+  registerDesktopIpc(desktopService, sessionManager);
+
   // Register system commands in the CommandRegistry
   CommandRegistry.register('memory', 'Memory', 'Open memory panel');
   CommandRegistry.register('tasks', 'Tasks', 'Open task board');
@@ -531,7 +547,30 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Cleanup on quit
+// Cleanup on quit — async cleanup (container stop) runs in before-quit,
+// synchronous cleanup runs in will-quit.
+let cleanupStarted = false;
+let cleanupFinished = false;
+
+app.on('before-quit', async (e) => {
+  if (cleanupFinished) return; // Cleanup complete — let quit proceed
+  e.preventDefault(); // Always prevent quit while cleanup is pending
+  if (cleanupStarted) return; // Already in progress — wait for it
+  cleanupStarted = true;
+
+  // Stop Docker containers gracefully before the process exits.
+  // Without this, stopAll()'s returned Promise is discarded and
+  // containers are left running after the app quits.
+  try {
+    await desktopService?.stopAll();
+  } catch {
+    // Best effort — don't block quit if Docker is unresponsive
+  }
+
+  cleanupFinished = true;
+  app.quit();
+});
+
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
   mcpManager?.disposeAll();

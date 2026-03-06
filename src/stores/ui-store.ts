@@ -29,7 +29,7 @@ const saveScratchPadContent = (content: string) => {
 export type SidebarPane = 'sessions' | 'memory' | 'tasks';
 
 /** Context panel tab type (right sidebar). */
-export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents';
+export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents' | 'desktop';
 
 /** Settings panel tab type. */
 export type SettingsTab =

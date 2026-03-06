@@ -33,6 +33,8 @@ import {
 } from './pi-session-commands';
 import { extractMemoriesInBackground } from './pi-session-memory';
 import type { McpManager } from './mcp-manager';
+import { createDesktopTools } from './desktop-tools';
+import { loadProjectSettings } from './project-settings';
 
 export class PilotSessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -48,6 +50,7 @@ export class PilotSessionManager {
   public taskManager = new TaskManager();
   public subagentManager: SubagentManager;
   public mcpManager: McpManager | null = null;
+  public desktopService: import('./desktop-service').DesktopService | null = null;
 
   constructor() {
     ensurePilotAppDirs();
@@ -122,6 +125,7 @@ export class PilotSessionManager {
       taskManager: this.taskManager,
       subagentManager: this.subagentManager,
       mcpManager: this.mcpManager,
+      desktopService: this.desktopService,
       onStagedDiff: (diff: StagedDiff) => {
         this.stagedDiffs.addDiff(diff);
         this.sendToRenderer(IPC.SANDBOX_STAGED_DIFF, { tabId, diff });
@@ -236,24 +240,37 @@ export class PilotSessionManager {
   }
 
   dispose(tabId: string): void {
-    // Clean up subagents for this tab first
-    this.subagentManager.cleanup(tabId);
+    // Each step is guarded so a failure in one doesn't skip the rest
+    try { this.subagentManager.cleanup(tabId); } catch { /* best effort */ }
+    try { this.mcpManager?.stopAllForTab(tabId).catch(() => {}); } catch { /* best effort */ }
 
-    // Release MCP server references for this tab
-    this.mcpManager?.stopAllForTab(tabId).catch(() => {});
+    // Check if this was the last tab for its project — stop desktop if so
+    const projectPath = this.tabProjectPaths.get(tabId);
 
-    const unsub = this.unsubscribers.get(tabId);
-    unsub?.();
+    try {
+      const unsub = this.unsubscribers.get(tabId);
+      unsub?.();
+    } catch { /* best effort */ }
     this.unsubscribers.delete(tabId);
 
-    const session = this.sessions.get(tabId);
-    session?.dispose();
+    try {
+      const session = this.sessions.get(tabId);
+      session?.dispose();
+    } catch { /* best effort */ }
     this.sessions.delete(tabId);
 
     this.stagedDiffs.clearTab(tabId);
     this.tabProjectPaths.delete(tabId);
     this.lastUserMessages.delete(tabId);
     this.tabSandboxOptions.delete(tabId);
+
+    // Stop Docker desktop when no more tabs reference this project
+    if (projectPath && this.desktopService) {
+      const stillUsed = [...this.tabProjectPaths.values()].some(p => p === projectPath);
+      if (!stillUsed) {
+        this.desktopService.stopDesktop(projectPath).catch(() => { /* best effort */ });
+      }
+    }
   }
 
   /**
@@ -275,6 +292,127 @@ export class PilotSessionManager {
     const opts = this.tabSandboxOptions.get(tabId);
     if (!opts) return null;
     return { jailEnabled: opts.jailEnabled, yoloMode: opts.yoloMode, allowedPaths: [...opts.allowedPaths] };
+  }
+
+  /**
+   * Add or remove Docker sandbox tools from a live session.
+   *
+   * HACK: This accesses the private _toolRegistry on AgentSession via an `any` cast.
+   * This is fragile — any SDK refactor that renames or restructures this property
+   * will silently break tool injection at runtime. Replace with a public
+   * session.addTools() / session.removeTools() API when the SDK exposes one.
+   *
+   * Verified working with @mariozechner/pi-coding-agent@0.55.x.
+   * If the SDK version is bumped, re-verify that _toolRegistry still exists
+   * and is a Map<string, ToolDefinition>.
+   *
+   * TODO(sdk): Request a public registerTool/unregisterTool API from
+   * @mariozechner/pi-coding-agent so we can drop the private-field access.
+   * Tracked upstream: https://github.com/nicepkg/pi-coding-agent/issues/TBD
+   * Add an integration test that toggles tools on a live session once a
+   * public API is available.
+   */
+  updateDesktopTools(tabId: string, enabled: boolean): void {
+    const session = this.sessions.get(tabId);
+    if (!session) return;
+
+    const projectPath = this.tabProjectPaths.get(tabId);
+    if (!projectPath) return;
+
+    // Access the private tool registry — verified as a Map in SDK 0.55.x.
+    // The runtime check below ensures a clear failure if the SDK changes.
+    const registry = (session as any)._toolRegistry;
+    if (!registry || !(registry instanceof Map)) {
+      let sdkVersion = 'unknown';
+      try { sdkVersion = require('@mariozechner/pi-coding-agent/package.json').version; } catch { /* */ }
+      const msg = `Desktop tool injection failed — SDK internal API changed. `
+        + `SDK version: ${sdkVersion} (verified with 0.55.x). `
+        + `Update Pilot or check for a newer SDK version.`;
+      console.error(`[SessionManager] ${msg}`);
+      // Broadcast a warning so the UI can surface the problem. We intentionally
+      // do NOT set status: 'error' — that would overwrite healthy container
+      // state and swap the VNC viewer for an error screen. The container is
+      // fine; only tool injection failed.
+      if (projectPath) {
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: msg });
+      }
+      return;
+    }
+
+    // Validate the map's value schema — not just its type. If the SDK still
+    // uses a Map but changes the value shape (e.g. wraps tools in metadata),
+    // the instanceof check above passes but injection silently corrupts the
+    // registry. Sample a single entry and verify it matches ToolDefinition.
+    if (registry.size > 0) {
+      const sample = registry.values().next().value;
+      if (!sample || typeof sample.name !== 'string' || typeof sample.execute !== 'function') {
+        let sdkVersion = 'unknown';
+        try { sdkVersion = require('@mariozechner/pi-coding-agent/package.json').version; } catch { /* */ }
+        const msg = `Desktop tool injection failed — _toolRegistry value schema changed. `
+          + `Expected {name: string, execute: function}, got: ${JSON.stringify(Object.keys(sample ?? {}))}. `
+          + `SDK version: ${sdkVersion}.`;
+        console.error(`[SessionManager] ${msg}`);
+        if (projectPath) {
+          broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: msg });
+        }
+        return;
+      }
+    }
+
+    const DESKTOP_TOOL_PREFIX = 'desktop_';
+    const hasDesktopTools = [...registry.keys()].some(name => name.startsWith(DESKTOP_TOOL_PREFIX));
+
+    if (enabled && !hasDesktopTools && this.desktopService) {
+      // Inject sandbox tools into the registry
+      const tools = createDesktopTools(this.desktopService, projectPath);
+      for (const tool of tools) {
+        registry.set(tool.name, tool);
+      }
+      // Spot-check: verify injection actually worked. A future SDK refactor
+      // could keep _toolRegistry as a Map but change key/value schema silently.
+      if (!registry.has('desktop_screenshot')) {
+        const spotMsg = 'Desktop tool injection spot-check failed — tools may not work correctly.';
+        console.error(`[SessionManager] ${spotMsg}`);
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: spotMsg });
+      } else {
+        // Clear any previous warning on successful injection
+        broadcastToRenderer(IPC.DESKTOP_EVENT, { projectPath, toolsWarning: undefined });
+      }
+    } else if (!enabled && hasDesktopTools) {
+      // Remove sandbox tools from the registry
+      for (const name of [...registry.keys()]) {
+        if (name.startsWith(DESKTOP_TOOL_PREFIX)) {
+          registry.delete(name);
+        }
+      }
+    }
+
+    // Rebuild active tools list
+    const activeNames = [...registry.keys()];
+    session.setActiveToolsByName(activeNames);
+  }
+
+  /**
+   * Update Docker sandbox tools on all live sessions for a project.
+   */
+  updateDesktopToolsForProject(projectPath: string, enabled: boolean): void {
+    for (const [tabId, pp] of this.tabProjectPaths) {
+      if (pp === projectPath) {
+        this.updateDesktopTools(tabId, enabled);
+      }
+    }
+  }
+
+  /**
+   * Update Docker sandbox tools on ALL live sessions (for global setting change).
+   */
+  updateDesktopToolsGlobally(enabled: boolean): void {
+    for (const [tabId, projectPath] of this.tabProjectPaths) {
+      // Skip tabs that have an explicit per-project override
+      const projectSettings = loadProjectSettings(projectPath);
+      if (projectSettings.desktopToolsEnabled !== undefined) continue;
+      this.updateDesktopTools(tabId, enabled);
+    }
   }
 
   /**

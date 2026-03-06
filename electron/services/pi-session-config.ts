@@ -24,6 +24,8 @@ import { createSubagentTools } from './subagent-tools';
 import { createWebFetchTool } from './web-fetch-tool';
 import { createMemoryTools } from './memory-tools';
 import { createEditorTools } from './editor-tools';
+import { createDesktopTools } from './desktop-tools';
+import type { DesktopService } from './desktop-service';
 import type { StagedDiff } from '../../shared/types';
 import type { McpManager } from './mcp-manager';
 
@@ -45,6 +47,7 @@ export interface SessionConfigOptions {
   taskManager: TaskManager;
   subagentManager: SubagentManager;
   mcpManager?: McpManager | null;
+  desktopService?: DesktopService | null;
   onStagedDiff: (diff: StagedDiff) => void;
 }
 
@@ -60,7 +63,7 @@ export interface SessionConfigOptions {
 export async function buildSessionConfig(
   options: SessionConfigOptions
 ): Promise<SessionConfigResult> {
-  const { tabId, projectPath, memoryManager, taskManager, subagentManager, mcpManager, onStagedDiff } = options;
+  const { tabId, projectPath, memoryManager, taskManager, subagentManager, mcpManager, desktopService, onStagedDiff } = options;
 
   const projectSettings = loadProjectSettings(projectPath);
   const piAgentDir = getPiAgentDir();
@@ -137,6 +140,14 @@ export async function buildSessionConfig(
     ? mcpManager.getToolDefinitions(projectPath)
     : [];
 
+  // Docker sandbox tools — project setting overrides global; when neither is set, disabled
+  const desktopEffectivelyEnabled = projectSettings.desktopToolsEnabled !== undefined
+    ? projectSettings.desktopToolsEnabled
+    : (appSettings.desktopEnabled ?? false);
+  const desktopTools = (desktopEffectivelyEnabled && desktopService)
+    ? createDesktopTools(desktopService, projectPath)
+    : [];
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
@@ -146,6 +157,7 @@ export async function buildSessionConfig(
     ...subagentTools,
     createWebFetchTool(),
     ...mcpTools,
+    ...desktopTools,
   ];
 
   return { settingsManager, resourceLoader, customTools, piAgentDir, sandboxOptions };

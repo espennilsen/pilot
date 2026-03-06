@@ -5,6 +5,7 @@ import { loadAppSettings, saveAppSettings, getPiAgentDir } from '../services/app
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLogger } from '../services/logger';
+import { requireBoolean } from '../utils/ipc-validation';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 
 export function registerSettingsIpc(sessionManager?: PilotSessionManager) {
@@ -23,6 +24,11 @@ export function registerSettingsIpc(sessionManager?: PilotSessionManager) {
       sessionManager.refreshSystemPrompt().catch(err => {
         console.warn('[Settings] Failed to refresh system prompt on active sessions:', err);
       });
+    }
+
+    // Toggle Docker sandbox tools on all live sessions when the global setting changes
+    if ('desktopEnabled' in updates && sessionManager) {
+      sessionManager.updateDesktopToolsGlobally(requireBoolean(updates.desktopEnabled, 'desktopEnabled'));
     }
 
     return result;

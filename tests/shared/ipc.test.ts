@@ -32,5 +32,6 @@ describe('IPC constants', () => {
     expect(domains).toContain('git');
     expect(domains).toContain('project');
     expect(domains).toContain('terminal');
+    expect(domains).toContain('desktop');
   });
 });

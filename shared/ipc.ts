@@ -131,6 +131,19 @@ export const IPC = {
   DEV_COMMAND_STATUS: 'dev:command-status', // main → renderer
   DEV_SERVER_URL: 'dev:server-url',         // main → renderer (URL detected in output)
 
+  // Desktop
+  DESKTOP_CHECK: 'desktop:check',
+  DESKTOP_START: 'desktop:start',
+  DESKTOP_STOP: 'desktop:stop',
+  DESKTOP_STATUS: 'desktop:status',
+  // Note: no DESKTOP_EXEC — agent tools call service.execInDesktop() directly.
+  // Exposing exec via IPC would widen the attack surface unnecessarily.
+  DESKTOP_SCREENSHOT: 'desktop:screenshot',
+  DESKTOP_EVENT: 'desktop:event',                     // main → renderer push
+  DESKTOP_REBUILD: 'desktop:rebuild',
+  DESKTOP_SET_TOOLS_ENABLED: 'desktop:set-tools-enabled',
+  DESKTOP_GET_TOOLS_ENABLED: 'desktop:get-tools-enabled',
+
   // Extensions
   EXTENSIONS_LIST: 'extensions:list',
   EXTENSIONS_IMPORT_ZIP: 'extensions:import-zip',

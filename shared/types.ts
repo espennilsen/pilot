@@ -76,6 +76,8 @@ export interface PilotAppSettings {
       appName?: string;
     };
   };
+  /** Enable Desktop feature globally. Per-project .pilot/settings.json overrides this. Default: false */
+  desktopEnabled?: boolean;
 }
 
 // MCP (Model Context Protocol) types
@@ -121,6 +123,48 @@ export interface ProjectSandboxSettings {
     allowedPaths: string[];
   };
   yoloMode: boolean;
+  /** Enable Desktop agent tools. Default: false (no tool defs sent to agent). */
+  desktopToolsEnabled?: boolean;
+}
+
+// Desktop — project-scoped containers with virtual display
+/** Result of the Desktop availability check */
+export interface DesktopCheckResult {
+  /** Whether the Docker daemon is running and responsive */
+  available: boolean;
+  /** Human-readable reason when not available */
+  reason?: 'not-installed' | 'not-running' | 'service-init-failed';
+  /** Detail message for the UI */
+  message?: string;
+}
+
+/** Status of a project-scoped Desktop container */
+export interface DesktopState {
+  containerId: string;
+  /** noVNC websockify port on host */
+  wsPort: number;
+  /** VNC port on host */
+  vncPort: number;
+  status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
+  /** Unix timestamp (ms) when the container was created */
+  createdAt: number;
+  /** Error message when status is 'error' */
+  error?: string;
+  /** Per-container VNC password for authentication */
+  vncPassword?: string;
+  /** Warning when desktop tools could not be injected into the agent session */
+  toolsWarning?: string;
+}
+
+/** Persisted to <project>/.pilot/desktop.json for startup reconciliation */
+export interface DesktopConfig {
+  containerId: string;
+  wsPort: number;
+  vncPort: number;
+  status: string;
+  createdAt: number;
+  /** Per-container VNC password for authentication */
+  vncPassword?: string;
 }
 
 // Staged diff for review

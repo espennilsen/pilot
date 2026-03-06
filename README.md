@@ -1,31 +1,19 @@
-<p align="center">
-  <img src="resources/icon.png" alt="Pilot" width="120" />
-</p>
 
-<h1 align="center">Pilot</h1>
 
-<p align="center"><strong>An Integrated Agentic Environment (IAE) for AI-powered coding.</strong></p>
+# Pilot
 
-<p align="center">
-  A native desktop environment for the <a href="https://www.npmjs.com/package/@mariozechner/pi-coding-agent">Pi Coding Agent</a> — chat with an AI agent, review diffs before they touch disk, manage git, run dev commands, coordinate subagents, and track tasks, all from one keyboard-driven app.
-</p>
+**An Integrated Agentic Environment (IAE) for AI-powered coding.**
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" />
-  <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-22c55e" />
-  <a href="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml"><img src="https://github.com/espennilsen/pilot/actions/workflows/nightly.yml/badge.svg" alt="Nightly Build" /></a>
-</p>
+A native desktop environment for the [Pi Coding Agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) — chat with an AI agent, review diffs before they touch disk, manage git, run dev commands, coordinate subagents, and track tasks, all from one keyboard-driven app.
 
-<p align="center">
-  <img src="docs/screenshots/pilot_overview.png" alt="Pilot Screenshot" width="800" />
-</p>
+
+
+
 
 > [!WARNING]
 > **Pilot is in early development.** The app runs on **macOS**, **Windows**, and **Linux**.
 >
-> [**Nightly builds**](https://github.com/espennilsen/pilot/releases/tag/nightly) are available for all platforms — use at your own risk. These are unstable, unsigned builds generated automatically from the latest `main` branch.
+> **[Nightly builds](https://github.com/espennilsen/pilot/releases/tag/nightly)** are available for all platforms — use at your own risk. These are unstable, unsigned builds generated automatically from the latest `main` branch.
 
 ---
 
@@ -42,6 +30,7 @@
 - **Companion Access** — access Pilot from iOS/iPad/browser via HTTPS + WebSocket with PIN/QR pairing
 - **Command Palette** — fuzzy-searchable `⌘K` overlay for every action
 - **Terminal** — embedded PTY terminal with tabs
+- **Desktop** — Docker-based virtual display the agent can control — browser testing, GUI automation, and visual verification with 18 tools (mouse, keyboard, screenshot, clipboard, browser)
 - **Extensions & Skills** — install and manage Pi SDK extensions and skills
 
 See [docs/](docs/INDEX.md) for full documentation.
@@ -95,11 +84,13 @@ npm run preview
 
 ### Global — `<PILOT_DIR>/`
 
-| Platform | Location |
-|---|---|
-| macOS | `~/.config/.pilot/` |
-| Windows | `%APPDATA%\.pilot\` |
-| Linux | `$XDG_CONFIG_HOME/.pilot/` (default `~/.config/.pilot/`) |
+
+| Platform | Location                                                 |
+| -------- | -------------------------------------------------------- |
+| macOS    | `~/.config/.pilot/`                                      |
+| Windows  | `%APPDATA%\.pilot\`                                      |
+| Linux    | `$XDG_CONFIG_HOME/.pilot/` (default `~/.config/.pilot/`) |
+
 
 Key files: `auth.json` (credentials), `app-settings.json` (preferences), `MEMORY.md` (global memory), `sessions/` (conversation history), `extensions/`, `skills/`, `prompts/`.
 
@@ -113,17 +104,19 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full details.
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows / Linux |
-|---|---|---|
-| Command Palette | `⌘K` | `Ctrl+K` |
-| New Tab / Conversation | `⌘T` / `⌘N` | `Ctrl+T` / `Ctrl+N` |
-| Close Tab | `⌘W` | `Ctrl+W` |
-| Next / Previous Tab | `⌘⇧]` / `⌘⇧[` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Toggle Sidebar | `⌘B` | `Ctrl+B` |
-| Toggle Terminal | `` ⌘` `` | `` Ctrl+` `` |
-| Prompt Library | `⌘/` | `Ctrl+/` |
-| Toggle Yolo Mode | `⌘⇧Y` | `Ctrl+Shift+Y` |
-| Settings | `⌘,` | `Ctrl+,` |
+
+| Action                 | macOS         | Windows / Linux               |
+| ---------------------- | ------------- | ----------------------------- |
+| Command Palette        | `⌘K`          | `Ctrl+K`                      |
+| New Tab / Conversation | `⌘T` / `⌘N`   | `Ctrl+T` / `Ctrl+N`           |
+| Close Tab              | `⌘W`          | `Ctrl+W`                      |
+| Next / Previous Tab    | `⌘⇧]` / `⌘⇧[` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| Toggle Sidebar         | `⌘B`          | `Ctrl+B`                      |
+| Toggle Terminal        | `⌘``          | `Ctrl+``                      |
+| Prompt Library         | `⌘/`          | `Ctrl+/`                      |
+| Toggle Yolo Mode       | `⌘⇧Y`         | `Ctrl+Shift+Y`                |
+| Settings               | `⌘,`          | `Ctrl+,`                      |
+
 
 All shortcuts are rebindable in Settings → Keybindings.
 
@@ -131,7 +124,7 @@ All shortcuts are rebindable in Settings → Keybindings.
 
 ## Documentation
 
-Full documentation lives in [`docs/`](docs/INDEX.md):
+Full documentation lives in `[docs/](docs/INDEX.md)`:
 
 - [Overview](docs/OVERVIEW.md) — what Pilot is
 - [Architecture](docs/ARCHITECTURE.md) — how components connect

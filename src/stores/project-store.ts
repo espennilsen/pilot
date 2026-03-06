@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import type { FileNode } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
+import { useTabStore } from './tab-store';
 
 interface ProjectStore {
   projectPath: string | null;
@@ -121,7 +122,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (path) {
       get().setProjectPath(path);
       try {
-        const { useTabStore } = await import('./tab-store');
         const { tabs, switchTab, addTab } = useTabStore.getState();
 
         // If a tab for this project already exists, switch to it
