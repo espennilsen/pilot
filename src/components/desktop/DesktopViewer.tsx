@@ -112,10 +112,10 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
         return r + 1;
       });
       if (iframeRef.current) {
-        iframeRef.current.src = '';
-        requestAnimationFrame(() => {
-          if (iframeRef.current) iframeRef.current.src = currentUrl;
-        });
+        // Force a fresh request with a cache-busting param. Avoid the
+        // src='' → rAF → src=url pattern because the empty-src navigation
+        // fires onLoad prematurely (setReady(true) before VNC connects).
+        iframeRef.current.src = `${currentUrl}&_r=${Date.now()}`;
       }
     }, delay);
   };
@@ -185,11 +185,9 @@ export default function DesktopViewer({ wsPort, vncPassword }: DesktopViewerProp
               <button
                 onClick={() => {
                   setRetries(0);
+                  setReady(false);
                   if (iframeRef.current) {
-                    iframeRef.current.src = '';
-                    requestAnimationFrame(() => {
-                      if (iframeRef.current) iframeRef.current.src = noVncUrl;
-                    });
+                    iframeRef.current.src = `${noVncUrl}&_r=${Date.now()}`;
                   }
                 }}
                 className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary

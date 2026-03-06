@@ -340,6 +340,10 @@ export class DesktopService {
     const state = this.desktops.get(projectPath);
     if (!state || !state.containerId) return;
 
+    // Cancel any in-flight startDesktop so its waitForReady polling loop
+    // doesn't overwrite the stopped state with an error after timeout.
+    this.startAbortControllers.get(projectPath)?.abort();
+
     this.pushEvent(projectPath, { ...state, status: 'stopping' });
 
     try {
@@ -958,8 +962,13 @@ export class DesktopService {
     headerBuf.write('0001750\0', 116, 8, 'utf-8');
     // File size in octal (124-135)
     headerBuf.write(contentBuf.length.toString(8).padStart(11, '0') + '\0', 124, 12, 'utf-8');
+    // Modification time in octal (136-147) — current Unix timestamp
+    headerBuf.write(Math.floor(Date.now() / 1000).toString(8).padStart(11, '0') + '\0', 136, 12, 'utf-8');
     // Type flag '0' = regular file (156)
     headerBuf.write('0', 156, 1, 'utf-8');
+    // POSIX ustar magic (257-262) and version (263-264)
+    headerBuf.write('ustar\0', 257, 6, 'utf-8');
+    headerBuf.write('00', 263, 2, 'utf-8');
     // Checksum (148-155): sum of all header bytes with checksum field as spaces
     headerBuf.write('        ', 148, 8, 'utf-8');
     let checksum = 0;
