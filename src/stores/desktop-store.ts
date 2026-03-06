@@ -114,11 +114,19 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       error: null,
     }));
     try {
-      const result = await invoke(IPC.DESKTOP_REBUILD, projectPath) as DesktopState;
-      set(state => ({
-        stateByProject: { ...state.stateByProject, [projectPath]: result },
-        loadingByProject: { ...state.loadingByProject, [projectPath]: false },
-      }));
+      const result = await invoke(IPC.DESKTOP_REBUILD, projectPath) as DesktopState | null;
+      if (result) {
+        set(state => ({
+          stateByProject: { ...state.stateByProject, [projectPath]: result },
+          loadingByProject: { ...state.loadingByProject, [projectPath]: false },
+        }));
+      } else {
+        // Null when a start superseded this rebuild — clear loading and let
+        // the DESKTOP_EVENT push update state instead.
+        set(state => ({
+          loadingByProject: { ...state.loadingByProject, [projectPath]: false },
+        }));
+      }
     } catch (err) {
       set(state => ({
         error: String(err),

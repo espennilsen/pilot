@@ -567,23 +567,20 @@ export class DesktopService {
       }
       const tarBuffer = Buffer.concat(chunks);
 
-      // Tar header is 512 bytes, file content follows. Search for the PNG magic
-      // bytes starting at offset 512 to avoid false matches inside the tar header.
+      // Parse file size from the tar header (offset 124, 12 bytes, octal,
+      // NUL/space terminated) instead of searching for IEND magic bytes —
+      // the 8-byte IEND+CRC sequence could theoretically appear inside a
+      // compressed IDAT stream, causing a truncated PNG.
       const TAR_HEADER_SIZE = 512;
-      const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-      const pngStart = tarBuffer.indexOf(pngMagic, TAR_HEADER_SIZE);
-      if (pngStart === -1) {
-        throw new Error('Screenshot capture failed — PNG not found in archive');
+      const fileSize = parseInt(
+        tarBuffer.subarray(124, 136).toString('ascii').replace(/\0/g, '').trim(),
+        8,
+      );
+      if (!fileSize || fileSize <= 0) {
+        throw new Error('Screenshot capture failed — invalid file size in tar header');
       }
 
-      // Find end of PNG (IEND chunk + CRC)
-      const iend = Buffer.from([0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
-      const pngEnd = tarBuffer.indexOf(iend, pngStart);
-      if (pngEnd === -1) {
-        throw new Error('Screenshot capture failed — malformed PNG');
-      }
-
-      const pngBuffer = tarBuffer.subarray(pngStart, pngEnd + iend.length);
+      const pngBuffer = tarBuffer.subarray(TAR_HEADER_SIZE, TAR_HEADER_SIZE + fileSize);
       return pngBuffer.toString('base64');
     } finally {
       // Clean up the temp file inside the container on both success and error.
