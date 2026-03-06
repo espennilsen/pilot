@@ -16,7 +16,7 @@ import { createServer } from 'net';
 import { get as httpGet } from 'http';
 import { IPC } from '../../shared/ipc';
 import { broadcastToRenderer } from '../utils/broadcast';
-import type { DesktopState, DesktopConfig } from '../../shared/types';
+import type { DesktopState, DesktopConfig, DesktopRebuildOptions } from '../../shared/types';
 
 /** Docker image name for the base desktop */
 const DESKTOP_IMAGE = 'pilot-desktop:latest';
@@ -25,7 +25,7 @@ const DESKTOP_IMAGE = 'pilot-desktop:latest';
 const PROJECT_IMAGE_PREFIX = 'pilot-desktop-project-';
 
 /** Default virtual display resolution */
-const DEFAULT_RESOLUTION = '1280x800x24';
+const DEFAULT_RESOLUTION = '1920x1080x24';
 
 /** Max time (ms) to wait for noVNC to become ready after container start */
 const READY_TIMEOUT_MS = 15_000;
@@ -134,7 +134,7 @@ export class DesktopService {
   }
 
   /** Start a desktop container for a project. Restarts a stopped container if one exists. */
-  async startDesktop(projectPath: string): Promise<DesktopState> {
+  async startDesktop(projectPath: string, buildOptions?: DesktopRebuildOptions): Promise<DesktopState> {
     // Already running or starting? Return existing state.
     const existing = this.desktops.get(projectPath);
     if (existing && (existing.status === 'running' || existing.status === 'starting')) {
@@ -182,8 +182,8 @@ export class DesktopService {
       if (signal.aborted) throw new DesktopSupersededError();
 
       // No existing container — create a new one
-      await this.ensureImage();
-      const image = await this.ensureProjectImage(projectPath);
+      await this.ensureImage(buildOptions);
+      const image = await this.ensureProjectImage(projectPath, buildOptions);
 
       // Retry port allocation + container creation to handle TOCTOU races
       // where a port is freed then claimed by another process before Docker binds it.
@@ -372,7 +372,7 @@ export class DesktopService {
    * Stops and removes the existing container, removes the project-specific
    * Docker image (if any), then starts a fresh container from a rebuilt image.
    */
-  async rebuildDesktop(projectPath: string): Promise<DesktopState> {
+  async rebuildDesktop(projectPath: string, options?: DesktopRebuildOptions): Promise<DesktopState> {
     // Cancel any in-flight startDesktop so it doesn't orphan a container
     // by writing state after we've cleared the map entry below.
     this.startAbortControllers.get(projectPath)?.abort();
@@ -398,8 +398,15 @@ export class DesktopService {
       await this.docker.getImage(projectImage).remove({ force: true });
     } catch { /* image may not exist */ }
 
+    // When noCache is set, also remove the base image so it's rebuilt from scratch
+    if (options?.noCache) {
+      try {
+        await this.docker.getImage(DESKTOP_IMAGE).remove({ force: true });
+      } catch { /* image may not exist */ }
+    }
+
     // Start fresh — ensureProjectImage will rebuild from Dockerfile
-    return this.startDesktop(projectPath);
+    return this.startDesktop(projectPath, options);
   }
 
   /** Get current desktop status for a project. Returns null if no desktop. */
@@ -845,13 +852,15 @@ export class DesktopService {
     }
   }
 
-  /** Build the desktop Docker image if it doesn't exist. */
-  private async ensureImage(): Promise<void> {
-    try {
-      await this.docker.getImage(DESKTOP_IMAGE).inspect();
-      return; // Image already exists
-    } catch {
-      // Image doesn't exist — build it
+  /** Build the desktop Docker image if it doesn't exist (or unconditionally with noCache). */
+  private async ensureImage(buildOptions?: DesktopRebuildOptions): Promise<void> {
+    if (!buildOptions?.noCache) {
+      try {
+        await this.docker.getImage(DESKTOP_IMAGE).inspect();
+        return; // Image already exists
+      } catch {
+        // Image doesn't exist — build it
+      }
     }
 
     // Resolve Dockerfile context path
@@ -876,8 +885,8 @@ export class DesktopService {
 
     // Build the image
     const stream = await this.docker.buildImage(
-      { context: contextPath, src: ['Dockerfile', 'entrypoint.sh', 'pilot-vnc.html'] },
-      { t: DESKTOP_IMAGE },
+      { context: contextPath, src: ['Dockerfile', 'entrypoint.sh', 'pilot-vnc.html', 'fluxbox/menu', 'fluxbox/init', 'fluxbox/keys', 'fluxbox/apps', 'fluxbox/wallpaper.png'] },
+      { t: DESKTOP_IMAGE, ...(buildOptions?.noCache && { nocache: true }) },
     );
 
     // Wait for build to complete. followProgress doesn't always surface
@@ -927,7 +936,7 @@ export class DesktopService {
    * The Dockerfile should use `FROM pilot-desktop:latest` as its base.
    * Returns the image tag to use for the container.
    */
-  private async ensureProjectImage(projectPath: string): Promise<string> {
+  private async ensureProjectImage(projectPath: string, buildOptions?: DesktopRebuildOptions): Promise<string> {
     const dockerfilePath = join(projectPath, '.pilot', 'desktop.Dockerfile');
     if (!existsSync(dockerfilePath)) {
       return DESKTOP_IMAGE;
@@ -939,16 +948,21 @@ export class DesktopService {
 
     // Check if we need to rebuild: compare Dockerfile mtime vs image creation time
     const dockerfileMtime = statSync(dockerfilePath).mtimeMs;
-    let needsBuild = true;
+    let needsBuild = !!buildOptions?.noCache;
 
-    try {
-      const imageInfo = await this.docker.getImage(projectImage).inspect();
-      const imageCreated = new Date(imageInfo.Created).getTime();
-      if (imageCreated > dockerfileMtime) {
-        needsBuild = false; // Image is newer than Dockerfile — skip rebuild
+    if (!needsBuild) {
+      try {
+        const imageInfo = await this.docker.getImage(projectImage).inspect();
+        const imageCreated = new Date(imageInfo.Created).getTime();
+        if (imageCreated > dockerfileMtime) {
+          needsBuild = false; // Image is newer than Dockerfile — skip rebuild
+        } else {
+          needsBuild = true;
+        }
+      } catch {
+        // Image doesn't exist — need to build
+        needsBuild = true;
       }
-    } catch {
-      // Image doesn't exist — need to build
     }
 
     if (!needsBuild) {
@@ -963,7 +977,7 @@ export class DesktopService {
     // is intentionally unsupported to avoid sending large trees to the daemon.
     const stream = await this.docker.buildImage(
       { context: projectPath, src: ['.pilot/desktop.Dockerfile'] },
-      { t: projectImage, dockerfile: '.pilot/desktop.Dockerfile' },
+      { t: projectImage, dockerfile: '.pilot/desktop.Dockerfile', ...(buildOptions?.noCache && { nocache: true }) },
     );
 
     await new Promise<void>((resolve, reject) => {

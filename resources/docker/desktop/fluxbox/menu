@@ -1,0 +1,15 @@
+[begin] (Pilot Desktop)
+  [submenu] (Browsers)
+    [exec] (Chromium) {chromium}
+    [exec] (Firefox) {firefox-pw}
+  [end]
+  [submenu] (Terminal)
+    [exec] (XTerm) {xterm}
+  [end]
+  [submenu] (Utilities)
+    [exec] (Image Viewer) {feh --auto-zoom}
+    [exec] (Screenshot to ~/screenshot.png) {scrot ~/screenshot.png --overwrite}
+  [end]
+  [separator]
+  [restart] (Restart Fluxbox)
+[end]

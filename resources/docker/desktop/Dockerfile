@@ -2,7 +2,7 @@ FROM ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:99
-ENV RESOLUTION=1280x800x24
+ENV RESOLUTION=1920x1080x24
 
 # ── Base: virtual display, VNC, window manager, utilities ────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     scrot \
     x11vnc \
     fluxbox \
+    feh \
     xclip \
     novnc \
     websockify \
@@ -19,17 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-# ── Browsers ─────────────────────────────────────────────────────────
-# Chromium (distro package — no snap, works in containers)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium-browser \
-    && rm -rf /var/lib/apt/lists/*
-
-# Firefox
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    firefox \
     && rm -rf /var/lib/apt/lists/*
 
 # Fonts — without these, pages render with missing glyphs
@@ -60,8 +50,32 @@ COPY --from=node:22-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
+# ── Browsers (via Playwright) ────────────────────────────────────────
+# Ubuntu 24.04's chromium-browser and firefox are snap shims that don't
+# work in containers. Playwright bundles real binaries for both and
+# handles all system dependency installation via --with-deps.
+# Installed to /opt/pw-browsers so they're accessible to all users.
+# Wrapper scripts in /usr/local/bin provide convenient shell access.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN npx playwright install --with-deps chromium firefox \
+    && chmod -R o+rx /opt/pw-browsers \
+    && rm -rf /tmp/npx* /tmp/npm*
+
+# Create wrapper scripts that locate the actual binaries
+RUN CHROME_BIN="$(find /opt/pw-browsers -path '*/chrome-linux/chrome' -o -path '*/chrome-linux64/chrome' | head -1)" \
+    && printf '#!/bin/sh\nexec "%s" --no-sandbox --disable-gpu --disable-dev-shm-usage "$@"\n' "$CHROME_BIN" > /usr/local/bin/chromium \
+    && chmod +x /usr/local/bin/chromium \
+    && FF_BIN="$(find /opt/pw-browsers -path '*/firefox/firefox' -type f | head -1)" \
+    && printf '#!/bin/sh\nexec "%s" "$@"\n' "$FF_BIN" > /usr/local/bin/firefox-pw \
+    && chmod +x /usr/local/bin/firefox-pw
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# ── Fluxbox configuration ───────────────────────────────────────────
+# Menu with installed apps and a toolbar. Installed before switching to
+# non-root so we can place files in /etc/skel (inherited by useradd).
+COPY fluxbox/ /etc/skel/.fluxbox/
 
 # Custom noVNC client that accepts VNC credentials via postMessage instead of
 # URL query parameters — keeps the password out of the browser address bar.

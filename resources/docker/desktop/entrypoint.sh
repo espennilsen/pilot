@@ -28,6 +28,10 @@ xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || {
 # failure doesn't bring down the entire container via wait -n.
 while true; do fluxbox; sleep 1; done &
 
+# Set wallpaper in the background — waits for fluxbox without blocking the entrypoint.
+# Disowned so `wait -n` below doesn't catch it as a "crashed" process.
+(sleep 2 && feh --bg-fill ~/.fluxbox/wallpaper.png 2>/dev/null) & disown
+
 # Start VNC server with per-container password authentication.
 # The password is injected via a tmpfs-mounted file at /run/secrets/vnc_password
 # (written by Pilot before container start). This avoids env vars which are
@@ -62,8 +66,8 @@ fi
 websockify --web /usr/share/novnc 6080 localhost:5900 &
 
 echo "Sandbox ready — noVNC on port 6080, VNC on port 5900"
-echo "  Chromium: chromium-browser \$CHROMIUM_FLAGS <url>"
-echo "  Firefox:  firefox <url>"
+echo "  Chromium: chromium <url>"
+echo "  Firefox:  firefox-pw <url>"
 
 # Wait for ANY background process to exit. If Xvfb, x11vnc, or websockify
 # crashes, the container exits immediately instead of continuing in a

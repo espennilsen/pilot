@@ -24,7 +24,7 @@ interface DesktopStore {
   checkDesktopAvailable: () => Promise<boolean>;
   startDesktop: (projectPath: string) => Promise<void>;
   stopDesktop: (projectPath: string) => Promise<void>;
-  rebuildDesktop: (projectPath: string) => Promise<void>;
+  rebuildDesktop: (projectPath: string, options?: { noCache?: boolean }) => Promise<void>;
   loadStatus: (projectPath: string) => Promise<void>;
   setToolsEnabled: (projectPath: string, enabled: boolean) => Promise<void>;
   loadToolsEnabled: (projectPath: string) => Promise<void>;
@@ -108,13 +108,13 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
     }
   },
 
-  rebuildDesktop: async (projectPath: string) => {
+  rebuildDesktop: async (projectPath: string, options?: { noCache?: boolean }) => {
     set(state => ({
       loadingByProject: { ...state.loadingByProject, [projectPath]: true },
       error: null,
     }));
     try {
-      const result = await invoke(IPC.DESKTOP_REBUILD, projectPath) as DesktopState | null;
+      const result = await invoke(IPC.DESKTOP_REBUILD, projectPath, options) as DesktopState | null;
       if (result) {
         set(state => ({
           stateByProject: { ...state.stateByProject, [projectPath]: result },

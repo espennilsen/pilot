@@ -156,6 +156,12 @@ export interface DesktopState {
   toolsWarning?: string;
 }
 
+/** Options for the desktop rebuild flow */
+export interface DesktopRebuildOptions {
+  /** When true, passes --no-cache to the Docker image build */
+  noCache?: boolean;
+}
+
 /** Persisted to <project>/.pilot/desktop.json for startup reconciliation */
 export interface DesktopConfig {
   containerId: string;

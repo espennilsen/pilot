@@ -1,0 +1,67 @@
+! Fluxbox init — optimised for agent-controlled virtual desktop.
+! The agent interacts via xdotool (mouse/keyboard), scrot (screenshots),
+! and xclip (clipboard). Every setting here prioritises predictability,
+! maximum usable screen area, and clean screenshots.
+
+session.menuFile:	~/.fluxbox/menu
+session.keyFile:	~/.fluxbox/keys
+session.appsFile:	~/.fluxbox/apps
+session.configVersion:	13
+
+! ── Style ──────────────────────────────────────────────────────────
+! Dark theme — better contrast for agent screenshot analysis.
+session.styleFile:	/usr/share/fluxbox/styles/ubuntu-dark
+
+! ── Toolbar ────────────────────────────────────────────────────────
+! Auto-hide to maximise usable viewport. Agent doesn't need it visible.
+session.screen0.toolbar.visible:	true
+session.screen0.toolbar.autoHide:	true
+session.screen0.toolbar.placement:	BottomCenter
+session.screen0.toolbar.widthPercent:	100
+session.screen0.toolbar.height:	0
+session.screen0.toolbar.tools:	iconbar, systemtray, clock
+
+! ── Workspaces ─────────────────────────────────────────────────────
+! Single workspace — multiple would confuse the agent.
+session.screen0.workspaces:	1
+session.screen0.workspaceNames:	Desktop,
+
+! ── Focus ──────────────────────────────────────────────────────────
+! Click-to-focus: mouse-follows-focus would cause unexpected switches
+! when xdotool moves the cursor across windows.
+session.screen0.focusModel:	ClickFocus
+session.screen0.autoRaise:	true
+session.screen0.autoRaise.delay:	0
+
+! ── Window behaviour ──────────────────────────────────────────────
+! Opaque move/resize so screenshots mid-interaction are still readable.
+session.screen0.opaqueMove:	true
+session.screen0.opaqueResize:	true
+
+! Disable edge and window snapping — agent needs pixel-accurate
+! programmatic placement via xdotool without snap interference.
+session.screen0.edgeSnapThreshold:	0
+session.screen0.windowSnapThreshold:	0
+
+! New windows placed by the window manager (not randomly) for consistency.
+session.screen0.windowPlacement:	RowSmartPlacement
+session.screen0.rowPlacementDirection:	LeftToRight
+session.screen0.colPlacementDirection:	TopToBottom
+
+! ── Tabs ──────────────────────────────────────────────────────────
+! Disable tab grouping — tabbed windows make screenshots ambiguous.
+session.screen0.tabs.usePixmap:	false
+session.screen0.tabs.maxOver:	false
+session.screen0.tabs.intitlebar:	true
+
+! ── Slit ──────────────────────────────────────────────────────────
+! Not used — hide it.
+session.screen0.slit.autoHide:	true
+
+! ── Misc ──────────────────────────────────────────────────────────
+session.screen0.strftimeFormat:	%H:%M
+session.screen0.allowRemoteActions:	true
+session.screen0.fullMaximization:	true
+session.screen0.maxIgnoreIncrement:	true
+session.screen0.maxDisableMove:	false
+session.screen0.maxDisableResize:	false

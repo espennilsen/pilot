@@ -1,6 +1,7 @@
 /**
  * @file Desktop header — status badge, start/stop/rebuild buttons, agent tools toggle.
  */
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AlertTriangle, ExternalLink, Hammer, Play, Square, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useDesktopStore } from '../../stores/desktop-store';
 import { useTabStore } from '../../stores/tab-store';
@@ -31,16 +32,80 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
   const hasContainer = !!desktopState?.containerId;
   const isBusy = status === 'starting' || status === 'stopping' || isLoading;
 
-  const handleRebuild = () => {
-    const confirmed = window.confirm(
-      'Rebuild desktop?\n\n' +
-      'This will remove the current container and all its state ' +
-      '(installed packages, files, browser data), then rebuild the image from the Dockerfile and start a fresh container.',
-    );
-    if (confirmed) rebuildDesktop(projectPath);
-  };
+  const [showRebuildDialog, setShowRebuildDialog] = useState(false);
+  const [noCache, setNoCache] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  const handleRebuildClick = useCallback(() => {
+    setNoCache(false);
+    setShowRebuildDialog(true);
+  }, []);
+
+  const handleRebuildConfirm = useCallback(() => {
+    setShowRebuildDialog(false);
+    rebuildDesktop(projectPath, noCache ? { noCache: true } : undefined);
+  }, [projectPath, noCache, rebuildDesktop]);
+
+  const handleRebuildCancel = useCallback(() => {
+    setShowRebuildDialog(false);
+  }, []);
+
+  // Close dialog on Escape key
+  useEffect(() => {
+    if (!showRebuildDialog) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowRebuildDialog(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showRebuildDialog]);
 
   return (
+    <>
+    {/* Rebuild confirmation dialog */}
+    {showRebuildDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={handleRebuildCancel}>
+        <div
+          className="bg-bg-elevated border border-border rounded-lg shadow-xl p-4 max-w-sm w-full mx-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-sm font-semibold text-text-primary mb-2">Rebuild desktop?</h3>
+          <p className="text-xs text-text-secondary mb-3">
+            This will remove the current container and all its state
+            (installed packages, files, browser data), then rebuild the image
+            from the Dockerfile and start a fresh container.
+          </p>
+          <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={noCache}
+              onChange={(e) => setNoCache(e.target.checked)}
+              className="rounded border-border accent-accent"
+            />
+            <span className="text-xs text-text-secondary">
+              Build without cache <span className="text-text-tertiary">(slower — re-downloads all packages)</span>
+            </span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={handleRebuildCancel}
+              className="px-3 py-1.5 text-xs font-medium rounded
+                bg-bg-surface text-text-secondary hover:bg-bg-surface/80 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRebuildConfirm}
+              className="px-3 py-1.5 text-xs font-medium rounded
+                bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
+            >
+              Rebuild
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    
     <div className="px-3 py-2 border-b border-border bg-bg-elevated flex items-center justify-between gap-2">
       {/* Status badge */}
       <div className="flex items-center gap-2">
@@ -86,10 +151,10 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
           )}
         </button>
 
-        {/* Rebuild button — destructive, requires confirmation */}
-        {hasContainer && (
+        {/* Rebuild button — show when container exists OR after a failed build */}
+        {(hasContainer || status === 'error') && (
           <button
-            onClick={handleRebuild}
+            onClick={handleRebuildClick}
             disabled={isBusy}
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
               bg-warning/20 text-warning hover:bg-warning/30 transition-colors disabled:opacity-40"
@@ -124,5 +189,6 @@ export default function DesktopHeader({ projectPath }: DesktopHeaderProps) {
         )}
       </div>
     </div>
+    </>
   );
 }

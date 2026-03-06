@@ -128,7 +128,7 @@ Built from `resources/docker/desktop/Dockerfile` on first use. Contains:
 - **Dev tools:** Node.js 22, curl, wget, jq, xterm, net-tools
 - **Ports:** 5900 (VNC), 6080 (noVNC/WebSocket)
 
-Default resolution: `1280×800×24`. Configurable via `RESOLUTION` env var.
+Default resolution: `1920×1080×24`. Configurable via `RESOLUTION` env var.
 
 ### Resource Limits
 

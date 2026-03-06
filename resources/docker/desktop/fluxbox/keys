@@ -1,0 +1,37 @@
+! Fluxbox keys — minimal set for agent-controlled desktop.
+! Only essential bindings kept. Multi-workspace and tab bindings removed
+! since the desktop runs a single workspace with no tab grouping.
+
+! ── Desktop ────────────────────────────────────────────────────────
+OnDesktop Mouse1 :HideMenus
+OnDesktop Mouse3 :RootMenu
+
+! ── Window interaction ─────────────────────────────────────────────
+! Alt + left-click to move, Alt + right-click to resize
+OnWindow Mod1 Mouse1 :MacroCmd {Raise} {Focus} {StartMoving}
+OnWindow Mod1 Mouse3 :MacroCmd {Raise} {Focus} {StartResizing NearestCorner}
+OnWindowBorder Move1 :StartMoving
+OnLeftGrip Move1 :StartResizing bottomleft
+OnRightGrip Move1 :StartResizing bottomright
+
+! Titlebar
+OnTitlebar Mouse1 :MacroCmd {Raise} {Focus} {ActivateTab}
+OnTitlebar Move1 :StartMoving
+OnTitlebar Double Mouse1 :Maximize
+OnTitlebar Mouse3 :WindowMenu
+
+! ── Window management ──────────────────────────────────────────────
+Mod1 F4 :Close
+Mod1 F9 :Minimize
+Mod1 F10 :Maximize
+Mod1 F11 :Fullscreen
+Mod1 space :WindowMenu
+Mod1 Tab :NextWindow {groups} (workspace=[current])
+Mod1 Shift Tab :PrevWindow {groups} (workspace=[current])
+
+! ── Launch ─────────────────────────────────────────────────────────
+Mod1 F1 :Exec xterm
+Mod1 F2 :Exec fbrun
+
+! ── Session ────────────────────────────────────────────────────────
+Control Mod1 Delete :Exit

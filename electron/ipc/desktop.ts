@@ -68,11 +68,14 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
   // service.execInDesktop() directly — no renderer-callable exec handler
   // is needed, and omitting it reduces attack surface.
 
-  ipcMain.handle(IPC.DESKTOP_REBUILD, async (_event, projectPath: unknown) => {
+  ipcMain.handle(IPC.DESKTOP_REBUILD, async (_event, projectPath: unknown, options?: unknown) => {
     if (!service) throw new Error('Docker desktop service is not available');
     const validPath = validateProjectPath(projectPath);
+    const rebuildOptions = (options && typeof options === 'object' && !Array.isArray(options))
+      ? options as { noCache?: boolean }
+      : undefined;
     try {
-      return await service.rebuildDesktop(validPath);
+      return await service.rebuildDesktop(validPath, rebuildOptions);
     } catch (err) {
       // A start raced with this rebuild — return current status instead of
       // surfacing a confusing error in the renderer's desktop store.

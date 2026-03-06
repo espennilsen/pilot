@@ -310,8 +310,8 @@ export function createDesktopTools(
         // as a positional parameter ($1) so it is never parsed as shell syntax —
         // this avoids injection via crafted quote sequences in the URL.
         const script = browser === 'firefox'
-          ? `nohup firefox -- "$1" > /dev/null 2>&1 &`
-          : `nohup chromium-browser --no-sandbox --disable-gpu --disable-dev-shm-usage -- "$1" > /dev/null 2>&1 &`;
+          ? `nohup firefox-pw -- "$1" > /dev/null 2>&1 &`
+          : `nohup chromium -- "$1" > /dev/null 2>&1 &`;
         await service.execInDesktopCmd(projectPath, ['bash', '-c', script, '--', params.url]);
 
         if (wait > 0) {

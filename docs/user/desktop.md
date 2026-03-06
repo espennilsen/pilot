@@ -221,7 +221,7 @@ The base container (`pilot-desktop:latest`) includes:
 | **curl, wget, jq** | Common networking and data tools |
 | **xterm** | Terminal emulator |
 
-Resolution: 1280×800 pixels (configurable).
+Resolution: 1920×1080 pixels (configurable).
 
 Resource limits: 2 GB memory, 2 CPU cores.
 
