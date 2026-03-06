@@ -81,10 +81,11 @@
       // authentication in that case.
       if (parentOrigin !== 'null' && event.origin !== parentOrigin) return;
 
-      // Require a matching one-time token when one was provided. This
-      // authenticates the sender for opaque (file://) origins where origin
-      // comparison is skipped.
-      if (postMessageToken && event.data?.token !== postMessageToken) return;
+      // Require a matching one-time token unconditionally. For opaque
+      // (file://) origins the origin check above is skipped, so the token
+      // is the sole sender-authentication mechanism — it must always be
+      // present and correct.
+      if (!postMessageToken || event.data?.token !== postMessageToken) return;
 
       if (event.data?.type === 'vnc-connect') {
         // Stop retrying once credentials are received.

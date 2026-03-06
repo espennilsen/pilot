@@ -71,7 +71,16 @@ export function registerDesktopIpc(service: DesktopService | null, sessionManage
   ipcMain.handle(IPC.DESKTOP_REBUILD, async (_event, projectPath: unknown) => {
     if (!service) throw new Error('Docker desktop service is not available');
     const validPath = validateProjectPath(projectPath);
-    return service.rebuildDesktop(validPath);
+    try {
+      return await service.rebuildDesktop(validPath);
+    } catch (err) {
+      // A start raced with this rebuild — return current status instead of
+      // surfacing a confusing error in the renderer's desktop store.
+      if (err instanceof Error && err.message.includes('superseded')) {
+        return service.getDesktopStatus(validPath);
+      }
+      throw err;
+    }
   });
 
   ipcMain.handle(IPC.DESKTOP_SCREENSHOT, async (_event, projectPath: unknown) => {

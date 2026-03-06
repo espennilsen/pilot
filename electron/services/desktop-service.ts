@@ -8,9 +8,8 @@
 import Dockerode from 'dockerode';
 import { join, posix, resolve } from 'path';
 import { homedir } from 'os';
-import { isWithinDir } from '../utils/paths';
-import { isWindowsPathSafe } from '../utils/ipc-validation';
-import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, realpathSync } from 'fs';
+import { validateProjectPath } from '../utils/ipc-validation';
+import { existsSync, lstatSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { createHash, randomBytes } from 'crypto';
 import { execFile } from 'child_process';
 import { createServer, createConnection } from 'net';
@@ -613,22 +612,14 @@ export class DesktopService {
 
         // Validate the label value to prevent writes to arbitrary paths
         // from crafted Docker labels (e.g. /etc, C:\Windows).
-        // Uses the same blocklist as validateProjectPath in ipc-validation.ts.
-        // Follow symlinks so a label like ~/projects/evil → /etc is caught.
-        let resolved: string;
-        try { resolved = realpathSync(resolve(projectPath)); } catch { resolved = resolve(projectPath); }
-        if (process.platform === 'win32') {
-          if (!/^[A-Za-z]:\\/.test(resolved) || !isWindowsPathSafe(resolved)) {
-            console.warn(`[Desktop] Removing container with invalid pilot.project label: ${projectPath}`);
-            try { await this.docker.getContainer(containerInfo.Id).remove({ force: true }); } catch { /* best effort */ }
-            continue;
-          }
-        } else {
-          if (!isWithinDir(homedir(), resolved)) {
-            console.warn(`[Desktop] Removing container with suspicious pilot.project label: ${projectPath}`);
-            try { await this.docker.getContainer(containerInfo.Id).remove({ force: true }); } catch { /* best effort */ }
-            continue;
-          }
+        // Reuses validateProjectPath from ipc-validation.ts so both code
+        // paths stay in sync (symlink following, Windows blocklist, etc.).
+        try {
+          validateProjectPath(projectPath);
+        } catch {
+          console.warn(`[Desktop] Removing container with invalid pilot.project label: ${projectPath}`);
+          try { await this.docker.getContainer(containerInfo.Id).remove({ force: true }); } catch { /* best effort */ }
+          continue;
         }
 
         const group = byProject.get(projectPath) ?? [];
