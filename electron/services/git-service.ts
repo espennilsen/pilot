@@ -576,6 +576,13 @@ try {
       }
       throw err;
     } finally {
+      // NOTE: Temp files (including the editor manifest) are deleted here.
+      // If the todo contains an `edit` action, git pauses the rebase and this
+      // process exits — the manifest is gone. When the user later runs
+      // `git rebase --continue`, any subsequent squash step will not find the
+      // manifest, causing the editor script to exit silently and git to
+      // auto-generate the squash message instead of using the user's custom one.
+      // A UI warning is shown when edit + squash/fixup are combined.
       await Promise.all(tmpFiles.map(f => fs.unlink(f).catch(() => {})));
     }
   }

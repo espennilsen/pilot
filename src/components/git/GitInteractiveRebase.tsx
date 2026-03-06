@@ -127,8 +127,8 @@ function EntryRow({
 
   return (
     <div
-      draggable
-      onDragStart={() => onDragStart(index)}
+      draggable={!isSquashMember}
+      onDragStart={isSquashMember ? undefined : () => onDragStart(index)}
       onDragOver={(e) => onDragOver(e, index)}
       onDragEnd={onDragEnd}
       className={`group flex flex-col transition-colors ${
@@ -256,7 +256,7 @@ function SquashGroupMessage({
   // Build default combined message from all group members
   const defaultMessage = group.memberIndices
     .filter(i => entries[i].action !== 'fixup')
-    .map(i => entries[i].message)
+    .map(i => entries[i].newMessage ?? entries[i].message)
     .join('\n\n');
 
   const currentMessage = targetEntry.squashMessage ?? defaultMessage;
@@ -493,6 +493,7 @@ export default function GitInteractiveRebase() {
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
           <span>
             {editCount} commit{editCount !== 1 ? 's' : ''} marked for edit — rebase will pause at {editCount !== 1 ? 'each' : 'that'} commit for you to amend.
+            {squashCount > 0 && ' Custom squash messages after the edit pause may not be applied.'}
           </span>
         </div>
       )}
