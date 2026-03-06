@@ -321,29 +321,28 @@ If nothing worth remembering, respond: {"memories": []}`;
   /**
    * Remove a memory by fuzzy matching its text.
    * Returns the removed text if found, null otherwise.
+   * Uses getMemoryFiles() to stay in sync with the canonical file list.
    */
   async removeMemory(text: string, projectPath: string): Promise<string | null> {
-    const files = [
-      GLOBAL_MEMORY_PATH,
-      path.join(projectPath, '.pilot', 'MEMORY.md'),
+    const memoryFiles = await this.getMemoryFiles(projectPath);
+    const scopes: Array<{ content: string | null; scope: 'global' | 'project' }> = [
+      { content: memoryFiles.global, scope: 'global' },
+      { content: memoryFiles.projectShared, scope: 'project' },
     ];
 
-    for (const filePath of files) {
-      try {
-        let content = await fs.readFile(filePath, 'utf-8');
-        const lines = content.split('\n');
-        const matchIdx = lines.findIndex(line =>
-          line.toLowerCase().includes(text.toLowerCase()) && line.startsWith('- ')
-        );
-        if (matchIdx !== -1) {
-          const removedLine = lines[matchIdx].replace(/^-\s*/, ''); // Strip bullet prefix
-          lines.splice(matchIdx, 1);
-          await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
-          return removedLine;
-        }
-      } catch {
-        /* Expected: memory file may not exist during remove */
-        continue;
+    for (const { content, scope } of scopes) {
+      if (!content) continue;
+
+      const lines = content.split('\n');
+      const matchIdx = lines.findIndex(line =>
+        line.toLowerCase().includes(text.toLowerCase()) && line.startsWith('- ')
+      );
+      if (matchIdx !== -1) {
+        const removedLine = lines[matchIdx].replace(/^-\s*/, ''); // Strip bullet prefix
+        lines.splice(matchIdx, 1);
+        const filePath = this.resolveFilePath(scope, projectPath);
+        await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+        return removedLine;
       }
     }
     return null;

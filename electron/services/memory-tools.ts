@@ -193,11 +193,11 @@ export function createMemoryTools(
   const memorySearch: ToolDefinition = {
     name: 'pilot_memory_search',
     label: 'Memory',
-    description: `Search memories by keyword or phrase without reading all entries.
+    description: `Search memories by keyword or phrase, returning only matching entries rather than the full memory file contents.
 
 **When to use:**
-- Looking for a specific fact without loading all memories
-- Checking if something is already remembered (lighter than full read)
+- Looking for a specific fact without wading through all memories
+- Checking if something is already remembered before adding
 - Finding memories related to a specific topic or keyword
 
 **Returns:** Matching entries with scope and category context.`,
@@ -211,6 +211,9 @@ export function createMemoryTools(
       ),
     }),
     execute: async (_toolCallId, params) => {
+      if (!params.query.trim()) {
+        return 'Please provide a non-empty search query. Use pilot_memory_read to see all memories.';
+      }
       const scope = params.scope ?? 'all';
       const results = await memoryManager.searchMemories(params.query, projectPath, scope);
 
