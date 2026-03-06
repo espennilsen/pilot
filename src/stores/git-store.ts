@@ -2,7 +2,7 @@
  * @file Git store — manages git operations, status, branches, commits, blame, and diffs.
  */
 import { create } from 'zustand';
-import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions, ConflictFile, GitOperationResult } from '../../shared/types';
+import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions, ConflictFile, GitOperationResult, RebaseTodoEntry, InteractiveRebaseRequest } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
@@ -24,6 +24,11 @@ interface GitStore {
   // Conflict resolution state
   conflictedFiles: ConflictFile[];
   isConflictLoading: boolean;
+
+  // Interactive rebase state
+  interactiveRebaseEntries: RebaseTodoEntry[];
+  interactiveRebaseOnto: string | null;
+  isInteractiveRebasePreparing: boolean;
 
   // Actions
   initGit: (projectPath: string) => Promise<void>;
@@ -57,6 +62,12 @@ interface GitStore {
   abortOperation: () => Promise<void>;
   continueOperation: () => Promise<GitOperationResult>;
   skipCommit: () => Promise<GitOperationResult>;
+
+  // Interactive rebase actions
+  prepareInteractiveRebase: (onto: string) => Promise<void>;
+  updateInteractiveRebaseEntries: (entries: RebaseTodoEntry[]) => void;
+  executeInteractiveRebase: () => Promise<GitOperationResult>;
+  cancelInteractiveRebase: () => void;
 }
 
 /**
@@ -78,6 +89,9 @@ export const useGitStore = create<GitStore>((set, get) => ({
   currentProjectPath: null,
   conflictedFiles: [],
   isConflictLoading: false,
+  interactiveRebaseEntries: [],
+  interactiveRebaseOnto: null,
+  isInteractiveRebasePreparing: false,
 
   initGit: async (projectPath: string) => {
     set({ isLoading: true, error: null, currentProjectPath: projectPath });
@@ -500,5 +514,63 @@ export const useGitStore = create<GitStore>((set, get) => ({
       set({ error: String(error), isLoading: false });
       return { success: false, conflicts: [], message: String(error) };
     }
+  },
+
+  // ── Interactive Rebase ──────────────────────────────────────────────
+
+  prepareInteractiveRebase: async (onto: string) => {
+    set({ isInteractiveRebasePreparing: true, error: null });
+    try {
+      const entries = await invoke(IPC.GIT_INTERACTIVE_REBASE_PREPARE, onto) as RebaseTodoEntry[];
+      set({
+        interactiveRebaseEntries: entries,
+        interactiveRebaseOnto: onto,
+        isInteractiveRebasePreparing: false,
+      });
+    } catch (error) {
+      set({ error: String(error), isInteractiveRebasePreparing: false });
+    }
+  },
+
+  updateInteractiveRebaseEntries: (entries: RebaseTodoEntry[]) => {
+    set({ interactiveRebaseEntries: entries });
+  },
+
+  executeInteractiveRebase: async () => {
+    const { interactiveRebaseOnto, interactiveRebaseEntries } = get();
+    if (!interactiveRebaseOnto || interactiveRebaseEntries.length === 0) {
+      return { success: false, conflicts: [], message: 'No interactive rebase prepared' };
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const request: InteractiveRebaseRequest = {
+        onto: interactiveRebaseOnto,
+        entries: interactiveRebaseEntries,
+      };
+      const result = await invoke(IPC.GIT_INTERACTIVE_REBASE_EXECUTE, request) as GitOperationResult;
+
+      if (result.success) {
+        // Clear interactive rebase state on success
+        set({
+          interactiveRebaseEntries: [],
+          interactiveRebaseOnto: null,
+        });
+      } else {
+        // Conflicts — load them for the conflict UI
+        await get().loadConflicts();
+      }
+      return result;
+    } catch (error) {
+      set({ error: String(error), isLoading: false });
+      return { success: false, conflicts: [], message: String(error) };
+    }
+  },
+
+  cancelInteractiveRebase: () => {
+    set({
+      interactiveRebaseEntries: [],
+      interactiveRebaseOnto: null,
+    });
   },
 }));

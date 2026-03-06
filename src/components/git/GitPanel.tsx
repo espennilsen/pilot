@@ -9,16 +9,18 @@ import GitCommitLog from './GitCommitLog';
 import GitStash from './GitStash';
 import GitConflictBanner from './GitConflictBanner';
 import GitConflictsList from './GitConflictsList';
+import GitInteractiveRebase from './GitInteractiveRebase';
 import type { ConflictFile } from '../../../shared/types';
 
 type GitView = 'status' | 'history' | 'stash';
 
 export default function GitPanel() {
   const { projectPath } = useProjectStore();
-  const { isAvailable, isRepo, status, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, loadConflicts, conflictedFiles, isLoading, error } = useGitStore();
+  const { isAvailable, isRepo, status, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, loadConflicts, conflictedFiles, interactiveRebaseEntries, isLoading, error } = useGitStore();
   const [currentView, setCurrentView] = useState<GitView>('status');
 
   const hasConflicts = (status?.operationInProgress != null) || (status?.conflicted?.length ?? 0) > 0;
+  const isInteractiveRebaseActive = interactiveRebaseEntries.length > 0;
 
   // Initialize git when project changes
   useEffect(() => {
@@ -186,17 +188,24 @@ export default function GitPanel() {
 
       {/* Content - scrollable */}
       <div className="flex-1 overflow-hidden">
-        {currentView === 'status' && (
-          <div className="h-full overflow-y-auto p-3 space-y-3">
-            {hasConflicts && <GitConflictBanner />}
-            {hasConflicts && <GitConflictsList onAskAgent={handleAskAgent} />}
-            <GitStatus />
-            <GitBranches />
-            {!hasConflicts && <GitCommitInput />}
-          </div>
+        {/* Interactive rebase editor takes over when active */}
+        {isInteractiveRebaseActive ? (
+          <GitInteractiveRebase />
+        ) : (
+          <>
+            {currentView === 'status' && (
+              <div className="h-full overflow-y-auto p-3 space-y-3">
+                {hasConflicts && <GitConflictBanner />}
+                {hasConflicts && <GitConflictsList onAskAgent={handleAskAgent} />}
+                <GitStatus />
+                <GitBranches />
+                {!hasConflicts && <GitCommitInput />}
+              </div>
+            )}
+            {currentView === 'history' && <GitCommitLog />}
+            {currentView === 'stash' && <GitStash />}
+          </>
         )}
-        {currentView === 'history' && <GitCommitLog />}
-        {currentView === 'stash' && <GitStash />}
       </div>
     </div>
   );

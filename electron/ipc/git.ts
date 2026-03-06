@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import { GitService } from '../services/git-service';
 import { broadcastToRenderer } from '../utils/broadcast';
-import type { GitLogOptions, GitStatusChangedPayload } from '../../shared/types';
+import type { GitLogOptions, GitStatusChangedPayload, InteractiveRebaseRequest } from '../../shared/types';
 
 /** Notify all renderer windows + companion clients that git status changed. */
 function pushStatusChanged(projectPath?: string, branchChanged?: boolean): void {
@@ -164,5 +164,17 @@ export function registerGitIpc() {
   ipcMain.handle(IPC.GIT_RESOLVE_CONFLICT_STRATEGY, async (_event, filePath: string, strategy: 'ours' | 'theirs' | 'mark-resolved', projectPath?: string) => {
     await getGitService(projectPath).resolveConflictWithStrategy(filePath, strategy);
     pushStatusChanged(projectPath);
+  });
+
+  // ── Interactive Rebase ──────────────────────────────────────────────
+
+  ipcMain.handle(IPC.GIT_INTERACTIVE_REBASE_PREPARE, async (_event, onto: string, projectPath?: string) => {
+    return getGitService(projectPath).prepareInteractiveRebase(onto);
+  });
+
+  ipcMain.handle(IPC.GIT_INTERACTIVE_REBASE_EXECUTE, async (_event, request: InteractiveRebaseRequest, projectPath?: string) => {
+    const result = await getGitService(projectPath).executeInteractiveRebase(request);
+    pushStatusChanged(projectPath, true);
+    return result;
   });
 }

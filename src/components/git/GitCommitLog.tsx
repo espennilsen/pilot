@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Clock, User } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Clock, User, GitBranch } from 'lucide-react';
 import { useGitStore } from '../../stores/git-store';
 
 export default function GitCommitLog() {
-  const { commitLog, loadCommitLog, isLoading } = useGitStore();
+  const { commitLog, loadCommitLog, prepareInteractiveRebase, isInteractiveRebasePreparing, isLoading } = useGitStore();
   const [maxCount, setMaxCount] = useState(50);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; commitHash: string } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadCommitLog({ maxCount });
@@ -60,6 +62,28 @@ export default function GitCommitLog() {
     setMaxCount((prev) => prev + 50);
   };
 
+  const handleContextMenu = (e: React.MouseEvent, commitHash: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, commitHash });
+  };
+
+  const handleInteractiveRebase = async (commitHash: string) => {
+    setContextMenu(null);
+    await prepareInteractiveRebase(commitHash);
+  };
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [contextMenu]);
+
   if (commitLog.length === 0 && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
@@ -81,7 +105,8 @@ export default function GitCommitLog() {
         {commitLog.map((commit, idx) => (
           <div
             key={commit.hash}
-            className="px-2 py-1.5 hover:bg-bg-elevated border-b border-border/30 transition-colors"
+            className="px-2 py-1.5 hover:bg-bg-elevated border-b border-border/30 transition-colors cursor-context-menu"
+            onContextMenu={(e) => handleContextMenu(e, commit.hash)}
           >
             <div className="flex items-start gap-2">
               {/* Graph dot */}
@@ -138,6 +163,24 @@ export default function GitCommitLog() {
           </div>
         )}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 bg-bg-elevated border border-border rounded-md shadow-lg py-1 min-w-[200px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => handleInteractiveRebase(contextMenu.commitHash)}
+            disabled={isInteractiveRebasePreparing}
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-bg-surface flex items-center gap-2 disabled:opacity-50"
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            {isInteractiveRebasePreparing ? 'Loading…' : 'Interactive rebase from here…'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

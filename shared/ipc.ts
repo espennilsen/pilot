@@ -120,6 +120,8 @@ export const IPC = {
   GIT_RESOLVE_FILE: 'git:resolve-file',
   GIT_SKIP_COMMIT: 'git:skip-commit',
   GIT_RESOLVE_CONFLICT_STRATEGY: 'git:resolve-conflict-strategy',
+  GIT_INTERACTIVE_REBASE_PREPARE: 'git:interactive-rebase-prepare', // get todo list for a range
+  GIT_INTERACTIVE_REBASE_EXECUTE: 'git:interactive-rebase-execute', // run the interactive rebase
   GIT_STATUS_CHANGED: 'git:status-changed',                       // main → renderer push
 
   // Dev commands

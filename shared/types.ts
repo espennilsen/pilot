@@ -259,6 +259,42 @@ export interface GitOperationResult {
   message: string;
 }
 
+// ── Interactive Rebase ───────────────────────────────────────────────
+export type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
+
+export interface RebaseTodoEntry {
+  /** The commit hash (short or full) */
+  hash: string;
+  /** Short hash for display */
+  hashShort: string;
+  /** The action to perform on this commit */
+  action: RebaseAction;
+  /** Original commit message */
+  message: string;
+  /** Author name */
+  author: string;
+  /** Commit timestamp */
+  date: number;
+  /** New message for reword action (set by user before executing) */
+  newMessage?: string;
+}
+
+export interface InteractiveRebaseRequest {
+  /** The upstream ref (commit/branch) to rebase onto — commits after this are included */
+  onto: string;
+  /** Ordered list of commits with their actions */
+  entries: RebaseTodoEntry[];
+}
+
+export interface InteractiveRebaseState {
+  /** Whether an interactive rebase is currently being prepared (not yet executed) */
+  isPreparing: boolean;
+  /** The upstream ref being rebased onto */
+  onto: string | null;
+  /** The todo list being edited */
+  entries: RebaseTodoEntry[];
+}
+
 export interface GitFileChange {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'renamed' | 'copied';
