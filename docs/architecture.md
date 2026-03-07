@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-02-24
+> Last updated: 2026-03-06
 
 Pilot is an Electron desktop app with strict three-process isolation. The **main process** owns all business logic; the **renderer** is a pure React app with no Node.js access; a **preload script** bridges them. All inter-process calls use typed IPC channels. The same renderer code also runs in a remote browser via a WebSocket-based companion mode.
 
@@ -11,8 +11,15 @@ Pilot is an Electron desktop app with strict three-process isolation. The **main
 | `PilotSessionManager` | `electron/services/pi-session-manager.ts` | SDK `AgentSession` lifecycle per tab; forwards SDK events to renderer |
 | `SandboxedTools` | `electron/services/sandboxed-tools.ts` | Wraps SDK file tools; stages diffs instead of writing directly to disk |
 | `StagedDiffManager` | `electron/services/staged-diffs.ts` | In-memory store of pending diffs; applies or discards on user decision |
-| `GitService` | `electron/services/git-service.ts` | `simple-git` wrapper; one instance per active project |
+| `GitService` | `electron/services/git-service.ts` | `simple-git` wrapper; status, commit, branch, rebase, conflict resolution |
 | `MemoryManager` | `electron/services/memory-manager.ts` | Reads/writes two-tier MEMORY.md; builds system prompt injection |
+| `MemoryTools` | `electron/services/memory-tools.ts` | Agent tools for memory CRUD (read, write, search, delete by category) |
+| `DesktopService` | `electron/services/desktop-service.ts` | Docker container lifecycle for virtual display (Xvfb + Fluxbox + noVNC) |
+| `DesktopTools` | `electron/services/desktop-tools.ts` | Agent tools: screenshot, click, type, scroll, clipboard, window management |
+| `EditorTools` | `electron/services/editor-tools.ts` | Agent tools: `pilot_show_file`, `pilot_open_url`, `pilot_web` |
+| `McpManager` | `electron/services/mcp-manager.ts` | MCP server connections; tool discovery; auto-reconnect with backoff |
+| `McpConfig` | `electron/services/mcp-config.ts` | Global + per-project MCP server config persistence |
+| `McpToolBridge` | `electron/services/mcp-tool-bridge.ts` | Converts MCP tools to Pi SDK `ToolDefinition` format |
 | `DevCommandsService` | `electron/services/dev-commands.ts` | Spawns child processes for dev commands; streams stdout/stderr to renderer |
 | `TerminalService` | `electron/services/terminal-service.ts` | `node-pty` PTY management |
 | `ExtensionManager` | `electron/services/extension-manager.ts` | Extension/skill discovery, enable/disable on disk |
@@ -26,7 +33,10 @@ Pilot is an Electron desktop app with strict three-process isolation. The **main
 | IPC Client | `src/lib/ipc-client.ts` | Dual-mode: `window.api` in Electron, WebSocket in companion browser |
 | Chat Store | `src/stores/chat-store.ts` | Messages per tab, streaming tokens, model info |
 | Sandbox Store | `src/stores/sandbox-store.ts` | Staged diffs per tab, yolo mode flag |
-| Tab Store | `src/stores/tab-store.ts` | Tab list, active tab, closed-tab stack |
+| Tab Store | `src/stores/tab-store.ts` | Tab list, active tab, closed-tab stack, web/desktop tabs |
+| Desktop Store | `src/stores/desktop-store.ts` | Desktop container state, VNC connection, screenshots |
+| MCP Store | `src/stores/mcp-store.ts` | MCP server statuses, tool lists, configuration |
+| Git Store | `src/stores/git-store.ts` | Git status, branches, log, blame, stashes, conflicts, rebase state |
 
 ## Data Flow
 
@@ -69,13 +79,61 @@ User rejects:
     → StagedDiffManager.rejectDiff(tabId, diffId)  →  no disk write
 ```
 
-### Agent File Write (Yolo Mode)
+### Desktop Virtual Display
 
 ```
-Agent decides to write/edit a file
-  → SandboxedTools.handleWrite(filePath, content)
-    → yoloMode === true → writes directly to disk
-      → no diff shown, no user confirmation
+User enables Desktop in settings
+  → window.api.invoke(IPC.DESKTOP_START, { projectPath })
+    → DesktopService.start(projectPath)
+      → Pulls/builds Docker image
+      → Starts container (Xvfb + Fluxbox + x11vnc + noVNC)
+      → Waits for noVNC readiness
+      → Broadcasts DESKTOP_EVENT with state { status: 'running', novncUrl, ... }
+        → useDesktopEvents hook → desktopStore updated
+          → DesktopViewer renders noVNC iframe
+
+Agent uses desktop tools:
+  → pilot_desktop_screenshot → scrot inside container → base64 image
+  → pilot_desktop_click/type/scroll → xdotool commands inside container
+  → pilot_desktop_browser → launches browser in container
+```
+
+### MCP Tool Integration
+
+```
+User adds MCP server in settings
+  → window.api.invoke(IPC.MCP_ADD_SERVER, config)
+    → McpConfig persists to mcp-servers.json
+    → McpManager.startServer(config)
+      → Creates MCP Client with stdio/SSE/HTTP transport
+      → Discovers tools via listTools()
+      → McpToolBridge converts to Pi SDK ToolDefinition[]
+      → Broadcasts MCP_SERVER_STATUS to renderer
+        → useMcpEvents hook → mcpStore updated
+
+Agent uses MCP tool:
+  → PilotSessionManager has MCP tools registered in session
+  → SDK calls tool.execute()
+    → McpToolBridge routes to MCP Client.callTool()
+      → MCP server processes request
+    ← Returns result to SDK
+```
+
+### Git Conflict Resolution
+
+```
+Git merge/rebase encounters conflicts
+  → GitService detects conflict state
+  → Broadcasts GIT_STATUS_CHANGED with conflict files
+    → useGitStatusEvents hook → gitStore updated with conflict list
+      → Conflict resolution UI shown
+
+AI-assisted resolution:
+  → window.api.invoke(IPC.GIT_RESOLVE_CONFLICT_STRATEGY, { tabId, filePath, strategy })
+    → PilotSessionManager sends conflict context to agent
+    → Agent produces resolved content
+    → GitService.resolveFile(filePath, resolvedContent)
+      → Marks file as resolved
 ```
 
 ### Push Event (Main → Renderer)
@@ -130,6 +188,12 @@ Companion browser loads companion UI bundle
 - **Where**: `electron/services/sandboxed-tools.ts` (interception), `electron/services/staged-diffs.ts` (storage), `src/stores/sandbox-store.ts` (renderer state), `src/components/sandbox/` (UI).
 - **Why it matters**: Core safety guarantee — the agent cannot write files without explicit user approval (unless yolo mode is on).
 
+### Agent Tool Registration
+
+- **What**: Agent tools are registered per-session during session creation. Custom tools (memory, desktop, editor, MCP) are added alongside SDK built-in tools.
+- **Where**: `pi-session-config.ts` (assembly), `memory-tools.ts`, `desktop-tools.ts`, `editor-tools.ts`, `mcp-tool-bridge.ts` (tool definitions).
+- **Why it matters**: Tools define what the agent can do. Adding a new tool means creating a `ToolDefinition` and registering it in session config.
+
 ### Service Injection Pattern
 
 - **What**: All services are instantiated once in `electron/main/index.ts` and injected into IPC handler registration functions.
@@ -145,12 +209,15 @@ Companion browser loads companion UI bundle
 | `nodeIntegration` | `false` | Node.js disabled in renderer |
 | Project Jail | enforced in `SandboxedTools` | Agent cannot write outside project root |
 | Companion TLS | self-signed cert + fingerprint pinning | Companion connection is encrypted |
+| Docker isolation | `DesktopService` | Virtual display runs in isolated container |
 
 ## External Dependencies
 
 | Dependency | Purpose | Integration Point |
 |-----------|---------|-------------------|
 | `@mariozechner/pi-coding-agent` | AI agent SDK (sessions, tools, streaming) | `electron/services/pi-session-manager.ts` |
+| `@modelcontextprotocol/sdk` | MCP client (stdio, SSE, HTTP transports) | `electron/services/mcp-manager.ts` |
+| `dockerode` | Docker container management | `electron/services/desktop-service.ts` |
 | `simple-git` | Git operations | `electron/services/git-service.ts` |
 | `node-pty` | PTY terminal emulation | `electron/services/terminal-service.ts` |
 | `@xterm/xterm` | Terminal UI rendering | `src/components/terminal/` |
@@ -163,6 +230,7 @@ Companion browser loads companion UI bundle
 | `gray-matter` | Frontmatter parsing in memory/prompt files | `electron/services/memory-manager.ts` |
 | `adm-zip` | Extension/skill ZIP import | `electron/services/extension-manager.ts` |
 | `diff` | Diff computation for staged diffs | `electron/services/staged-diffs.ts` |
+| `@sinclair/typebox` | JSON Schema for tool parameter definitions | `electron/services/*-tools.ts` |
 
 ## Architectural Decisions
 
@@ -171,7 +239,11 @@ Companion browser loads companion UI bundle
 - **Push events go to all windows**: `BrowserWindow.getAllWindows().forEach(...)` is used everywhere to support multi-window and companion forwarding.
 - **Companion is a first-class citizen**: Every main→renderer push event is automatically forwarded to companion clients via `CompanionIpcBridge`, so no special companion-only code paths are needed for event delivery.
 - **Session metadata is separate from session files**: Pinned/archived/title metadata lives in `session-metadata.json` so it survives session file deletion.
+- **Agent tools are registered per-session**: Each session gets its own tool set based on project context (MCP servers, desktop availability, etc.).
+- **MCP servers are reference-counted**: Multiple tabs sharing a project share a single MCP connection with reference counting for cleanup.
+- **Desktop containers are project-scoped**: One Docker container per project, shared across all tabs in that project.
 
 ## Changes Log
 
+- 2026-03-06: Added Desktop, MCP, editor tools, memory tools, git conflict/rebase flows, agent tool registration pattern
 - 2026-02-24: Initial documentation generated

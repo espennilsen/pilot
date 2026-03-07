@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-02-24
+> Last updated: 2026-03-06
 
 This directory contains both AI-readable reference docs (UPPERCASE files) and developer-authored deep-dives (lowercase files). Start with OVERVIEW.md for a high-level understanding.
 
@@ -23,7 +23,7 @@ This directory contains both AI-readable reference docs (UPPERCASE files) and de
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Component map, data flows, key abstractions, security model |
 | [DATA_MODEL.md](DATA_MODEL.md) | Core types, IPC types, file-based persistence summary |
 | [CONFIGURATION.md](CONFIGURATION.md) | All config files, keys, defaults, and file locations |
-| [PATTERNS.md](PATTERNS.md) | IPC conventions, Zustand rules, error handling, cross-platform |
+| [PATTERNS.md](PATTERNS.md) | IPC conventions, Zustand rules, error handling, cross-platform, agent tools |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, build, adding features, debugging, checklist |
 | [ROADMAP.md](ROADMAP.md) | What's in progress, planned post-MVP, and recently completed |
 | [GLOSSARY.md](GLOSSARY.md) | Definitions for all domain-specific and project-specific terms |
@@ -60,5 +60,6 @@ This directory contains both AI-readable reference docs (UPPERCASE files) and de
 
 ## Changes Log
 
+- 2026-03-06: Updated all AI-readable reference docs for Desktop, MCP, interactive rebase, memory tools, editor tools, web tabs, theme support
 - 2026-02-24: Added Desktop feature documentation (desktop.md, user/desktop.md)
 - 2026-02-24: Initial documentation generated

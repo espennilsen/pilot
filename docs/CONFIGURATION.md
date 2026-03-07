@@ -1,6 +1,6 @@
 # Configuration
 
-> Last updated: 2026-02-24
+> Last updated: 2026-03-06
 
 Pilot has no `.env` files. All configuration is stored in JSON files on disk. There are three layers: **app-level** (user preferences, `<PILOT_DIR>/app-settings.json`), **SDK-level** (Pi agent config, `<PILOT_DIR>/config.json`), and **project-level** (per-project settings, `<project>/.pilot/settings.json`).
 
@@ -21,6 +21,7 @@ Managed by `electron/services/app-settings.ts`. Read/written via `APP_SETTINGS_G
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `piAgentDir` | `string` | `<PILOT_DIR>` | Base directory for SDK data (sessions, models, auth) |
+| `theme` | `ThemeMode` | `'dark'` | App colour theme: `'dark'`, `'light'`, or `'system'` |
 | `terminalApp` | `string \| null` | `null` | External terminal app CLI. `null` = system default |
 | `editorCli` | `string \| null` | `null` | External editor CLI (`code`, `cursor`, `vim`, etc.). `null` = auto-detect |
 | `onboardingComplete` | `boolean` | `false` | Set to `true` after first-launch wizard |
@@ -56,6 +57,32 @@ Managed by `electron/services/project-settings.ts`. Read/written via `SETTINGS_G
 | `jail.enabled` | `boolean` | `true` | Enforce project file jail (block writes outside project root) |
 | `jail.allowedPaths` | `string[]` | `[]` | Absolute paths outside project root the agent is allowed to write |
 | `yoloMode` | `boolean` | `false` | Skip diff review; agent writes go directly to disk |
+
+## MCP Server Config (`mcp-servers.json`)
+
+Managed by `electron/services/mcp-config.ts`. Exists at two levels:
+
+- **Global**: `<PILOT_DIR>/mcp-servers.json` — servers available to all projects
+- **Project**: `<project>/.pilot/mcp-servers.json` — servers specific to one project
+
+Merged at runtime with project config taking precedence. Read/written via `MCP_LIST_SERVERS` / `MCP_ADD_SERVER` / `MCP_UPDATE_SERVER` / `MCP_REMOVE_SERVER` IPC channels.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique server ID |
+| `name` | `string` | Human-readable name |
+| `transport` | `'stdio' \| 'sse' \| 'streamable-http'` | Connection transport |
+| `command` | `string \| undefined` | Shell command (stdio only) |
+| `args` | `string[] \| undefined` | Command arguments (stdio only) |
+| `url` | `string \| undefined` | Server URL (SSE/HTTP only) |
+| `env` | `Record<string, string> \| undefined` | Environment variables |
+| `enabled` | `boolean` | Whether the server is active |
+| `autoStart` | `boolean \| undefined` | Start when project opens |
+| `scope` | `'global' \| 'project'` | Config scope |
+
+## Desktop Config (`<project>/.pilot/desktop/`)
+
+Optional project-specific Docker customisation. If a `Dockerfile` exists in this directory, the desktop service builds a project-specific image with those customisations layered on top of the base `pilot-desktop:latest` image.
 
 ## Dev Commands (`<project>/.pilot/commands.json`)
 
@@ -101,4 +128,5 @@ Auto-saved (debounced 500ms) by `useWorkspacePersistence` hook. Contains the ful
 
 ## Changes Log
 
+- 2026-03-06: Added MCP server config, Desktop config, theme setting, ThemeMode type
 - 2026-02-24: Initial documentation generated

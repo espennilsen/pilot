@@ -1,6 +1,6 @@
 # Patterns & Conventions
 
-> Last updated: 2026-02-24
+> Last updated: 2026-03-06
 
 Pilot is an Electron + React + TypeScript app with strict process isolation. The patterns below are enforced throughout the codebase and must be followed when adding new code.
 
@@ -15,8 +15,10 @@ Pilot is an Electron + React + TypeScript app with strict process isolation. The
 | Zustand stores | `camelCase` hook, `PascalCase` interface | `useTabStore`, `TabStore` |
 | Store files | `<domain>-store.ts` | `src/stores/tab-store.ts` |
 | React hooks | `use<Domain>` | `useAgentSession` |
-| Component folders | `kebab-case`, domain-named | `src/components/diff-review/` |
+| Component folders | `kebab-case`, domain-named | `src/components/sandbox/` |
 | Shared types | `PascalCase` interface | `StagedDiff`, `SessionMetadata` |
+| Agent tools | `snake_case` with `pilot_` prefix | `pilot_show_file`, `pilot_desktop_screenshot` |
+| Tool definition files | `<domain>-tools.ts` | `electron/services/memory-tools.ts` |
 
 ## IPC Pattern
 
@@ -42,16 +44,14 @@ const createTab = useTabStore(state => state.createTab);
 
 ## Push Events
 
-Main → renderer push events use `BrowserWindow.getAllWindows().forEach(...)` (never assume a single window):
+Main → renderer push events use `broadcastToRenderer()` from `electron/utils/broadcast.ts` (which iterates `BrowserWindow.getAllWindows()`):
 
 ```typescript
 // electron/services/my-service.ts
-import { BrowserWindow } from 'electron';
+import { broadcastToRenderer } from '../utils/broadcast';
 import { IPC } from '../../shared/ipc';
 
-BrowserWindow.getAllWindows().forEach(win => {
-  win.webContents.send(IPC.MY_EVENT, payload);
-});
+broadcastToRenderer(IPC.MY_EVENT, payload);
 ```
 
 In the renderer, always return the unsubscribe function from `useEffect`:
@@ -109,9 +109,7 @@ export class MyService {
 
   // Emit events for async results — don't return promises from event-driven flows
   private notifyRenderer(payload: MyPayload) {
-    BrowserWindow.getAllWindows().forEach(win =>
-      win.webContents.send(IPC.MY_EVENT, payload)
-    );
+    broadcastToRenderer(IPC.MY_EVENT, payload);
   }
 }
 ```
@@ -125,6 +123,34 @@ registerAgentIpc(sessionManager);
 registerMemoryIpc(memManager);
 ```
 
+## Agent Tool Pattern
+
+Agent tools follow a consistent pattern using `@sinclair/typebox` for parameter schemas and the Pi SDK's `ToolDefinition` interface:
+
+```typescript
+import { Type } from '@sinclair/typebox';
+import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
+
+const myTool: ToolDefinition = {
+  name: 'pilot_my_tool',
+  label: 'MyDomain',          // shown in UI as the tool source
+  description: '...',          // LLM sees this to decide when to use the tool
+  parameters: Type.Object({
+    arg1: Type.String({ description: '...' }),
+    arg2: Type.Optional(Type.Number({ description: '...' })),
+  }),
+  execute: async (_toolCallId, params) => {
+    // ... perform the operation ...
+    return {
+      content: [{ type: 'text' as const, text: 'Result message' }],
+      details: {},
+    };
+  },
+};
+```
+
+Tools are created per-session in factory functions and registered during session configuration in `pi-session-config.ts`.
+
 ## Error Handling
 
 - **IPC handlers**: `throw` on failure — Electron serializes the error; renderer receives a rejected Promise. Catch at the call site.
@@ -136,13 +162,10 @@ registerMemoryIpc(memManager);
 All file paths in IPC handlers must be validated before touching disk:
 
 ```typescript
-import { resolve, relative } from 'path';
+import { validateProjectPath } from '../utils/ipc-validation';
 
-function isWithinProject(filePath: string, projectRoot: string): boolean {
-  const resolved = resolve(projectRoot, filePath);
-  const rel = relative(projectRoot, resolved);
-  return !rel.startsWith('..') && !resolve(filePath).startsWith('/');
-}
+// Throws if path escapes project root
+validateProjectPath(filePath, projectRoot);
 ```
 
 Follow the pattern in `electron/services/sandboxed-tools.ts`. Use `execFile`/`spawn` with argument arrays — never `exec` with interpolated strings.
@@ -177,4 +200,5 @@ Every user-facing feature must consider companion impact:
 
 ## Changes Log
 
+- 2026-03-06: Added agent tool pattern, broadcastToRenderer helper, tool naming conventions, validateProjectPath pattern
 - 2026-02-24: Initial documentation generated
