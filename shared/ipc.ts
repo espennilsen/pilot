@@ -198,6 +198,8 @@ export const IPC = {
   TASKS_CHANGED: 'tasks:changed',           // main → renderer
   TASKS_SHOW_PANEL: 'tasks:show-panel',     // main → renderer
   TASKS_SHOW_CREATE: 'tasks:show-create',   // main → renderer
+  TASKS_APPROVE: 'tasks:approve',           // approve a task in review (spawns background td session)
+  TASKS_REJECT: 'tasks:reject',             // reject a task in review (spawns background td session)
 
   // Prompts
   PROMPTS_GET_ALL: 'prompts:get-all',

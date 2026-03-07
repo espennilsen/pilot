@@ -536,6 +536,13 @@ export interface TaskDependencyChain {
   dependents: TaskItem[];
 }
 
+/** Result of a task review operation (approve or reject via td CLI). */
+export interface TaskReviewResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
 // ─── Prompt Library ──────────────────────────────────────────────────────
 
 export interface CommandConflict {

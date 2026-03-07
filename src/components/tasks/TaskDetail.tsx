@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { relativeTime } from '../../lib/utils';
 import { useTaskStore } from '../../stores/task-store';
 import { useProjectStore } from '../../stores/project-store';
-import { ArrowLeft, Trash2, Edit, Lock, Bot, User, MessageSquare, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit, Lock, Bot, User, MessageSquare, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
 import type { TaskItem, TaskStatus, TaskPriority, TaskDependencyChain } from '../../../shared/types';
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string; color: string }[] = [
@@ -21,12 +21,16 @@ const PRIORITY_OPTIONS = [
 ];
 
 export function TaskDetail() {
-  const { selectedTaskId, selectTask, tasks, updateTask, deleteTask, addComment, getDependencies } = useTaskStore();
+  const { selectedTaskId, selectTask, tasks, updateTask, deleteTask, addComment, getDependencies, approveTask, rejectTask } = useTaskStore();
   const projectPath = useProjectStore((state) => state.projectPath);
   
   const [newComment, setNewComment] = useState('');
   const [dependencies, setDependencies] = useState<TaskDependencyChain | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isReviewLoading, setIsReviewLoading] = useState(false);
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const task = tasks.find((t) => t.id === selectedTaskId);
 
@@ -72,6 +76,39 @@ export function TaskDetail() {
     if (!newComment.trim()) return;
     await addComment(projectPath, task.id, newComment.trim());
     setNewComment('');
+  };
+
+  const handleApprove = async () => {
+    if (!projectPath) return;
+    setIsReviewLoading(true);
+    setReviewMessage(null);
+    const result = await approveTask(projectPath, task!.id);
+    setIsReviewLoading(false);
+    setReviewMessage({
+      type: result.success ? 'success' : 'error',
+      text: result.message,
+    });
+    if (result.success) {
+      // Auto-clear success message after 3s
+      setTimeout(() => setReviewMessage(null), 3000);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!projectPath || !rejectReason.trim()) return;
+    setIsReviewLoading(true);
+    setReviewMessage(null);
+    const result = await rejectTask(projectPath, task!.id, rejectReason.trim());
+    setIsReviewLoading(false);
+    setShowRejectInput(false);
+    setRejectReason('');
+    setReviewMessage({
+      type: result.success ? 'success' : 'error',
+      text: result.message,
+    });
+    if (result.success) {
+      setTimeout(() => setReviewMessage(null), 3000);
+    }
   };
 
   const handleTaskClick = (taskId: string) => {
@@ -218,6 +255,75 @@ export function TaskDetail() {
             <div className="text-sm text-text-primary">{relativeTime(task.updatedAt)}</div>
           </div>
         </div>
+
+        {/* Review Actions */}
+        {task.status === 'review' && (
+          <div className="mb-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-purple-400">Awaiting Review</span>
+            </div>
+            {reviewMessage && (
+              <div className={`mb-3 px-3 py-2 rounded text-sm ${
+                reviewMessage.type === 'success'
+                  ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                  : 'bg-red-500/10 border border-red-500/20 text-red-400'
+              }`}>
+                {reviewMessage.text}
+              </div>
+            )}
+            {showRejectInput ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && rejectReason.trim()) handleReject();
+                    if (e.key === 'Escape') { setShowRejectInput(false); setRejectReason(''); }
+                  }}
+                  placeholder="Reason for rejection..."
+                  autoFocus
+                  className="w-full bg-bg-elevated border border-border rounded px-3 py-2 text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReject}
+                    disabled={isReviewLoading || !rejectReason.trim()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50 transition-colors"
+                  >
+                    <XCircle size={14} />
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                    className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleApprove}
+                  disabled={isReviewLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 transition-colors"
+                >
+                  <CheckCircle size={14} />
+                  {isReviewLoading ? 'Approving…' : 'Approve'}
+                </button>
+                <button
+                  onClick={() => setShowRejectInput(true)}
+                  disabled={isReviewLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded disabled:opacity-50 transition-colors"
+                >
+                  <XCircle size={14} />
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Labels */}
         {task.labels.length > 0 && (

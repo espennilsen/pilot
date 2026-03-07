@@ -12,6 +12,7 @@ import type {
   TaskAssignee,
   TaskEpicProgress,
   TaskDependencyChain,
+  TaskReviewResult,
 } from '../../shared/types';
 import { invoke } from '../lib/ipc-client';
 import { invokeAndReload } from '../lib/invoke-and-reload';
@@ -66,6 +67,10 @@ interface TaskStore {
   setTasksEnabled: (enabled: boolean) => void;
   setShowCreateDialog: (show: boolean) => void;
   setEditingTask: (task: TaskItem | null) => void;
+
+  // Review actions
+  approveTask: (projectPath: string, taskId: string) => Promise<TaskReviewResult>;
+  rejectTask: (projectPath: string, taskId: string, reason?: string) => Promise<TaskReviewResult>;
 
   // Queries
   getFilteredTasks: () => TaskItem[];
@@ -181,6 +186,30 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   setShowCreateDialog: (show) => set({ showCreateDialog: show, editingTask: show ? get().editingTask : null }),
 
   setEditingTask: (task) => set({ editingTask: task, showCreateDialog: !!task }),
+
+  approveTask: async (projectPath: string, taskId: string) => {
+    try {
+      const result = await invoke(IPC.TASKS_APPROVE, projectPath, taskId) as TaskReviewResult;
+      if (result.success) {
+        await get().loadBoard(projectPath);
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: String(err), error: String(err) };
+    }
+  },
+
+  rejectTask: async (projectPath: string, taskId: string, reason?: string) => {
+    try {
+      const result = await invoke(IPC.TASKS_REJECT, projectPath, taskId, reason) as TaskReviewResult;
+      if (result.success) {
+        await get().loadBoard(projectPath);
+      }
+      return result;
+    } catch (err) {
+      return { success: false, message: String(err), error: String(err) };
+    }
+  },
 
   getFilteredTasks: () => {
     const { tasks, filters } = get();
