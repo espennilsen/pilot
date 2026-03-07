@@ -190,20 +190,16 @@ export function createDesktopTools(
     {
       name: 'desktop_screenshot',
       label: 'Desktop Screenshot',
-      description: 'Take a screenshot of the desktop virtual display (1920×1080). Returns a PNG image with a coordinate grid overlay by default, helping you determine precise pixel coordinates for clicking, reading text, etc. The grid coordinates match the coordinate system used by desktop_click, desktop_drag, and other mouse tools. Use grid: false for clean screenshots when verifying visual appearance without coordinate reference.',
+      description: 'Take a screenshot of the desktop virtual display (1920×1080). Returns a PNG image with a coordinate grid overlay showing pixel coordinates, helping you determine precise click/drag positions. The grid coordinates match the coordinate system used by desktop_click, desktop_drag, and other mouse tools.',
       parameters: Type.Object({
-        grid: Type.Optional(Type.Boolean({ description: 'Whether to overlay a coordinate grid. Default: true', default: true })),
         gridSize: Type.Optional(Type.Number({ description: 'Grid spacing in pixels. Default: 100', default: 100, minimum: 50, maximum: 500 })),
       }),
       async execute(_toolCallId, params) {
         let base64 = await service.screenshotDesktop(projectPath);
 
-        // Apply grid overlay if enabled (default: true)
-        const enableGrid = params.grid !== false;
-        if (enableGrid) {
-          const gridSize = params.gridSize ?? 100;
-          base64 = await overlayGrid(base64, { gridSize });
-        }
+        // Always overlay coordinate grid for agent click precision
+        const gridSize = params.gridSize ?? 100;
+        base64 = await overlayGrid(base64, { gridSize });
 
         return {
           content: [{
