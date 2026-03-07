@@ -13,6 +13,7 @@ const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
 ];
 
 export function TaskKanban() {
+  useTaskStore((s) => s.tasks); // subscribe to task data changes for reactivity
   const getTasksByStatus = useTaskStore((s) => s.getTasksByStatus);
   const moveTask = useTaskStore((s) => s.moveTask);
   const setShowCreateDialog = useTaskStore((s) => s.setShowCreateDialog);
