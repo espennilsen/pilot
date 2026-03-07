@@ -13,7 +13,9 @@ const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
 ];
 
 export function TaskKanban() {
-  const { getTasksByStatus, moveTask, setShowCreateDialog } = useTaskStore();
+  const getTasksByStatus = useTaskStore((s) => s.getTasksByStatus);
+  const moveTask = useTaskStore((s) => s.moveTask);
+  const setShowCreateDialog = useTaskStore((s) => s.setShowCreateDialog);
   const statusFilter = useTaskStore((s) => s.filters.status);
   const projectPath = useProjectStore((s) => s.projectPath);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
