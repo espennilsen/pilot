@@ -177,4 +177,30 @@ export function registerGitIpc() {
     pushStatusChanged(projectPath, true);
     return result;
   });
+
+  // ── Submodules ──────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.GIT_SUBMODULE_LIST, async (_event, projectPath?: string) => {
+    return getGitService(projectPath).getSubmodules();
+  });
+
+  ipcMain.handle(IPC.GIT_SUBMODULE_INIT, async (_event, subPath?: string, projectPath?: string) => {
+    await getGitService(projectPath).initSubmodule(subPath);
+    pushStatusChanged(projectPath);
+  });
+
+  ipcMain.handle(IPC.GIT_SUBMODULE_DEINIT, async (_event, subPath: string, force?: boolean, projectPath?: string) => {
+    await getGitService(projectPath).deinitSubmodule(subPath, force);
+    pushStatusChanged(projectPath);
+  });
+
+  ipcMain.handle(IPC.GIT_SUBMODULE_UPDATE, async (_event, subPath?: string, options?: { recursive?: boolean; init?: boolean }, projectPath?: string) => {
+    await getGitService(projectPath).updateSubmodule(subPath, options);
+    pushStatusChanged(projectPath);
+  });
+
+  ipcMain.handle(IPC.GIT_SUBMODULE_SYNC, async (_event, subPath?: string, projectPath?: string) => {
+    await getGitService(projectPath).syncSubmodule(subPath);
+    pushStatusChanged(projectPath);
+  });
 }

@@ -124,6 +124,13 @@ export const IPC = {
   GIT_INTERACTIVE_REBASE_EXECUTE: 'git:interactive-rebase-execute', // run the interactive rebase
   GIT_STATUS_CHANGED: 'git:status-changed',                       // main → renderer push
 
+  // Git submodules
+  GIT_SUBMODULE_LIST: 'git:submodule-list',
+  GIT_SUBMODULE_INIT: 'git:submodule-init',
+  GIT_SUBMODULE_DEINIT: 'git:submodule-deinit',
+  GIT_SUBMODULE_UPDATE: 'git:submodule-update',
+  GIT_SUBMODULE_SYNC: 'git:submodule-sync',
+
   // Dev commands
   DEV_LOAD_CONFIG: 'dev:load-config',
   DEV_SAVE_CONFIG: 'dev:save-config',

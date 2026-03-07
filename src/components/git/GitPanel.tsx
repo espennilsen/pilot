@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, AlertCircle, GitBranch, History, Archive } from 'lucide-react';
+import { RefreshCw, AlertCircle, GitBranch, History, Archive, Package } from 'lucide-react';
 import { useGitStore } from '../../stores/git-store';
 import { useProjectStore } from '../../stores/project-store';
 import GitStatus from './GitStatus';
@@ -10,13 +10,14 @@ import GitStash from './GitStash';
 import GitConflictBanner from './GitConflictBanner';
 import GitConflictsList from './GitConflictsList';
 import GitInteractiveRebase from './GitInteractiveRebase';
+import GitSubmodules from './GitSubmodules';
 import type { ConflictFile } from '../../../shared/types';
 
-type GitView = 'status' | 'history' | 'stash';
+type GitView = 'status' | 'history' | 'stash' | 'submodules';
 
 export default function GitPanel() {
   const { projectPath } = useProjectStore();
-  const { isAvailable, isRepo, status, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, loadConflicts, conflictedFiles, interactiveRebaseEntries, isLoading, error } = useGitStore();
+  const { isAvailable, isRepo, status, initGit, initRepo, refreshStatus, refreshBranches, loadStashes, loadSubmodules, loadConflicts, conflictedFiles, submodules, interactiveRebaseEntries, isLoading, error } = useGitStore();
   const [currentView, setCurrentView] = useState<GitView>('status');
 
   const hasConflicts = (status?.operationInProgress != null) || (status?.conflicted?.length ?? 0) > 0;
@@ -41,6 +42,9 @@ export default function GitPanel() {
     refreshBranches();
     if (currentView === 'stash') {
       loadStashes();
+    }
+    if (currentView === 'submodules') {
+      loadSubmodules();
     }
     if (hasConflicts) {
       loadConflicts();
@@ -177,6 +181,20 @@ export default function GitPanel() {
           <Archive className="w-4 h-4" />
           Stash
         </button>
+        {submodules.length > 0 && (
+          <button
+            onClick={() => setCurrentView('submodules')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm transition-colors ${
+              currentView === 'submodules'
+                ? 'text-accent border-b-2 border-accent bg-bg-elevated'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Modules
+            <span className="text-xs text-text-secondary">({submodules.length})</span>
+          </button>
+        )}
       </div>
 
       {/* Error display */}
@@ -204,6 +222,7 @@ export default function GitPanel() {
             )}
             {currentView === 'history' && <GitCommitLog />}
             {currentView === 'stash' && <GitStash />}
+            {currentView === 'submodules' && <GitSubmodules />}
           </>
         )}
       </div>

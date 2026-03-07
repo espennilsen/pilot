@@ -1,6 +1,6 @@
 # Roadmap
 
-> Last updated: 2026-02-25
+> Last updated: 2026-03-06
 
 Current state: **Cross-platform alpha**. Core chat, sandbox, git, companion, memory, tasks, and subagent features work on macOS, Windows, and Linux. Nightly builds ship automatically via GitHub Actions.
 
@@ -68,13 +68,11 @@ Features planned after cross-platform shipping. Ordered by priority.
 |---------|-------------|
 | **Extension Marketplace** | Browse and install extensions/skills from a community registry (beyond zip import). |
 | **Multi-Agent Backends** | Support for multiple AI agent backends (not just Pi SDK). |
-| **Git Interactive Rebase** | Visual interactive rebase editor within the app. |
 
 ### Low Priority
 
 | Feature | Description |
 |---------|-------------|
-| **Git Submodule Support** | Manage and navigate submodules from the git panel. |
 | **Collaborative Sessions** | Share a session link for pair-programming with AI. |
 | **Voice Input** | Local AI speech-to-text for hands-free prompting (Whisper.cpp, MLX). Cloud STT (Deepgram, AssemblyAI) as opt-in. |
 | **Custom Themes** | User-created themes with a theme editor. |
@@ -85,6 +83,8 @@ Features planned after cross-platform shipping. Ordered by priority.
 
 | Date | Milestone |
 |------|-----------|
+| 2026-03-06 | Git submodule support — list, init, deinit, update, sync from git panel |
+| 2026-03-06 | Git interactive rebase — visual rebase editor with drag-to-reorder |
 | 2026-02-25 | Nightly CI builds — macOS, Windows, Linux via GitHub Actions |
 | 2026-02-25 | Agent memory tools — `pilot_memory_read/add/remove` |
 | 2026-02-25 | System prompt settings — editable with live refresh on active sessions |

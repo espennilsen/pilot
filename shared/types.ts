@@ -208,6 +208,7 @@ export interface GitStatus {
   isClean: boolean;
   /** Non-null when a merge, rebase, cherry-pick, or revert is in progress */
   operationInProgress: GitOperationState | null;
+  submodules?: GitSubmodule[];
 }
 
 /** Tracks the state of an in-progress git operation that may produce conflicts */
@@ -348,6 +349,38 @@ export interface GitStash {
   message: string;
   date: number;
   branch: string;
+}
+
+// ── Git Submodules ───────────────────────────────────────────────────
+
+/** Status indicator for a git submodule */
+export type SubmoduleStatusCode =
+  | 'initialized'    // Submodule is checked out at the recorded commit
+  | 'uninitialized'  // Submodule directory is not checked out (needs `git submodule init`)
+  | 'modified'       // Submodule HEAD differs from the commit recorded in the parent
+  | 'conflict'       // Merge conflict on the submodule entry
+  ;
+
+/** A git submodule registered in .gitmodules */
+export interface GitSubmodule {
+  /** Submodule name (from .gitmodules) */
+  name: string;
+  /** Relative path within the parent repo */
+  path: string;
+  /** Remote URL */
+  url: string;
+  /** Branch tracked by the submodule (if configured, else null) */
+  branch: string | null;
+  /** The commit hash the parent repo expects the submodule to be at */
+  expectedCommit: string;
+  /** The commit hash the submodule is actually at (null if uninitialized) */
+  currentCommit: string | null;
+  /** Current status */
+  status: SubmoduleStatusCode;
+  /** Whether the submodule working tree has uncommitted changes */
+  dirty: boolean;
+  /** Human-readable status label for the UI */
+  statusLabel: string;
 }
 
 // Dev commands

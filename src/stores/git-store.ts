@@ -2,7 +2,7 @@
  * @file Git store — manages git operations, status, branches, commits, blame, and diffs.
  */
 import { create } from 'zustand';
-import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions, ConflictFile, GitOperationResult, RebaseTodoEntry, InteractiveRebaseRequest } from '../../shared/types';
+import type { GitStatus, GitBranch, GitCommit, BlameLine, GitStash, GitLogOptions, ConflictFile, GitOperationResult, RebaseTodoEntry, InteractiveRebaseRequest, GitSubmodule } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 
@@ -29,6 +29,10 @@ interface GitStore {
   interactiveRebaseEntries: RebaseTodoEntry[];
   interactiveRebaseOnto: string | null;
   isInteractiveRebasePreparing: boolean;
+
+  // Submodule state
+  submodules: GitSubmodule[];
+  isSubmoduleLoading: boolean;
 
   // Actions
   initGit: (projectPath: string) => Promise<void>;
@@ -69,6 +73,13 @@ interface GitStore {
   updateSquashMessage: (targetIndex: number, message: string) => void;
   executeInteractiveRebase: () => Promise<GitOperationResult>;
   cancelInteractiveRebase: () => void;
+
+  // Submodule actions
+  loadSubmodules: () => Promise<void>;
+  initSubmodule: (subPath?: string) => Promise<void>;
+  deinitSubmodule: (subPath: string, force?: boolean) => Promise<void>;
+  updateSubmodule: (subPath?: string, options?: { recursive?: boolean; init?: boolean }) => Promise<void>;
+  syncSubmodule: (subPath?: string) => Promise<void>;
 }
 
 /**
@@ -93,6 +104,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
   interactiveRebaseEntries: [],
   interactiveRebaseOnto: null,
   isInteractiveRebasePreparing: false,
+  submodules: [],
+  isSubmoduleLoading: false,
 
   initGit: async (projectPath: string) => {
     set({ isLoading: true, error: null, currentProjectPath: projectPath });
@@ -116,8 +129,9 @@ export const useGitStore = create<GitStore>((set, get) => ({
       const deduped = { ...status, unstaged: status.unstaged.filter(f => !stagedPaths.has(f.path)) };
       set({ isAvailable: true, isRepo: true, status: deduped, isLoading: false });
       
-      // Load branches in parallel
+      // Load branches and submodules in parallel
       get().refreshBranches();
+      get().loadSubmodules();
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }
@@ -377,6 +391,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
       currentProjectPath: null,
       conflictedFiles: [],
       isConflictLoading: false,
+      submodules: [],
+      isSubmoduleLoading: false,
     });
   },
 
@@ -579,5 +595,59 @@ export const useGitStore = create<GitStore>((set, get) => ({
       interactiveRebaseEntries: [],
       interactiveRebaseOnto: null,
     });
+  },
+
+  // ── Submodule actions ──────────────────────────────────────────────
+
+  loadSubmodules: async () => {
+    if (!get().isRepo) return;
+
+    set({ isSubmoduleLoading: true });
+    try {
+      const submodules = await invoke(IPC.GIT_SUBMODULE_LIST) as GitSubmodule[];
+      set({ submodules, isSubmoduleLoading: false });
+    } catch {
+      set({ submodules: [], isSubmoduleLoading: false });
+    }
+  },
+
+  initSubmodule: async (subPath?: string) => {
+    set({ isSubmoduleLoading: true, error: null });
+    try {
+      await invoke(IPC.GIT_SUBMODULE_INIT, subPath);
+      await get().loadSubmodules();
+    } catch (error) {
+      set({ error: String(error), isSubmoduleLoading: false });
+    }
+  },
+
+  deinitSubmodule: async (subPath: string, force?: boolean) => {
+    set({ isSubmoduleLoading: true, error: null });
+    try {
+      await invoke(IPC.GIT_SUBMODULE_DEINIT, subPath, force);
+      await get().loadSubmodules();
+    } catch (error) {
+      set({ error: String(error), isSubmoduleLoading: false });
+    }
+  },
+
+  updateSubmodule: async (subPath?: string, options?: { recursive?: boolean; init?: boolean }) => {
+    set({ isSubmoduleLoading: true, error: null });
+    try {
+      await invoke(IPC.GIT_SUBMODULE_UPDATE, subPath, options);
+      await get().loadSubmodules();
+    } catch (error) {
+      set({ error: String(error), isSubmoduleLoading: false });
+    }
+  },
+
+  syncSubmodule: async (subPath?: string) => {
+    set({ isSubmoduleLoading: true, error: null });
+    try {
+      await invoke(IPC.GIT_SUBMODULE_SYNC, subPath);
+      await get().loadSubmodules();
+    } catch (error) {
+      set({ error: String(error), isSubmoduleLoading: false });
+    }
   },
 }));

@@ -7,6 +7,7 @@ import type {
   BlameLine, GitStash, GitFileChange,
   GitOperationState, ConflictFile, GitOperationResult,
   RebaseTodoEntry, InteractiveRebaseRequest, RebaseAction,
+  GitSubmodule, SubmoduleStatusCode,
 } from '../../shared/types';
 
 export class GitService {
@@ -587,7 +588,146 @@ try {
     }
   }
 
+  // ── Submodules ──────────────────────────────────────────────────────
+
+  /** List all submodules with their current status. Returns [] if no .gitmodules. */
+  async getSubmodules(): Promise<GitSubmodule[]> {
+    if (!existsSync(join(this.cwd, '.gitmodules'))) return [];
+
+    try {
+      // `git submodule status` outputs one line per submodule:
+      //   <status-char><sha1> <path> (<describe>)
+      // Status char: ' ' = initialized at recorded commit, '-' = uninitialized,
+      //              '+' = different commit, 'U' = merge conflict
+      const raw = await this.git.raw(['submodule', 'status', '--recursive']);
+      if (!raw.trim()) return [];
+
+      // Parse .gitmodules for url and branch info
+      const moduleConfig = await this.parseGitmodules();
+
+      const submodules: GitSubmodule[] = [];
+      // Split on newlines but preserve leading status character (space = initialized)
+      for (const line of raw.split('\n').filter(l => l.length > 0)) {
+        const match = line.match(/^([U+ -])([0-9a-f]+)\s+(\S+)(?:\s+\((.+)\))?$/);
+        if (!match) continue;
+
+        const [, statusChar, hash, subPath] = match;
+        const config = moduleConfig.get(subPath);
+
+        let status: SubmoduleStatusCode;
+        let statusLabel: string;
+        switch (statusChar) {
+          case '-':
+            status = 'uninitialized';
+            statusLabel = 'Not initialized';
+            break;
+          case '+':
+            status = 'modified';
+            statusLabel = 'Modified (HEAD differs from recorded commit)';
+            break;
+          case 'U':
+            status = 'conflict';
+            statusLabel = 'Merge conflict';
+            break;
+          default:
+            status = 'initialized';
+            statusLabel = 'Up to date';
+            break;
+        }
+
+        // Check if submodule working tree is dirty
+        let dirty = false;
+        if (status !== 'uninitialized') {
+          try {
+            const dirtyCheck = await this.git.raw([
+              '-C', join(this.cwd, subPath), 'status', '--porcelain',
+            ]);
+            dirty = dirtyCheck.trim().length > 0;
+          } catch { /* submodule dir may not exist */ }
+        }
+
+        if (dirty) {
+          statusLabel += ' (dirty)';
+        }
+
+        submodules.push({
+          name: config?.name ?? subPath,
+          path: subPath,
+          url: config?.url ?? '',
+          branch: config?.branch ?? null,
+          expectedCommit: hash,
+          currentCommit: status === 'uninitialized' ? null : hash,
+          status,
+          dirty,
+          statusLabel,
+        });
+      }
+      return submodules;
+    } catch { /* Expected: submodule command may fail if git is too old */
+      return [];
+    }
+  }
+
+  /** Initialize one or all submodules. */
+  async initSubmodule(subPath?: string): Promise<void> {
+    const args = ['submodule', 'init'];
+    if (subPath) args.push('--', subPath);
+    await this.git.raw(args);
+  }
+
+  /** Deinitialize a submodule (removes its working tree). */
+  async deinitSubmodule(subPath: string, force?: boolean): Promise<void> {
+    const args = ['submodule', 'deinit'];
+    if (force) args.push('--force');
+    args.push('--', subPath);
+    await this.git.raw(args);
+  }
+
+  /** Update one or all submodules to the commit recorded in the parent. */
+  async updateSubmodule(subPath?: string, options?: { recursive?: boolean; init?: boolean }): Promise<void> {
+    const args = ['submodule', 'update'];
+    if (options?.init) args.push('--init');
+    if (options?.recursive) args.push('--recursive');
+    if (subPath) args.push('--', subPath);
+    await this.git.raw(args);
+  }
+
+  /** Sync submodule remote URLs from .gitmodules to .git/config. */
+  async syncSubmodule(subPath?: string): Promise<void> {
+    const args = ['submodule', 'sync'];
+    if (subPath) args.push('--', subPath);
+    await this.git.raw(args);
+  }
+
   // ── Private helpers ────────────────────────────────────────────────
+
+  /** Parse .gitmodules file to extract submodule config (name, url, branch). */
+  private async parseGitmodules(): Promise<Map<string, { name: string; url: string; branch: string | null }>> {
+    const result = new Map<string, { name: string; url: string; branch: string | null }>();
+    try {
+      const raw = await this.git.raw(['config', '--file', '.gitmodules', '--list']);
+      // Output lines: submodule.<name>.path=<path>, submodule.<name>.url=<url>, etc.
+      const entries = new Map<string, Record<string, string>>();
+      for (const line of raw.trim().split('\n')) {
+        const match = line.match(/^submodule\.(.+?)\.(path|url|branch)=(.*)$/);
+        if (!match) continue;
+        const [, name, key, value] = match;
+        if (!entries.has(name)) entries.set(name, {});
+        entries.get(name)![key] = value;
+      }
+      for (const [name, config] of entries) {
+        const path = config['path'];
+        if (path) {
+          result.set(path, {
+            name,
+            url: config['url'] ?? '',
+            branch: config['branch'] ?? null,
+          });
+        }
+      }
+    } catch { /* Expected: .gitmodules may be malformed or missing */ }
+    return result;
+  }
 
   /** Get list of conflicted file paths from git status. */
   private async getConflictedPaths(): Promise<string[]> {
