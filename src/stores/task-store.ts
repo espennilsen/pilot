@@ -189,11 +189,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   approveTask: async (projectPath: string, taskId: string) => {
     try {
-      const result = await invoke(IPC.TASKS_APPROVE, projectPath, taskId) as TaskReviewResult;
-      if (result.success) {
-        await get().loadBoard(projectPath);
-      }
-      return result;
+      return await invoke(IPC.TASKS_APPROVE, projectPath, taskId) as TaskReviewResult;
+      // Board reload is driven by TASKS_CHANGED push event from main process
     } catch (err) {
       return { success: false, message: String(err), error: String(err) };
     }
@@ -201,11 +198,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   rejectTask: async (projectPath: string, taskId: string, reason?: string) => {
     try {
-      const result = await invoke(IPC.TASKS_REJECT, projectPath, taskId, reason) as TaskReviewResult;
-      if (result.success) {
-        await get().loadBoard(projectPath);
-      }
-      return result;
+      return await invoke(IPC.TASKS_REJECT, projectPath, taskId, reason) as TaskReviewResult;
+      // Board reload is driven by TASKS_CHANGED push event from main process
     } catch (err) {
       return { success: false, message: String(err), error: String(err) };
     }

@@ -12,19 +12,26 @@ import type { TaskReviewResult } from '../../shared/types';
 const execFileAsync = promisify(execFile);
 
 export class TaskReviewService {
+  /** Cached td binary path. `undefined` = not yet looked up, `null` = not found. */
+  private tdPath: string | null | undefined = undefined;
+
   /**
-   * Find the td binary path. Returns null if td is not installed.
+   * Find the td binary path. Caches the result after first lookup.
+   * Returns null if td is not installed.
    */
   private async findTd(): Promise<string | null> {
+    if (this.tdPath !== undefined) return this.tdPath;
+
     try {
       // Use 'which' on macOS/Linux, 'where' on Windows
       const cmd = process.platform === 'win32' ? 'where' : 'which';
       const { stdout } = await execFileAsync(cmd, ['td']);
-      const tdPath = stdout.trim().split('\n')[0];
-      return tdPath || null;
+      // Trim each line individually to strip \r on Windows
+      this.tdPath = stdout.split('\n')[0].trim() || null;
     } catch {
-      return null;
+      this.tdPath = null;
     }
+    return this.tdPath;
   }
 
   /**
@@ -44,13 +51,6 @@ export class TaskReviewService {
       });
 
       const output = (stdout || stderr || '').trim();
-
-      // td approve outputs "APPROVED <id>" on success
-      if (output.toLowerCase().includes('approved') || output.toLowerCase().includes('closed')) {
-        return { success: true, message: output || `Approved ${taskId}` };
-      }
-
-      // Some output but unclear — treat as success if no error code
       return { success: true, message: output || `Approved ${taskId}` };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
