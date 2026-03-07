@@ -122,7 +122,7 @@ describe('SessionToolInjector', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.added).toBe(2);
-        expect(result.removed).toBe(0);
+        expect(result).not.toHaveProperty('removed');
       }
       expect((session as any)._customTools).toHaveLength(2);
       expect((session as any)._refreshToolRegistry).toHaveBeenCalledTimes(1);
@@ -194,7 +194,7 @@ describe('SessionToolInjector', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.removed).toBe(3);
-        expect(result.added).toBe(0);
+        expect(result).not.toHaveProperty('added');
       }
       expect((session as any)._customTools).toHaveLength(1);
       expect((session as any)._customTools[0].name).toBe('web_fetch');
@@ -241,12 +241,12 @@ describe('SessionToolInjector', () => {
   // ── hasTools ──
 
   describe('hasTools', () => {
-    it('returns true when matching tools are active', () => {
+    it('returns true when matching tools exist in _customTools', () => {
       const session = makeFakeSession([makeTool('desktop_screenshot')]);
       expect(hasTools(session, name => name.startsWith('desktop_'))).toBe(true);
     });
 
-    it('returns false when no matching tools are active', () => {
+    it('returns false when no matching tools exist in _customTools', () => {
       const session = makeFakeSession([makeTool('web_fetch')]);
       expect(hasTools(session, name => name.startsWith('desktop_'))).toBe(false);
     });
@@ -254,6 +254,25 @@ describe('SessionToolInjector', () => {
     it('returns false for empty session', () => {
       const session = makeFakeSession();
       expect(hasTools(session, () => true)).toBe(false);
+    });
+
+    it('checks _customTools not active tools — detects tools even when deactivated', () => {
+      const session = makeFakeSession([makeTool('desktop_screenshot')]);
+      // Simulate external code deactivating tools via setActiveToolsByName
+      session.setActiveToolsByName([]);
+      // hasTools should still find it in _customTools
+      expect(hasTools(session, name => name === 'desktop_screenshot')).toBe(true);
+      // But the public active list is empty
+      expect(session.getActiveToolNames()).toEqual([]);
+    });
+
+    it('falls back to active tools when SDK internals are unavailable', () => {
+      // Session without _customTools — simulates a future SDK change
+      const session = {
+        getActiveToolNames: () => ['desktop_screenshot', 'web_fetch'],
+      } as unknown as AgentSession;
+      expect(hasTools(session, name => name.startsWith('desktop_'))).toBe(true);
+      expect(hasTools(session, name => name === 'nonexistent')).toBe(false);
     });
   });
 

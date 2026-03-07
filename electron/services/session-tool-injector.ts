@@ -38,9 +38,13 @@ interface AgentSessionInternals {
   _refreshToolRegistry: (options?: { activeToolNames?: string[] }) => void;
 }
 
-export interface ToolInjectionResult {
+export interface ToolInjectResult {
   ok: true;
   added: number;
+}
+
+export interface ToolEjectResult {
+  ok: true;
   removed: number;
 }
 
@@ -110,8 +114,8 @@ export function validateSessionInternals(
 export function injectTools(
   session: AgentSession,
   tools: ToolDefinition[],
-): ToolInjectionResult | ToolInjectionError {
-  if (tools.length === 0) return { ok: true, added: 0, removed: 0 };
+): ToolInjectResult | ToolInjectionError {
+  if (tools.length === 0) return { ok: true, added: 0 };
 
   const validation = validateSessionInternals(session);
   if (!validation.ok) return validation;
@@ -131,7 +135,7 @@ export function injectTools(
     internals._refreshToolRegistry();
   }
 
-  return { ok: true, added, removed: 0 };
+  return { ok: true, added };
 }
 
 /**
@@ -146,7 +150,7 @@ export function injectTools(
 export function ejectTools(
   session: AgentSession,
   filter: (toolName: string) => boolean,
-): ToolInjectionResult | ToolInjectionError {
+): ToolEjectResult | ToolInjectionError {
   const validation = validateSessionInternals(session);
   if (!validation.ok) return validation;
 
@@ -165,17 +169,26 @@ export function ejectTools(
     internals._refreshToolRegistry();
   }
 
-  return { ok: true, added: 0, removed };
+  return { ok: true, removed };
 }
 
 /**
  * Check whether any tools matching the filter exist in the session's custom tools.
  *
- * Uses `getActiveToolNames()` (public API) so this does NOT require private access.
+ * Checks `_customTools` (the same source of truth that `injectTools`/`ejectTools`
+ * operate on) to avoid divergence with the active-tools list, which can be changed
+ * independently via `setActiveToolsByName`.
+ *
+ * Falls back to the public `getActiveToolNames()` if SDK internals are unavailable.
  */
 export function hasTools(
   session: AgentSession,
   filter: (toolName: string) => boolean,
 ): boolean {
+  const validation = validateSessionInternals(session);
+  if (validation.ok) {
+    return validation.internals._customTools.some(t => filter(t.name));
+  }
+  // Fallback: use public API if SDK internals changed
   return session.getActiveToolNames().some(filter);
 }
