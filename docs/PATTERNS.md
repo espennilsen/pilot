@@ -17,7 +17,7 @@ Pilot is an Electron + React + TypeScript app with strict process isolation. The
 | React hooks | `use<Domain>` | `useAgentSession` |
 | Component folders | `kebab-case`, domain-named | `src/components/sandbox/` |
 | Shared types | `PascalCase` interface | `StagedDiff`, `SessionMetadata` |
-| Agent tools | `snake_case` with `pilot_` prefix | `pilot_show_file`, `pilot_desktop_screenshot` |
+| Agent tools | `snake_case`, `pilot_` prefix for editor tools | `pilot_show_file`, `desktop_screenshot` |
 | Tool definition files | `<domain>-tools.ts` | `electron/services/memory-tools.ts` |
 
 ## IPC Pattern

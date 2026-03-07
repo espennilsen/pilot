@@ -93,9 +93,9 @@ User enables Desktop in settings
           → DesktopViewer renders noVNC iframe
 
 Agent uses desktop tools:
-  → pilot_desktop_screenshot → scrot inside container → base64 image
-  → pilot_desktop_click/type/scroll → xdotool commands inside container
-  → pilot_desktop_browser → launches browser in container
+  → desktop_screenshot → scrot inside container → base64 image
+  → desktop_click/desktop_type/desktop_scroll → xdotool commands inside container
+  → desktop_open_browser → launches browser in container
 ```
 
 ### MCP Tool Integration
