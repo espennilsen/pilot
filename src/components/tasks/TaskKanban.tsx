@@ -14,6 +14,7 @@ const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
 
 export function TaskKanban() {
   const { getTasksByStatus, moveTask, setShowCreateDialog } = useTaskStore();
+  const statusFilter = useTaskStore((s) => s.filters.status);
   const projectPath = useProjectStore((s) => s.projectPath);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
@@ -64,7 +65,10 @@ export function TaskKanban() {
 
   return (
     <div className="flex h-full overflow-x-auto gap-4 p-4">
-      {COLUMNS.map(({ status, label, color }) => {
+      {(statusFilter.length > 0
+        ? COLUMNS.filter((col) => statusFilter.includes(col.status))
+        : COLUMNS
+      ).map(({ status, label, color }) => {
         const tasks = getTasksByStatus(status);
         const sortedTasks = sortTasks(tasks);
         const isDropTarget = dragOverColumn === status;
