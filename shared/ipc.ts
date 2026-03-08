@@ -78,6 +78,7 @@ export const IPC = {
   SHELL_DETECT_EDITORS: 'shell:detect-editors',
   SHELL_DETECT_TERMINALS: 'shell:detect-terminals',
   SHELL_OPEN_IN_EDITOR: 'shell:open-in-editor',
+  SHELL_CONFIRM_DIALOG: 'shell:confirm-dialog',
 
   // Tabs
   TABS_SAVE_STATE: 'tabs:save-state',

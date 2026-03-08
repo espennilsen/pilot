@@ -599,7 +599,11 @@ try {
       //   <status-char><sha1> <path> (<describe>)
       // Status char: ' ' = initialized at recorded commit, '-' = uninitialized,
       //              '+' = different commit, 'U' = merge conflict
-      const raw = await this.git.raw(['submodule', 'status', '--recursive']);
+      // Note: intentionally not using --recursive here. Recursive output includes
+      // nested submodule paths (e.g. outer/inner), but parseGitmodules only reads the
+      // root .gitmodules and ls-tree only resolves direct children of HEAD. Supporting
+      // nested submodules would require reading .gitmodules at each nesting level.
+      const raw = await this.git.raw(['submodule', 'status']);
       if (!raw.trim()) return [];
 
       // Parse .gitmodules for url and branch info

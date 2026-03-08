@@ -1,4 +1,4 @@
-import { ipcMain, shell } from 'electron';
+import { ipcMain, shell, dialog, BrowserWindow } from 'electron';
 import { exec, execFile, execFileSync, execSync } from 'child_process';
 import { existsSync, statSync } from 'fs';
 import { dirname } from 'path';
@@ -276,6 +276,21 @@ export function registerShellIpc() {
 
   ipcMain.handle(IPC.SHELL_DETECT_TERMINALS, async () => {
     return detectTerminals();
+  });
+
+  ipcMain.handle(IPC.SHELL_CONFIRM_DIALOG, async (event, options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const result = await dialog.showMessageBox(win!, {
+      type: 'warning',
+      title: options.title ?? 'Confirm',
+      message: options.message,
+      detail: options.detail,
+      buttons: [options.cancelLabel ?? 'Cancel', options.confirmLabel ?? 'Confirm'],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    // button index 1 = confirm
+    return result.response === 1;
   });
 
   ipcMain.handle(IPC.SHELL_OPEN_IN_EDITOR, async (_event, editorCli: string, filePath: string) => {

@@ -37,6 +37,13 @@ export default function GitPanel() {
     }
   }, [hasConflicts, conflictedFiles.length, loadConflicts]);
 
+  // Reset view when the submodules tab disappears (e.g. switching to a project without submodules)
+  useEffect(() => {
+    if (submodules.length === 0 && currentView === 'submodules') {
+      setCurrentView('status');
+    }
+  }, [submodules.length, currentView]);
+
   const handleRefresh = () => {
     refreshStatus();
     refreshBranches();

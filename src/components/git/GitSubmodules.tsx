@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
   Package, RefreshCw, Download, Trash2, Link, Play,
   AlertTriangle, CheckCircle, MinusCircle, AlertCircle,
 } from 'lucide-react';
 import { useGitStore } from '../../stores/git-store';
+import { IPC } from '../../../shared/ipc';
 import type { GitSubmodule, SubmoduleStatusCode } from '../../../shared/types';
 
 function statusIcon(status: SubmoduleStatusCode, dirty: boolean) {
@@ -15,6 +16,16 @@ function statusIcon(status: SubmoduleStatusCode, dirty: boolean) {
 
 function SubmoduleRow({ sub }: { sub: GitSubmodule }) {
   const { initSubmodule, deinitSubmodule, updateSubmodule, syncSubmodule, isSubmoduleLoading } = useGitStore();
+
+  const handleDeinit = useCallback(async () => {
+    const confirmed = await window.api.invoke(IPC.SHELL_CONFIRM_DIALOG, {
+      title: 'Deinitialize Submodule',
+      message: `Deinitialize submodule "${sub.name}"?`,
+      detail: 'This removes its working tree. Any uncommitted changes will be lost.',
+      confirmLabel: 'Deinitialize',
+    });
+    if (confirmed) deinitSubmodule(sub.path);
+  }, [sub.name, sub.path, deinitSubmodule]);
 
   return (
     <div className="px-3 py-2.5 border-b border-border hover:bg-bg-elevated transition-colors">
@@ -87,11 +98,7 @@ function SubmoduleRow({ sub }: { sub: GitSubmodule }) {
                 <Link className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => {
-                  if (window.confirm(`Deinitialize submodule "${sub.name}"? This removes its working tree and any uncommitted changes will be lost.`)) {
-                    deinitSubmodule(sub.path);
-                  }
-                }}
+                onClick={handleDeinit}
                 disabled={isSubmoduleLoading}
                 className="p-1 text-text-secondary hover:text-error hover:bg-bg-surface rounded disabled:opacity-50 transition-colors"
                 title="Deinitialize submodule"
