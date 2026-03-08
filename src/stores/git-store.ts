@@ -108,7 +108,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
   isSubmoduleLoading: false,
 
   initGit: async (projectPath: string) => {
-    set({ isLoading: true, error: null, currentProjectPath: projectPath });
+    set({ isLoading: true, error: null, currentProjectPath: projectPath, submodules: [] });
     try {
       // Initialize git service in main process first
       const result = await invoke(IPC.GIT_INIT, projectPath) as { available: boolean; isRepo: boolean };

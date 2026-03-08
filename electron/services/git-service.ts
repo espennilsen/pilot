@@ -612,7 +612,7 @@ try {
       const submodules: GitSubmodule[] = [];
       // Split on newlines but preserve leading status character (space = initialized)
       for (const line of raw.split('\n').filter(l => l.length > 0)) {
-        const match = line.match(/^([U+ -])([0-9a-f]+)\s+(\S+)(?:\s+\((.+)\))?$/);
+        const match = line.match(/^([U+ -])([0-9a-f]+)\s+(.+?)(?:\s+\((.+)\))?$/);
         if (!match) continue;
 
         const [, statusChar, hash, subPath] = match;
