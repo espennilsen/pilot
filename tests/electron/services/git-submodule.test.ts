@@ -129,14 +129,19 @@ describe('GitService — submodule support', () => {
       });
     });
 
-    it('parses modified submodule (HEAD differs)', async () => {
+    it('parses modified submodule (HEAD differs) and resolves recorded commit via ls-tree', async () => {
       mockedExistsSync.mockReturnValue(true);
+      const currentHead = 'def4567890abcdef1234567890abcdef12345678';
+      const recordedCommit = 'aaa0000000000000000000000000000000000000';
       mockGit.raw.mockImplementation((args: string[]) => {
         if (args[0] === 'submodule' && args[1] === 'status') {
-          return Promise.resolve('+def4567890abcdef1234567890abcdef12345678 libs/core (heads/feature)\n');
+          return Promise.resolve(`+${currentHead} libs/core (heads/feature)\n`);
         }
         if (args[0] === 'config' && args[1] === '--file') {
           return Promise.resolve('submodule.core.path=libs/core\nsubmodule.core.url=https://github.com/org/core.git\n');
+        }
+        if (args[0] === 'ls-tree') {
+          return Promise.resolve(`160000 commit ${recordedCommit}\tlibs/core\n`);
         }
         if (args[0] === '-C') return Promise.resolve('');
         return Promise.resolve('');
@@ -147,6 +152,8 @@ describe('GitService — submodule support', () => {
       expect(result[0]).toMatchObject({
         status: 'modified',
         statusLabel: 'Modified (HEAD differs from recorded commit)',
+        expectedCommit: recordedCommit,
+        currentCommit: currentHead,
       });
     });
 

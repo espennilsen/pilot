@@ -87,7 +87,11 @@ function SubmoduleRow({ sub }: { sub: GitSubmodule }) {
                 <Link className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => deinitSubmodule(sub.path)}
+                onClick={() => {
+                  if (window.confirm(`Deinitialize submodule "${sub.name}"? This removes its working tree and any uncommitted changes will be lost.`)) {
+                    deinitSubmodule(sub.path);
+                  }
+                }}
                 disabled={isSubmoduleLoading}
                 className="p-1 text-text-secondary hover:text-error hover:bg-bg-surface rounded disabled:opacity-50 transition-colors"
                 title="Deinitialize submodule"

@@ -635,19 +635,15 @@ try {
             break;
         }
 
-        // Check if submodule working tree is dirty
-        let dirty = false;
-        if (status !== 'uninitialized') {
+        // For modified submodules, `hash` is the current HEAD, not the recorded commit.
+        // Fetch the recorded commit from the parent index via ls-tree.
+        let expectedCommit = hash;
+        if (status === 'modified') {
           try {
-            const dirtyCheck = await this.git.raw([
-              '-C', join(this.cwd, subPath), 'status', '--porcelain',
-            ]);
-            dirty = dirtyCheck.trim().length > 0;
-          } catch { /* submodule dir may not exist */ }
-        }
-
-        if (dirty) {
-          statusLabel += ' (dirty)';
+            const lsTree = await this.git.raw(['ls-tree', 'HEAD', '--', subPath]);
+            const treeMatch = lsTree.match(/\s([0-9a-f]{40})\s/);
+            if (treeMatch) expectedCommit = treeMatch[1];
+          } catch { /* fall back to hash from submodule status */ }
         }
 
         submodules.push({
@@ -655,13 +651,31 @@ try {
           path: subPath,
           url: config?.url ?? '',
           branch: config?.branch ?? null,
-          expectedCommit: hash,
+          expectedCommit,
           currentCommit: status === 'uninitialized' ? null : hash,
           status,
-          dirty,
+          dirty: false, // populated below
           statusLabel,
         });
       }
+
+      // Check dirty status for all initialized submodules in parallel
+      await Promise.all(
+        submodules
+          .filter(s => s.status !== 'uninitialized')
+          .map(async (s) => {
+            try {
+              const dirtyCheck = await this.git.raw([
+                '-C', join(this.cwd, s.path), 'status', '--porcelain',
+              ]);
+              if (dirtyCheck.trim().length > 0) {
+                s.dirty = true;
+                s.statusLabel += ' (dirty)';
+              }
+            } catch { /* submodule dir may not exist */ }
+          })
+      );
+
       return submodules;
     } catch { /* Expected: submodule command may fail if git is too old */
       return [];

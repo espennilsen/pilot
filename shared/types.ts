@@ -208,7 +208,6 @@ export interface GitStatus {
   isClean: boolean;
   /** Non-null when a merge, rebase, cherry-pick, or revert is in progress */
   operationInProgress: GitOperationState | null;
-  submodules?: GitSubmodule[];
 }
 
 /** Tracks the state of an in-progress git operation that may produce conflicts */
