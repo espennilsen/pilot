@@ -280,7 +280,7 @@ export function registerShellIpc() {
 
   ipcMain.handle(IPC.SHELL_CONFIRM_DIALOG, async (event, options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const result = await dialog.showMessageBox(win!, {
+    const result = await dialog.showMessageBox(win, {
       type: 'warning',
       title: options.title ?? 'Confirm',
       message: options.message,
