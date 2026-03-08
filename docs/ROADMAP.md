@@ -1,59 +1,14 @@
 # Roadmap
 
-> Last updated: 2026-03-06
+> Last updated: 2026-03-08
 
-Current state: **Cross-platform alpha**. Core chat, sandbox, git, companion, memory, tasks, and subagent features work on macOS, Windows, and Linux. Nightly builds ship automatically via GitHub Actions.
-
----
-
-## In Progress
-
-### 🪟 Windows Platform Support (epic)
-
-Ship Pilot on Windows. 12 tasks, most in review.
-
-| Priority | Task | Status |
-|----------|------|--------|
-| 🔴 Critical | Config paths — use `%APPDATA%` | Review |
-| 🔴 Critical | Replace `which`/`mv`/`unzip` with cross-platform alternatives | Review |
-| 🔴 Critical | Add NSIS/portable build target + `.ico` icon | ✅ Done |
-| 🟠 High | Session path encoding — handle drive letters | Review |
-| 🟠 High | Terminal & editor detection (`wt.exe`, PowerShell, `cmd`) | Review |
-| 🟠 High | Keyboard shortcut labels — show `Ctrl` instead of `⌘` | Review |
-| 🟡 Medium | Snap layouts & titlebar overlay | Review |
-| 🟡 Medium | Process management — tree-kill and SIGTERM handling | Review |
-| 🟡 Medium | Companion TLS — replace OpenSSL `/dev/stdin` with Node crypto | Review |
-| 🟡 Medium | Path handling — drive letter case, tilde expansion, UNC paths | Review |
-| 🔵 Low | CI/CD — GitHub Actions for Windows builds | ✅ Done |
-
-### 🐧 Linux Platform Support (epic)
-
-Ship Pilot on Linux. 8 tasks, most in review.
-
-| Priority | Task | Status |
-|----------|------|--------|
-| 🔴 Critical | Config paths — respect `$XDG_CONFIG_HOME` | Review |
-| 🔴 Critical | Add AppImage/deb build targets | ✅ Done |
-| 🟠 High | Terminal detection & working-directory flags per terminal | Review |
-| 🟠 High | Keyboard shortcut labels — show `Ctrl` instead of `⌘` | Review |
-| 🟡 Medium | UI labels — "File Manager" and Linux-appropriate fonts | Review |
-| 🔵 Low | Window chrome — test drag/resize across DEs | Review |
-| 🔵 Low | CI/CD — GitHub Actions for Linux builds | ✅ Done |
-
-### 🏗️ Code Quality
-
-| Item | Status |
-|------|--------|
-| MVC migration — large file decomposition (19 items, 2 waves) | ✅ Done |
-| Code review — resolve all 71 findings | ✅ Done |
-| Annotate all 64 silent catch blocks | ✅ Done |
-| Configurable logger with file rotation | ✅ Done |
+Current state: **Cross-platform alpha**. Core chat, sandbox, git, companion, memory, tasks, desktop, and subagent features work on macOS, Windows, and Linux. Nightly builds ship automatically via GitHub Actions. All platform epics and code quality work are complete.
 
 ---
 
-## Planned — Post-MVP
+## Planned — Next Up
 
-Features planned after cross-platform shipping. Ordered by priority.
+Features planned for the next development cycle. Ordered by priority.
 
 ### High Priority
 
@@ -83,8 +38,16 @@ Features planned after cross-platform shipping. Ordered by priority.
 
 | Date | Milestone |
 |------|-----------|
-| 2026-03-06 | Git submodule support — list, init, deinit, update, sync from git panel |
+| 2026-03-08 | Git submodule support — list, init, deinit, update, sync from git panel |
+| 2026-03-07 | Task review approval — approve/reject tasks in review status from UI |
+| 2026-03-07 | Refactor: extract SessionToolInjector to isolate private SDK access |
+| 2026-03-07 | Fix kanban board columns not hiding when excluded by status filter |
+| 2026-03-07 | Dependency update — pi-coding-agent 0.55.3→0.57.0, Electron 40.6.1→40.8.0 |
+| 2026-03-06 | Desktop screenshot grid overlay — always-on coordinate grid for agent precision |
 | 2026-03-06 | Git interactive rebase — visual rebase editor with drag-to-reorder |
+| 2026-03-04 | Memory tools — search, category normalization, and improved UX |
+| 2026-02-28 | Desktop — Docker-based virtual display for agent GUI automation |
+| 2026-02-27 | AI-assisted git conflict resolution with agent integration |
 | 2026-02-25 | Nightly CI builds — macOS, Windows, Linux via GitHub Actions |
 | 2026-02-25 | Agent memory tools — `pilot_memory_read/add/remove` |
 | 2026-02-25 | System prompt settings — editable with live refresh on active sessions |
@@ -95,13 +58,28 @@ Features planned after cross-platform shipping. Ordered by priority.
 | 2026-02-24 | Light theme — dark/light/system modes, terminal theme, hljs overrides |
 | 2026-02-24 | MVC migration complete — all 19 large files decomposed |
 | 2026-02-24 | Full documentation suite (14 docs + 8 user guides) |
-| 2026-02-23 | Cross-platform review — Windows (12 tasks) + Linux (8 tasks) created |
+| 2026-02-23 | Cross-platform support — Windows + Linux in a single 48-file commit |
+| 2026-02-23 | Companion app — WebSocket bridge, pairing, TLS, Tailscale/Cloudflare tunnels |
 | 2026-02-23 | Companion auth hardening — token persistence, device trust, PIN refresh |
 | 2026-02-23 | Configurable logger with syslog support and daily rotation |
 | 2026-02-22 | `web_fetch` tool for agent |
 | 2026-02-22 | Jail enforcement on bash tool via path analysis |
 | 2026-02-22 | Session delete, archive/pin persistence |
 | 2026-02-22 | File tree hidden patterns with `.gitignore` syntax |
+
+## Completed Epics
+
+| Epic | Completed |
+|------|-----------|
+| 🪟 Windows platform support (12 tasks) | 2026-02-23 |
+| 🐧 Linux platform support (8 tasks) | 2026-02-23 |
+| 📱 Companion app — server, auth, TLS, discovery, remote access | 2026-02-23 |
+| 🏗️ Code quality — MVC migration, 71 review findings, 64 catch blocks, logger | 2026-02-24 |
+| 🖥️ Desktop — Docker sandbox with virtual display | 2026-02-28 |
+| ⚔️ AI-assisted git conflict resolution | 2026-02-27 |
+| 🔀 Git interactive rebase UI | 2026-03-06 |
+| 📦 Git submodule support | 2026-03-08 |
+| ✅ Task review approval (approve/reject from UI) | 2026-03-07 |
 
 ---
 
