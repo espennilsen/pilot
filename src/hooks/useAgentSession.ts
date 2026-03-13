@@ -109,11 +109,14 @@ export function useAgentSession() {
   useEffect(() => {
     const unsubUpdated = on(IPC.MEMORY_UPDATED, (payload: MemoryUpdatedPayload) => {
       const { count, preview } = payload;
-      useMemoryStore.getState().setLastUpdate({ count, preview });
-      // Refresh memory count
+      if (count > 0) {
+        useMemoryStore.getState().setLastUpdate({ count, preview });
+      }
+      // Refresh memory count and content so the sidebar panel stays in sync
       const projectPath = useProjectStore.getState().projectPath;
       if (projectPath) {
         useMemoryStore.getState().loadMemoryCount(projectPath);
+        useMemoryStore.getState().loadMemories(projectPath);
       }
     });
 

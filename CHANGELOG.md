@@ -2,6 +2,13 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-03-13
+
+### Fixed
+- **Memory tools crash + session freeze** — memory tool `execute` functions returned plain strings instead of `AgentToolResult` objects, causing `content: undefined` in tool result messages; the next LLM API call would crash inside the SDK's unguarded async agent loop, leaving the `EventStream` hanging forever and permanently freezing the session (`isStreaming` stuck `true`)
+- **"undefined" written to memory** — auto-extraction model sometimes returned the literal string `"undefined"` as memory text; added a junk filter in `processExtractionResult` to reject nonsense values
+- **Memory panel not refreshing after writes** — the sidebar memory pane only loaded content on mount; added an `onChanged` callback to `MemoryManager` that fires after every disk write and broadcasts `MEMORY_UPDATED` to the renderer, which now reloads both count and content
+
 ## 2026-03-11
 
 ### Fixed

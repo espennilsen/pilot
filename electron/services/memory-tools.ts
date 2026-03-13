@@ -2,6 +2,11 @@ import { Type } from '@sinclair/typebox';
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
 import type { MemoryManager } from './memory-manager';
 
+/** Wrap a plain string in the AgentToolResult format the SDK expects. */
+function textResult(text: string) {
+  return { content: [{ type: 'text' as const, text }], details: {} };
+}
+
 /**
  * Normalize category names to prevent fragmentation.
  * Maps common variations to canonical categories.
@@ -111,7 +116,7 @@ export function createMemoryTools(
         sections.push(`## Project Memory\n${files.projectShared}`);
       }
 
-      return sections.length > 0 ? sections.join('\n\n') : 'No memories stored.';
+      return textResult(sections.length > 0 ? sections.join('\n\n') : 'No memories stored.');
     },
   };
 
@@ -158,7 +163,7 @@ export function createMemoryTools(
       const scope = params.scope ?? 'project';
       const category = normalizeCategory(params.category ?? 'General');
       await memoryManager.appendMemory(params.text, scope, projectPath, category);
-      return `Saved to ${scope} memory under "${category}": ${params.text}`;
+      return textResult(`Saved to ${scope} memory under "${category}": ${params.text}`);
     },
   };
 
@@ -182,9 +187,9 @@ export function createMemoryTools(
     }),
     execute: async (_toolCallId, params) => {
       const removed = await memoryManager.removeMemory(params.text, projectPath);
-      return removed
+      return textResult(removed
         ? `Removed: "${removed}"`
-        : `No memory found matching: ${params.text}`;
+        : `No memory found matching: ${params.text}`);
     },
   };
 
@@ -212,17 +217,17 @@ export function createMemoryTools(
     }),
     execute: async (_toolCallId, params) => {
       if (!params.query.trim()) {
-        return 'Please provide a non-empty search query. Use pilot_memory_read to see all memories.';
+        return textResult('Please provide a non-empty search query. Use pilot_memory_read to see all memories.');
       }
       const scope = params.scope ?? 'all';
       const results = await memoryManager.searchMemories(params.query, projectPath, scope);
 
       if (results.length === 0) {
-        return `No memories found matching: ${params.query}`;
+        return textResult(`No memories found matching: ${params.query}`);
       }
 
       const lines = results.map(r => `[${r.scope}/${r.category}] ${r.text}`);
-      return `Found ${results.length} matching ${results.length === 1 ? 'memory' : 'memories'}:\n\n${lines.join('\n')}`;
+      return textResult(`Found ${results.length} matching ${results.length === 1 ? 'memory' : 'memories'}:\n\n${lines.join('\n')}`);
     },
   };
 

@@ -37,6 +37,7 @@ export interface MemoryFiles {
 export class MemoryManager {
   private lastExtractionTime = 0;
   private _enabled = true;
+  private _onChange?: () => void;
 
   get enabled(): boolean {
     return this._enabled;
@@ -44,6 +45,15 @@ export class MemoryManager {
 
   setEnabled(enabled: boolean): void {
     this._enabled = enabled;
+  }
+
+  /** Register a callback invoked after any memory file is written to disk. */
+  onChanged(cb: () => void): void {
+    this._onChange = cb;
+  }
+
+  private notifyChanged(): void {
+    this._onChange?.();
   }
 
   /**
@@ -124,6 +134,7 @@ export class MemoryManager {
     const filePath = this.resolveFilePath(scope, projectPath);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content, 'utf-8');
+    this.notifyChanged();
   }
 
   /**
@@ -136,6 +147,7 @@ export class MemoryManager {
     const filePath = this.resolveFilePath(scope, projectPath);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, '# Memory\n', 'utf-8');
+    this.notifyChanged();
   }
 
   /**
@@ -257,9 +269,14 @@ If nothing worth remembering, respond: {"memories": []}`;
       if (memories.length > 0) {
         for (const mem of memories) {
           if (mem.text && typeof mem.text === 'string') {
-            const text = mem.text.length > MAX_MEMORY_TEXT_LENGTH
-              ? mem.text.slice(0, MAX_MEMORY_TEXT_LENGTH) + '…'
-              : mem.text;
+            // Skip junk values the extraction model sometimes produces
+            const trimmed = mem.text.trim();
+            if (!trimmed || trimmed === 'undefined' || trimmed === 'null' || trimmed === 'true' || trimmed === 'false') {
+              continue;
+            }
+            const text = trimmed.length > MAX_MEMORY_TEXT_LENGTH
+              ? trimmed.slice(0, MAX_MEMORY_TEXT_LENGTH) + '…'
+              : trimmed;
             const category = (typeof mem.category === 'string' ? mem.category : 'General')
               .slice(0, MAX_CATEGORY_LENGTH);
             await this.appendMemory(
@@ -316,6 +333,7 @@ If nothing worth remembering, respond: {"memories": []}`;
     }
 
     await fs.writeFile(filePath, content, 'utf-8');
+    this.notifyChanged();
   }
 
   /**
@@ -355,6 +373,7 @@ If nothing worth remembering, respond: {"memories": []}`;
         const removedLine = lines[matchIdx].replace(/^-\s*/, ''); // Strip bullet prefix
         lines.splice(matchIdx, 1);
         await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+        this.notifyChanged();
         return removedLine;
       }
     }

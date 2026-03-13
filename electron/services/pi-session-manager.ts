@@ -64,6 +64,11 @@ export class PilotSessionManager {
     this.taskManager.onBoardChanged = (projectPath: string) => {
       this.sendToRenderer(IPC.TASKS_CHANGED, { projectPath });
     };
+
+    // Wire up memory change notifications to renderer
+    this.memoryManager.onChanged(() => {
+      this.sendToRenderer(IPC.MEMORY_UPDATED, { count: 0, preview: '' });
+    });
   }
 
   async createSession(tabId: string, projectPath: string): Promise<void> {
