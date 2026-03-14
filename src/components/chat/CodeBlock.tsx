@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { highlightCode } from '../../lib/syntax-highlight';
 import { useTabStore } from '../../stores/tab-store';
 import { useArtifactStore } from '../../stores/artifact-store';
@@ -72,9 +72,13 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
   }, [code, resolvedLang]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard write can fail if document loses focus or permissions denied
+    }
   };
 
   const lines = highlightedLines ?? code.split('\n');

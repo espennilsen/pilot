@@ -146,7 +146,12 @@ export const useArtifactStore = create<ArtifactStore>((set, get) => ({
       delete newArtifacts[tabId];
       const newActive = { ...state.activeArtifactByTab };
       delete newActive[tabId];
-      return { artifactsByTab: newArtifacts, activeArtifactByTab: newActive };
+      const anyRemaining = Object.values(newArtifacts).some(list => list.length > 0);
+      return {
+        artifactsByTab: newArtifacts,
+        activeArtifactByTab: newActive,
+        panelVisible: anyRemaining ? state.panelVisible : false,
+      };
     });
   },
 }));
