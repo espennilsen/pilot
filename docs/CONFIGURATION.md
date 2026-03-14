@@ -14,6 +14,36 @@ Pilot has no `.env` files. All configuration is stored in JSON files on disk. Th
 
 Resolved at runtime by `electron/services/pilot-paths.ts`.
 
+## Configuration Files and Directories
+
+The following files and directories live inside `<PILOT_DIR>`:
+
+| Path | Contents |
+|---|---|
+| `<PILOT_DIR>/auth.json` | API keys and OAuth tokens |
+| `<PILOT_DIR>/models.json` | Model registry cache |
+| `<PILOT_DIR>/app-settings.json` | Terminal, editor, developer mode, keybind overrides |
+| `<PILOT_DIR>/workspace.json` | Saved tab layout and UI state |
+| `<PILOT_DIR>/config.json` | Pi SDK configuration |
+| `<PILOT_DIR>/mcp-servers.json` | Global MCP server configurations |
+| `<PILOT_DIR>/sessions/` | Session `.jsonl` files (managed by Pi SDK) |
+| `<PILOT_DIR>/extensions/` | Global extensions |
+| `<PILOT_DIR>/skills/` | Global skills |
+| `<PILOT_DIR>/themes/` | Custom theme JSON files. Each file defines a complete color palette. See [user/themes.md](user/themes.md). |
+| `<PILOT_DIR>/extension-registry.json` | Extension enabled/disabled state |
+| `<PILOT_DIR>/MEMORY.md` | Global memory |
+| `<PILOT_DIR>/logs/` | Rotating log files (if file logging is enabled) |
+
+Project-specific paths (inside each project):
+
+| Path | Contents |
+|---|---|
+| `<project>/.pilot/settings.json` | Jail, yolo mode, allowed paths |
+| `<project>/.pilot/commands.json` | Dev command buttons |
+| `<project>/.pilot/mcp-servers.json` | Project-specific MCP server configurations |
+| `<project>/.pilot/desktop/` | Docker customization for desktop service |
+| `<project>/.pilot/MEMORY.md` | Project memory (can be git-tracked) |
+
 ## App Settings (`app-settings.json`)
 
 Managed by `electron/services/app-settings.ts`. Read/written via `APP_SETTINGS_GET` / `APP_SETTINGS_UPDATE` IPC channels.
