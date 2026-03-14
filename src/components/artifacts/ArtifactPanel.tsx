@@ -14,12 +14,19 @@ import ArtifactRenderer from './ArtifactRenderer';
 
 export default function ArtifactPanel() {
   const activeTabId = useTabStore(s => s.activeTabId);
-  const { panelVisible, hidePanel, getArtifacts, getActiveArtifact, setActiveArtifact, removeArtifact } = useArtifactStore();
+  const { panelVisible, hidePanel, setActiveArtifact, removeArtifact } = useArtifactStore();
+  const artifactsByTab = useArtifactStore(s => s.artifactsByTab);
+  const activeArtifactByTab = useArtifactStore(s => s.activeArtifactByTab);
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const artifacts = useMemo(() => activeTabId ? getArtifacts(activeTabId) : [], [activeTabId, getArtifacts, useArtifactStore(s => s.artifactsByTab)]);
-  const activeArtifact = useMemo(() => activeTabId ? getActiveArtifact(activeTabId) : null, [activeTabId, getActiveArtifact, useArtifactStore(s => s.activeArtifactByTab), useArtifactStore(s => s.artifactsByTab)]);
+  const artifacts = useMemo(() => activeTabId ? artifactsByTab[activeTabId] || [] : [], [activeTabId, artifactsByTab]);
+  const activeArtifact = useMemo(() => {
+    if (!activeTabId) return null;
+    const list = artifactsByTab[activeTabId] || [];
+    const activeId = activeArtifactByTab[activeTabId];
+    return list.find(a => a.id === activeId) || null;
+  }, [activeTabId, artifactsByTab, activeArtifactByTab]);
 
   if (!panelVisible || !activeTabId || artifacts.length === 0) return null;
 
@@ -70,11 +77,14 @@ export default function ArtifactPanel() {
       {artifacts.length > 1 && (
         <div className="flex items-center gap-1 px-2 py-1 bg-bg-surface border-b border-border overflow-x-auto">
           {artifacts.map(a => (
-            <button
+            <div
               key={a.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveArtifact(activeTabId!, a.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveArtifact(activeTabId!, a.id); } }}
               className={`
-                flex items-center gap-1 px-2 py-1 rounded text-xs whitespace-nowrap transition-colors
+                flex items-center gap-1 px-2 py-1 rounded text-xs whitespace-nowrap transition-colors cursor-pointer
                 ${a.id === activeArtifact?.id
                   ? 'bg-accent/20 text-accent'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}
@@ -87,7 +97,7 @@ export default function ArtifactPanel() {
               >
                 <X className="w-3 h-3" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       )}

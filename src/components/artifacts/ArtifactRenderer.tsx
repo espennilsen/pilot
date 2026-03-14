@@ -72,7 +72,9 @@ ${artifact.source}
 <html>
 <head>
   <meta charset="utf-8">
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"
+          integrity="sha384-zkWMJO4sgpPUzyuOgDx8HB/K55glbAwajEpk1Go2NWRuPkPA/wIhoEJTuSkmOYrV"
+          crossorigin="anonymous"><\/script>
   <style>
     body {
       margin: 0;
@@ -100,9 +102,15 @@ ${artifact.source}
 <html>
 <head>
   <meta charset="utf-8">
-  <script src="https://cdn.jsdelivr.net/npm/react@19/umd/react.production.min.js"><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@19/umd/react-dom.production.min.js"><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/react@19.1.0/umd/react.production.min.js"
+          integrity="sha384-WcU25JcSvbqF7FhAved4KMxL1rMz6Ba2tG4D1gWn7X2CljYCCjlarh0BbnRRwNN1"
+          crossorigin="anonymous"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@19.1.0/umd/react-dom.production.min.js"
+          integrity="sha384-hBq0oXHNHhoXThqlW6pzrWD7luBPeba+U6wYAvIuMJKFb/s1BmjcTT4w8LJP7P7C"
+          crossorigin="anonymous"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.27.1/babel.min.js"
+          integrity="sha384-gfdDnMJZ5KDBvTE8ubvJFTQpYg0sEBsV/T5HU1fjbkytB0atp//jUAocPT6F3NKX"
+          crossorigin="anonymous"><\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -117,17 +125,21 @@ ${artifact.source}
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
+  <script>
+// Provide a render helper the user's code can call.
+// Also used by the auto-render harness below.
+window.__render__ = function(Component) {
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Component));
+};
+  <\/script>
+  <script type="text/babel" data-type="module">
 ${artifact.source}
 
-// Auto-render: find the last exported/defined component
-const _components = {};
+// Auto-render harness: detect the default export and render it.
+// If the code called __render__() itself, this is a no-op.
 try {
-  // Try common component names
-  const _names = Object.keys(window).filter(k => /^[A-Z]/.test(k) && typeof window[k] === 'function');
-  if (_names.length > 0) {
-    const Component = window[_names[_names.length - 1]];
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Component));
+  if (typeof exports !== 'undefined' && exports.default) {
+    window.__render__(exports.default);
   }
 } catch (e) {
   document.getElementById('root').innerHTML = '<pre style="color:#ff6b6b">' + e.message + '</pre>';
@@ -137,7 +149,7 @@ try {
 </html>`;
 
     default:
-      return `<html><body><pre>${artifact.source}</pre></body></html>`;
+      return `<html><body><pre>${artifact.source.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre></body></html>`;
   }
 }
 
