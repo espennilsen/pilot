@@ -293,6 +293,21 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
     };
   });
 
+  // Get user messages with entry IDs for fork/regenerate
+  ipcMain.handle(IPC.SESSION_GET_FORK_POINTS, async (_event, tabId: string) => {
+    return sessionManager.getForkPoints(tabId);
+  });
+
+  // Fork session at a specific entry (for regenerate/edit-and-resend)
+  ipcMain.handle(IPC.SESSION_FORK, async (_event, tabId: string, entryId: string) => {
+    const result = await sessionManager.fork(tabId, entryId);
+    return {
+      selectedText: result.selectedText,
+      cancelled: result.cancelled,
+      history: sessionManager.getSessionHistory(tabId),
+    };
+  });
+
   // Generate a commit message from a git diff (one-shot LLM call, no session)
   ipcMain.handle(IPC.GIT_GENERATE_COMMIT_MSG, async (_event, diff: string) => {
     return sessionManager.generateCommitMessage(diff);

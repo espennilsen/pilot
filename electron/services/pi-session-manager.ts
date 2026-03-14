@@ -232,6 +232,17 @@ export class PilotSessionManager {
     return session.fork(entryId);
   }
 
+  /** Get user messages with their entry IDs for forking / regeneration. */
+  getForkPoints(tabId: string): Array<{ entryId: string; text: string }> {
+    const session = this.sessions.get(tabId);
+    if (!session) return [];
+    try {
+      return session.getUserMessagesForForking();
+    } catch {
+      return [];
+    }
+  }
+
   getSession(tabId: string): AgentSession | undefined {
     return this.sessions.get(tabId);
   }
