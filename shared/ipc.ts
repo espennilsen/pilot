@@ -35,11 +35,22 @@ export const IPC = {
   SESSION_NEW: 'session:new',
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
+  SESSION_EXPORT: 'session:export',
+  SESSION_EXPORT_CLIPBOARD: 'session:export-clipboard',
 
   // App Settings (Pilot-level, stored in ~/.config/pilot/)
   APP_SETTINGS_GET: 'app-settings:get',
   APP_SETTINGS_UPDATE: 'app-settings:update',
   APP_THEME_CHANGED: 'app-settings:theme-changed',
+
+  // Custom Themes
+  THEME_LIST: 'theme:list',
+  THEME_GET: 'theme:get',
+  THEME_SAVE: 'theme:save',
+  THEME_DELETE: 'theme:delete',
+  THEME_IMPORT: 'theme:import',
+  THEME_EXPORT: 'theme:export',
+
   PI_SETTINGS_GET: 'pi-settings:get',
   PI_SETTINGS_UPDATE: 'pi-settings:update',
 

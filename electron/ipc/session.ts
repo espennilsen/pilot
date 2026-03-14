@@ -1,8 +1,12 @@
-import { ipcMain } from 'electron';
+import { ipcMain, dialog, clipboard, BrowserWindow } from 'electron';
+import { writeFileSync } from 'fs';
 import { IPC } from '../../shared/ipc';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 import { updateSessionMeta, removeSessionMeta } from '../services/session-metadata';
 import type { SessionMeta } from '../services/session-metadata';
+import type { SessionExportOptions, SessionExportResult } from '../../shared/types';
+import type { Message } from '@mariozechner/pi-ai';
+import { formatAsMarkdown, formatAsJson } from '../services/session-export';
 
 export function registerSessionIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.SESSION_LIST, async (_event, projectPath: string) => {
@@ -20,4 +24,80 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.SESSION_DELETE, async (_event, sessionPath: string) => {
     return sessionManager.deleteSession(sessionPath);
   });
+
+  // ── Session export ──────────────────────────────────────────────────
+
+  /** Export session to a file (shows save dialog). */
+  ipcMain.handle(
+    IPC.SESSION_EXPORT,
+    async (
+      _event,
+      tabId: string,
+      options: SessionExportOptions,
+      meta?: { title?: string; projectPath?: string }
+    ): Promise<SessionExportResult> => {
+      const rawMessages = sessionManager.getRawMessages(tabId) as Message[];
+      if (rawMessages.length === 0) {
+        throw new Error('No messages to export — the session is empty.');
+      }
+
+      const sessionPath = sessionManager.getSessionPath(tabId) || undefined;
+      const exportMeta = { ...meta, sessionPath };
+
+      const content = options.format === 'json'
+        ? formatAsJson(rawMessages, options, exportMeta)
+        : formatAsMarkdown(rawMessages, options, exportMeta);
+
+      const ext = options.format === 'json' ? 'json' : 'md';
+      const filterName = options.format === 'json' ? 'JSON' : 'Markdown';
+
+      // Generate a default filename from the session title
+      const slug = (meta?.title || 'chat-export')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 60);
+      const dateStamp = new Date().toISOString().split('T')[0];
+      const defaultName = `${slug}-${dateStamp}.${ext}`;
+
+      const win = BrowserWindow.getFocusedWindow();
+      const result = await dialog.showSaveDialog(win ?? BrowserWindow.getAllWindows()[0], {
+        title: `Export Chat as ${filterName}`,
+        defaultPath: defaultName,
+        filters: [{ name: filterName, extensions: [ext] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false };
+      }
+
+      writeFileSync(result.filePath, content, 'utf-8');
+      return { success: true, filePath: result.filePath };
+    }
+  );
+
+  /** Export session to clipboard (returns the formatted content). */
+  ipcMain.handle(
+    IPC.SESSION_EXPORT_CLIPBOARD,
+    async (
+      _event,
+      tabId: string,
+      options: SessionExportOptions,
+      meta?: { title?: string; projectPath?: string }
+    ): Promise<SessionExportResult> => {
+      const rawMessages = sessionManager.getRawMessages(tabId) as Message[];
+      if (rawMessages.length === 0) {
+        throw new Error('No messages to export — the session is empty.');
+      }
+
+      const sessionPath = sessionManager.getSessionPath(tabId) || undefined;
+      const exportMeta = { ...meta, sessionPath };
+
+      // Always use Markdown for clipboard — it's the most readable plain-text format
+      const content = formatAsMarkdown(rawMessages, { ...options, format: 'markdown' }, exportMeta);
+
+      clipboard.writeText(content);
+      return { success: true, content };
+    }
+  );
 }

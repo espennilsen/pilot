@@ -17,14 +17,38 @@ export interface SessionMetadata {
 }
 
 // Pilot app settings (stored in ~/.config/pilot/app-settings.json)
-/** Theme mode — 'dark', 'light', or 'system' (follows OS preference). */
-export type ThemeMode = 'dark' | 'light' | 'system';
+/** Theme mode — 'dark', 'light', 'system' (follows OS), or 'custom' (user-defined). */
+export type ThemeMode = 'dark' | 'light' | 'system' | 'custom';
+
+/** A user-defined or built-in custom theme. */
+export interface CustomTheme {
+  /** Display name (e.g. "Nord") */
+  name: string;
+  /** URL-safe unique identifier, derived from name (e.g. "nord") */
+  slug: string;
+  /** Theme author */
+  author: string;
+  /** Base theme to inherit from — determines fallback colors for unset keys */
+  base: 'dark' | 'light';
+  /** Schema version for future migrations */
+  version: number;
+  /** Whether this is a built-in theme (cannot be deleted or overwritten) */
+  builtIn?: boolean;
+  /** App chrome colors — keys map to CSS custom properties (e.g. "bg-base" → --color-bg-base) */
+  colors: Record<string, string>;
+  /** Terminal (xterm) color overrides. Optional — falls back to base palette if omitted */
+  terminal?: Record<string, string>;
+  /** Syntax highlighting (highlight.js) token color overrides. Optional */
+  syntax?: Record<string, string>;
+}
 
 export interface PilotAppSettings {
   /** Custom pi agent config directory. Default: ~/.config/pilot */
   piAgentDir: string;
   /** App color theme. Default: 'dark' */
   theme?: ThemeMode;
+  /** Active custom theme slug (used when theme === 'custom'). */
+  customThemeSlug?: string;
   /** Preferred terminal app. null = system default */
   terminalApp: string | null;
   /** Preferred code editor CLI command. null = auto-detect first available */
@@ -627,6 +651,33 @@ export interface PromptUpdateInput {
   icon?: string;
   command?: string | null;
   hidden?: boolean;
+}
+
+// ─── Session Export ──────────────────────────────────────────────────────
+
+/** Supported export formats for chat sessions. */
+export type SessionExportFormat = 'markdown' | 'json';
+
+/** Options for exporting a chat session. */
+export interface SessionExportOptions {
+  /** Export format. */
+  format: SessionExportFormat;
+  /** Whether to include thinking/reasoning blocks. Default: false. */
+  includeThinking?: boolean;
+  /** Whether to include tool call details. Default: false. */
+  includeToolCalls?: boolean;
+  /** Whether to include timestamps on each message. Default: true. */
+  includeTimestamps?: boolean;
+}
+
+/** Result of a session export operation. */
+export interface SessionExportResult {
+  /** Whether the export was successful (user may cancel file dialog). */
+  success: boolean;
+  /** File path where the export was saved (for file export). */
+  filePath?: string;
+  /** Exported content string (for clipboard export). */
+  content?: string;
 }
 
 // ─── Subagents ──────────────────────────────────────────────────────────
