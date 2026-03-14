@@ -38,8 +38,15 @@ export function generateSuggestions(
   const hasSteps = /step \d|1\.|first,|next,|then,/i.test(assistantResponse);
   const hasTodo = /todo|remaining|next step|follow.?up/i.test(assistantResponse);
 
+  // Analyze user's last message for context-aware filtering
+  const userLower = lastUserMessage.toLowerCase();
+  const userAskedQuestion = /\?$|^(what|why|how|when|where|who|explain|describe|tell me)/i.test(lastUserMessage.trim());
+  const userAskedToRun = /\b(run|build|test|start|deploy|execute|compile)\b/i.test(userLower);
+  const userAskedToFix = /\b(fix|debug|resolve|repair|patch)\b/i.test(userLower);
+
   // After code changes — suggest running tests or reviewing
-  if (hasChanges && !hasTests) {
+  // Skip "Run tests" if the user already asked to run something
+  if (hasChanges && !hasTests && !userAskedToRun) {
     suggestions.push({
       text: 'Run the tests to verify the changes work correctly',
       label: 'Run tests',
@@ -54,7 +61,8 @@ export function generateSuggestions(
   }
 
   // After errors — suggest fixing or explaining
-  if (hasError && suggestions.length < 3) {
+  // Skip if the user already asked to fix something
+  if (hasError && !userAskedToFix && suggestions.length < 3) {
     suggestions.push({
       text: 'Can you fix this error?',
       label: 'Fix error',
@@ -62,7 +70,8 @@ export function generateSuggestions(
   }
 
   // After explanations — suggest deeper dive
-  if (hasExplanation && !hasChanges && suggestions.length < 3) {
+  // Skip "Show example" if user asked to run/build (they want action, not more explanation)
+  if (hasExplanation && !hasChanges && !userAskedToRun && suggestions.length < 3) {
     suggestions.push({
       text: 'Can you show me an example?',
       label: 'Show example',

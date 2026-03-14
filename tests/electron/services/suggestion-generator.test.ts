@@ -75,4 +75,26 @@ Step 3 is to update tests.`;
     const labels = suggestions.map(s => s.label);
     expect(labels).toContain('Show diff');
   });
+
+  // Context-aware filtering tests (uses lastUserMessage)
+  it('should skip "Run tests" when user already asked to run something', () => {
+    const response = 'I\'ve updated the implementation:\n```ts\nconst x = 1;\n```';
+    const suggestions = generateSuggestions(response, 'Run the build and deploy', ['write']);
+    const labels = suggestions.map(s => s.label);
+    expect(labels).not.toContain('Run tests');
+  });
+
+  it('should skip "Fix error" when user already asked to fix', () => {
+    const response = 'There was an error: TypeError in auth module.';
+    const suggestions = generateSuggestions(response, 'Fix the auth bug', []);
+    const labels = suggestions.map(s => s.label);
+    expect(labels).not.toContain('Fix error');
+  });
+
+  it('should skip "Show example" when user asked to run/build', () => {
+    const response = 'A'.repeat(600); // Long explanation
+    const suggestions = generateSuggestions(response, 'Build the project', []);
+    const labels = suggestions.map(s => s.label);
+    expect(labels).not.toContain('Show example');
+  });
 });
