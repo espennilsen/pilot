@@ -90,7 +90,7 @@ ${artifact.source}
 </head>
 <body>
   <pre class="mermaid">
-${artifact.source.replace(/<\/pre>/gi, '&lt;/pre&gt;')}
+${artifact.source.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
   </pre>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });<\/script>
 </body>

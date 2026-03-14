@@ -109,15 +109,17 @@ export const useArtifactStore = create<ArtifactStore>((set, get) => ({
     set(state => {
       const artifacts = (state.artifactsByTab[tabId] || []).filter(a => a.id !== artifactId);
       const activeId = state.activeArtifactByTab[tabId];
+      const newArtifactsByTab = { ...state.artifactsByTab, [tabId]: artifacts };
+      const anyRemaining = Object.values(newArtifactsByTab).some(list => list.length > 0);
       return {
-        artifactsByTab: { ...state.artifactsByTab, [tabId]: artifacts },
+        artifactsByTab: newArtifactsByTab,
         activeArtifactByTab: {
           ...state.activeArtifactByTab,
           [tabId]: activeId === artifactId
             ? (artifacts[0]?.id ?? null)
             : activeId,
         },
-        panelVisible: artifacts.length > 0 ? state.panelVisible : false,
+        panelVisible: anyRemaining ? state.panelVisible : false,
       };
     });
   },

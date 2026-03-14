@@ -61,6 +61,9 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
   const resolvedLang = resolveLanguage(language);
   const activeTabId = useTabStore(s => s.activeTabId);
   const createArtifact = useArtifactStore(s => s.createArtifact);
+  const getArtifacts = useArtifactStore(s => s.getArtifacts);
+  const setActiveArtifact = useArtifactStore(s => s.setActiveArtifact);
+  const showPanel = useArtifactStore(s => s.showPanel);
   const artifactType = getArtifactType(language);
 
   useEffect(() => {
@@ -91,7 +94,15 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
         <div className="flex items-center gap-1">
           {artifactType && activeTabId && (
             <button
-              onClick={() => createArtifact(activeTabId, artifactType, code)}
+              onClick={() => {
+                const existing = getArtifacts(activeTabId!).find(a => a.type === artifactType && a.source === code);
+                if (existing) {
+                  setActiveArtifact(activeTabId!, existing.id);
+                  showPanel();
+                } else {
+                  createArtifact(activeTabId!, artifactType, code);
+                }
+              }}
               className="hover:text-text-primary transition-colors px-2 py-0.5 rounded hover:bg-bg-elevated"
               title="Open as live preview"
             >
