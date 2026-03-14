@@ -45,15 +45,15 @@ export function generateSuggestions(
   const userAskedToFix = /\b(fix|debug|resolve|repair|patch)\b/i.test(userLower);
 
   // After code changes — suggest running tests or reviewing
-  // Skip "Run tests" if the user already asked to run something
-  if (hasChanges && !hasTests && !userAskedToRun) {
+  // Skip action suggestions if the user asked a conceptual question or already asked to run
+  if (hasChanges && !hasTests && !userAskedToRun && !userAskedQuestion) {
     suggestions.push({
       text: 'Run the tests to verify the changes work correctly',
       label: 'Run tests',
     });
   }
 
-  if (hasChanges && hasCode) {
+  if (hasChanges && hasCode && !userAskedQuestion) {
     suggestions.push({
       text: 'Show me the full diff of what changed',
       label: 'Show diff',

@@ -97,4 +97,12 @@ Step 3 is to update tests.`;
     const labels = suggestions.map(s => s.label);
     expect(labels).not.toContain('Show example');
   });
+
+  it('should skip action suggestions when user asked a question', () => {
+    const response = 'I\'ve updated the file:\n```ts\nconst x = 1;\n```\nDone.';
+    const suggestions = generateSuggestions(response, 'How does this function work?', ['write']);
+    const labels = suggestions.map(s => s.label);
+    expect(labels).not.toContain('Run tests');
+    expect(labels).not.toContain('Show diff');
+  });
 });
