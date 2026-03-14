@@ -3,6 +3,7 @@
  */
 import { create } from 'zustand';
 import { useProjectStore } from './project-store';
+import { useArtifactStore } from './artifact-store';
 
 /**
  * Represents a single tab (chat, file, tasks, docs, or web).
@@ -420,6 +421,9 @@ export const useTabStore = create<TabStore>((set, get) => {
         activeTabId: newActiveTabId,
         closedTabStack: newClosedStack,
       });
+
+      // Clean up artifacts for the closed tab
+      useArtifactStore.getState().clearTab(tabId);
     },
 
   /** Switch to a tab by ID. Clears unread flag and updates lastActiveAt. */

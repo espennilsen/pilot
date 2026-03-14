@@ -629,6 +629,29 @@ export interface PromptUpdateInput {
   hidden?: boolean;
 }
 
+// ─── Artifacts ──────────────────────────────────────────────────────────
+
+/** Supported artifact content types. */
+export type ArtifactType = 'html' | 'react' | 'svg' | 'mermaid';
+
+/** An artifact created from a code block in chat. */
+export interface Artifact {
+  /** Unique ID. */
+  id: string;
+  /** Display title (derived from language/content). */
+  title: string;
+  /** Content type. */
+  type: ArtifactType;
+  /** Raw source code. */
+  source: string;
+  /** Tab ID this artifact belongs to. */
+  tabId: string;
+  /** Timestamp when created. */
+  createdAt: number;
+  /** Version counter (incremented on updates). */
+  version: number;
+}
+
 // ─── Subagents ──────────────────────────────────────────────────────────
 
 export type SubagentStatus = 'queued' | 'running' | 'completed' | 'failed' | 'aborted';

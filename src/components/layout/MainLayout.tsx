@@ -9,6 +9,7 @@ import { TaskBoardView } from '../tasks/TaskBoardView';
 import { DocsViewer } from '../docs/DocsViewer';
 import { WebView } from '../web/WebView';
 import DesktopTabView from '../desktop/DesktopTabView';
+import ArtifactPanel from '../artifacts/ArtifactPanel';
 
 export default function MainLayout() {
   const { sidebarVisible, contextPanelVisible, setSidebarWidth, setContextPanelWidth } = useUIStore();
@@ -48,6 +49,7 @@ export default function MainLayout() {
         <ResizeHandle side="right" onResize={handleSidebarResize} />
       )}
       {renderMainContent()}
+      <ArtifactPanel />
       {contextPanelVisible && (
         <ResizeHandle side="left" onResize={handleContextPanelResize} />
       )}
