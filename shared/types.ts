@@ -78,6 +78,13 @@ export interface PilotAppSettings {
   };
   /** Enable Desktop feature globally. Per-project .pilot/settings.json overrides this. Default: false */
   desktopEnabled?: boolean;
+  /** Web search configuration */
+  webSearch?: {
+    /** Enable web search tool in agent sessions. Default: false */
+    enabled: boolean;
+    /** Brave Search API key. Get one free at https://api.search.brave.com/ */
+    apiKey?: string;
+  };
 }
 
 // MCP (Model Context Protocol) types

@@ -25,6 +25,7 @@ import { createWebFetchTool } from './web-fetch-tool';
 import { createMemoryTools } from './memory-tools';
 import { createEditorTools } from './editor-tools';
 import { createDesktopTools } from './desktop-tools';
+import { createWebSearchTool } from './web-search-tool';
 import type { DesktopService } from './desktop-service';
 import type { StagedDiff } from '../../shared/types';
 import type { McpManager } from './mcp-manager';
@@ -148,6 +149,12 @@ export async function buildSessionConfig(
     ? createDesktopTools(desktopService, projectPath)
     : [];
 
+  // Web search tool — enabled via settings with Brave Search API key
+  const webSearchEnabled = appSettings.webSearch?.enabled && appSettings.webSearch?.apiKey;
+  const webSearchTools: ToolDefinition[] = webSearchEnabled
+    ? [createWebSearchTool(() => appSettings.webSearch?.apiKey)]
+    : [];
+
   const customTools: ToolDefinition[] = [
     ...tools,
     ...readOnlyTools,
@@ -156,6 +163,7 @@ export async function buildSessionConfig(
     ...editorTools,
     ...subagentTools,
     createWebFetchTool(),
+    ...webSearchTools,
     ...mcpTools,
     ...desktopTools,
   ];
