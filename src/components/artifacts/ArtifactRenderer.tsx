@@ -90,7 +90,7 @@ ${artifact.source}
 </head>
 <body>
   <pre class="mermaid">
-${artifact.source}
+${artifact.source.replace(/<\/pre>/gi, '&lt;/pre&gt;')}
   </pre>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });<\/script>
 </body>
@@ -142,7 +142,8 @@ try {
     window.__render__(exports.default);
   }
 } catch (e) {
-  document.getElementById('root').innerHTML = '<pre style="color:#ff6b6b">' + e.message + '</pre>';
+  var esc = function(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  document.getElementById('root').innerHTML = '<pre style="color:#ff6b6b">' + esc(e.message) + '</pre>';
 }
   <\/script>
 </body>
