@@ -84,6 +84,8 @@ interface ChatState {
   queuedByTab: Record<string, { steering: string[]; followUp: string[] }>;
   // Streaming index cache per tab (performance optimization)
   streamingIndexByTab: Record<string, number>;
+  // Follow-up suggestions per tab
+  suggestionsByTab: Record<string, Array<{ text: string; label: string }>>;
 
   // Actions
   addMessage: (tabId: string, message: ChatMessage) => void;
@@ -100,6 +102,8 @@ interface ChatState {
   setContextUsage: (tabId: string, usage: ContextUsage) => void;
   setCost: (tabId: string, cost: number) => void;
   setQueued: (tabId: string, queued: { steering: string[]; followUp: string[] }) => void;
+  setSuggestions: (tabId: string, suggestions: Array<{ text: string; label: string }>) => void;
+  clearSuggestions: (tabId: string) => void;
   clearMessages: (tabId: string) => void;
   getMessages: (tabId: string) => ChatMessage[];
 }
@@ -146,6 +150,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   costByTab: {},
   queuedByTab: {},
   streamingIndexByTab: {},
+  suggestionsByTab: {},
 
   addMessage: (tabId, message) => {
     set(state => {
@@ -355,10 +360,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
+  setSuggestions: (tabId, suggestions) => {
+    set(state => ({
+      suggestionsByTab: { ...state.suggestionsByTab, [tabId]: suggestions },
+    }));
+  },
+
+  clearSuggestions: (tabId) => {
+    set(state => {
+      const newSuggestionsByTab = { ...state.suggestionsByTab };
+      delete newSuggestionsByTab[tabId];
+      return { suggestionsByTab: newSuggestionsByTab };
+    });
+  },
+
   clearMessages: (tabId) => {
     set(state => {
       const newStreamingIndexByTab = { ...state.streamingIndexByTab };
       delete newStreamingIndexByTab[tabId];
+      const newSuggestionsByTab = { ...state.suggestionsByTab };
+      delete newSuggestionsByTab[tabId];
       
       return {
         messagesByTab: {
@@ -366,6 +387,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [tabId]: [],
         },
         streamingIndexByTab: newStreamingIndexByTab,
+        suggestionsByTab: newSuggestionsByTab,
       };
     });
   },
