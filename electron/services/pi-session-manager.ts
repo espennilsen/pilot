@@ -422,6 +422,17 @@ export class PilotSessionManager {
     return this.modelRegistry;
   }
 
+  /** Get the raw SDK messages for a session (used by export). */
+  getRawMessages(tabId: string): unknown[] {
+    const session = this.sessions.get(tabId);
+    if (!session) return [];
+    try {
+      return session.state.messages;
+    } catch {
+      return [];
+    }
+  }
+
   /** Get displayable chat history from a session's persisted entries */
   getSessionHistory(tabId: string): Array<{ role: 'user' | 'assistant'; content: string; timestamp: number; thinkingContent?: string }> {
     const session = this.sessions.get(tabId);
