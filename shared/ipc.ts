@@ -36,6 +36,9 @@ export const IPC = {
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
 
+  // Artifacts
+  ARTIFACT_OPEN: 'artifact:open',     // renderer → main (request to open artifact panel)
+
   // App Settings (Pilot-level, stored in ~/.config/pilot/)
   APP_SETTINGS_GET: 'app-settings:get',
   APP_SETTINGS_UPDATE: 'app-settings:update',
