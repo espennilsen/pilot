@@ -81,9 +81,9 @@ export default function CitationsBar({ citations }: CitationsBarProps) {
         <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wider">Sources</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {citations.map((c) => (
+        {citations.map((c, i) => (
           <a
-            key={c.index}
+            key={`${i}-${c.url}`}
             href={isSafeUrl(c.url) ? c.url : '#'}
             target="_blank"
             rel="noopener noreferrer"

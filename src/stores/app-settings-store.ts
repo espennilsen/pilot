@@ -208,17 +208,17 @@ Guidelines:
     setDesktopEnabled: async (enabled: boolean) => updateSetting({ desktopEnabled: enabled }, true),
 
     setWebSearchEnabled: async (enabled: boolean) => {
-      const current = get();
-      await updateSetting({
-        webSearch: { enabled, apiKey: current.webSearchApiKey || undefined },
-      });
+      // Read apiKey at call time (not from a prior snapshot) to avoid race with setWebSearchApiKey
+      const apiKey = get().webSearchApiKey || undefined;
+      set({ webSearchEnabled: enabled });
+      await updateSetting({ webSearch: { enabled, apiKey } });
     },
 
     setWebSearchApiKey: async (apiKey: string) => {
-      const current = get();
-      await updateSetting({
-        webSearch: { enabled: current.webSearchEnabled, apiKey: apiKey || undefined },
-      });
+      // Read enabled at call time (not from a prior snapshot) to avoid race with setWebSearchEnabled
+      const enabled = get().webSearchEnabled;
+      set({ webSearchApiKey: apiKey });
+      await updateSetting({ webSearch: { enabled, apiKey: apiKey || undefined } });
     },
     completeOnboarding: async () => updateSetting({ onboardingComplete: true }),
     setKeybindOverride: async (id: string, combo: string | null) => {
