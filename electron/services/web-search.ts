@@ -39,10 +39,11 @@ export async function searchWeb(
   signal?: AbortSignal,
 ): Promise<SearchResponse> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT);
+  const timedOut = { value: false };
+  const timeout = setTimeout(() => { timedOut.value = true; controller.abort(); }, SEARCH_TIMEOUT);
 
   if (signal) {
-    signal.addEventListener('abort', () => controller.abort());
+    signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
   try {
@@ -96,7 +97,11 @@ export async function searchWeb(
   } catch (err: any) {
     clearTimeout(timeout);
     if (err.name === 'AbortError') {
-      throw new Error(`Search timed out after ${SEARCH_TIMEOUT / 1000}s`);
+      throw new Error(
+        timedOut.value
+          ? `Search timed out after ${SEARCH_TIMEOUT / 1000}s`
+          : 'Search was cancelled'
+      );
     }
     throw err;
   }

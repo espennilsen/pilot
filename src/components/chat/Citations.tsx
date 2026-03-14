@@ -35,7 +35,8 @@ export function extractCitations(toolCalls?: ToolCallInfo[]): Citation[] {
       const resultText = tc.result;
 
       // Parse numbered references from the text output: [N] Title\n    URL\n    Description
-      const refPattern = /\[(\d+)\]\s+(.+)\n\s+(\S+)\n(?:\s+(.+))?/g;
+      // Use [^\S\n]+ (horizontal whitespace only) to avoid matching across blank lines
+      const refPattern = /\[(\d+)\]\s+(.+)\n[^\S\n]+(\S+)\n(?:[^\S\n]+(.+))?/g;
       let match;
       while ((match = refPattern.exec(resultText)) !== null) {
         citations.push({
@@ -57,6 +58,16 @@ interface CitationsBarProps {
   citations: Citation[];
 }
 
+/** Only allow safe URL protocols. */
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Render a horizontal bar of citation chips below a message.
  */
@@ -73,7 +84,7 @@ export default function CitationsBar({ citations }: CitationsBarProps) {
         {citations.map((c) => (
           <a
             key={c.index}
-            href={c.url}
+            href={isSafeUrl(c.url) ? c.url : '#'}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-2 py-1 bg-bg-surface hover:bg-bg-elevated border border-border rounded-md text-xs transition-colors group"

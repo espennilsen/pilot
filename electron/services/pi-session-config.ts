@@ -150,9 +150,10 @@ export async function buildSessionConfig(
     : [];
 
   // Web search tool — enabled via settings with Brave Search API key
+  // The getApiKey closure calls loadAppSettings() live so key updates mid-session are picked up.
   const webSearchEnabled = appSettings.webSearch?.enabled && appSettings.webSearch?.apiKey;
   const webSearchTools: ToolDefinition[] = webSearchEnabled
-    ? [createWebSearchTool(() => appSettings.webSearch?.apiKey)]
+    ? [createWebSearchTool(() => loadAppSettings().webSearch?.apiKey)]
     : [];
 
   const customTools: ToolDefinition[] = [

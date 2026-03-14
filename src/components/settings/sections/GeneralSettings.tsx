@@ -11,6 +11,7 @@ export function GeneralSettings() {
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const [dirInput, setDirInput] = useState(piAgentDir);
   const [dirDirty, setDirDirty] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(webSearchApiKey);
   const [availableModels, setAvailableModels] = useState<Array<{ provider: string; id: string; name: string }>>([]);
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export function GeneralSettings() {
     setDirInput(piAgentDir);
     setDirDirty(false);
   }, [piAgentDir]);
+
+  useEffect(() => {
+    setApiKeyInput(webSearchApiKey);
+  }, [webSearchApiKey]);
 
   const handleDirChange = (value: string) => {
     setDirInput(value);
@@ -107,8 +112,9 @@ export function GeneralSettings() {
             >
               <input
                 type="password"
-                value={webSearchApiKey}
-                onChange={(e) => setWebSearchApiKey(e.target.value)}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onBlur={() => { if (apiKeyInput !== webSearchApiKey) setWebSearchApiKey(apiKeyInput); }}
                 placeholder="BSA-xxxxxxxxxx"
                 className="w-64 px-3 py-1.5 bg-bg-base border border-border rounded-md text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
