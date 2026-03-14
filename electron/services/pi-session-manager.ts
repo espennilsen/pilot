@@ -23,6 +23,7 @@ import { TaskManager } from './task-manager';
 import { SubagentManager } from './subagent-manager';
 import { broadcastToRenderer } from '../utils/broadcast';
 import { getSessionDir } from './pi-session-helpers';
+import { generateSuggestions, type FollowUpSuggestion } from './suggestion-generator';
 import { buildSessionConfig } from './pi-session-config';
 import { generateCommitMessage } from './pi-session-commit';
 import { listSessions, listAllSessions, deleteSession } from './pi-session-listing';
@@ -164,6 +165,11 @@ export class PilotSessionManager {
         const responseText = extractLastAssistantText(messages);
         if (responseText) {
           this.triggerMemoryExtraction(tabId, responseText);
+        }
+
+        // Generate follow-up suggestions after agent finishes
+        if (event.type === 'agent_end' && responseText) {
+          this.generateAndPushSuggestions(tabId, responseText);
         }
       }
     });
@@ -521,6 +527,41 @@ export class PilotSessionManager {
         this.sendToRenderer(IPC.MEMORY_UPDATED, { count, preview });
       },
     }).catch(() => {});
+  }
+
+  /**
+   * Generate follow-up suggestions and push them to the renderer.
+   * Runs synchronously (no LLM call) — uses heuristic analysis.
+   */
+  private generateAndPushSuggestions(tabId: string, responseText: string): void {
+    try {
+      const lastUserMessage = this.lastUserMessages.get(tabId) || '';
+
+      // Get tool names from the last assistant message's tool calls
+      const session = this.sessions.get(tabId);
+      const toolNames: string[] = [];
+      if (session) {
+        const messages = session.state.messages;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i];
+          if ('role' in msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
+            for (const block of msg.content) {
+              if (block.type === 'toolCall' && 'name' in block) {
+                toolNames.push(block.name);
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      const suggestions = generateSuggestions(responseText, lastUserMessage, toolNames);
+      if (suggestions.length > 0) {
+        this.sendToRenderer(IPC.SESSION_SUGGESTIONS, { tabId, suggestions });
+      }
+    } catch {
+      // Never let suggestion generation crash the main flow
+    }
   }
 
   private forwardEventToRenderer(tabId: string, event: AgentSessionEvent): void {

@@ -35,6 +35,7 @@ export const IPC = {
   SESSION_NEW: 'session:new',
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
+  SESSION_SUGGESTIONS: 'session:suggestions', // main → renderer push
 
   // App Settings (Pilot-level, stored in ~/.config/pilot/)
   APP_SETTINGS_GET: 'app-settings:get',

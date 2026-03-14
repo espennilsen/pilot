@@ -139,11 +139,17 @@ export function useAgentSession() {
       useTaskStore.getState().setShowCreateDialog(true);
     });
 
+    // Follow-up suggestions from main process
+    const unsubSuggestions = on(IPC.SESSION_SUGGESTIONS, (payload: { tabId: string; suggestions: Array<{ text: string; label: string }> }) => {
+      useChatStore.getState().setSuggestions(payload.tabId, payload.suggestions);
+    });
+
     return () => {
       unsubUpdated();
       unsubShowPanel();
       unsubTasksShowPanel();
       unsubTasksShowCreate();
+      unsubSuggestions();
     };
   }, []);
 
@@ -221,6 +227,8 @@ export function useAgentSession() {
         break;
       case 'agent_start':
         setStreaming(tabId, true);
+        // Clear suggestions when agent starts (user sent a new message)
+        useChatStore.getState().clearSuggestions(tabId);
         break;
       case 'agent_end':
         setStreaming(tabId, false);
