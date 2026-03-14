@@ -33,7 +33,7 @@ export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents' |
 
 /** Settings panel tab type. */
 export type SettingsTab =
-  | 'general' | 'auth' | 'project' | 'files'
+  | 'general' | 'appearance' | 'auth' | 'project' | 'files'
   | 'companion' | 'system-prompt' | 'prompts' | 'keybindings'
   | 'extensions' | 'skills' | 'mcp' | 'developer';
 

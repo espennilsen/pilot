@@ -53,6 +53,7 @@ Start with OVERVIEW.md for a high-level understanding, then follow the reading o
 | [user/sidebar.md](user/sidebar.md) | Left sidebar — sessions, memory, tasks panes |
 | [user/context-panel.md](user/context-panel.md) | Right panel — files, git, changes tabs |
 | [user/settings.md](user/settings.md) | Configuration, auth, extensions, preferences |
+| [user/themes.md](user/themes.md) | Custom themes — create, edit, import, export color themes |
 | [user/companion.md](user/companion.md) | Companion remote access |
 | [user/desktop.md](user/desktop.md) | Desktop virtual display — agent-controlled browser testing and GUI automation |
 

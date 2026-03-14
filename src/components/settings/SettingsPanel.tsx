@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import {
   X, Settings, FolderCog, Puzzle, BookOpen, Terminal, Keyboard,
   Shield, FolderOpen, KeyRound, FileText, Smartphone, MessageSquareText, Plug,
+  Palette,
 } from 'lucide-react';
 import { ReopenWelcomeButton } from './settings-helpers';
 import { GeneralSettings } from './sections/GeneralSettings';
@@ -17,9 +18,11 @@ import { SkillsSettings } from './sections/SkillsSettings';
 import { DeveloperSettings } from './sections/DeveloperSettings';
 import { SystemPromptSettings } from './sections/SystemPromptSettings';
 import { McpSettings } from './sections/McpSettings';
+import { AppearanceSettings } from './sections/AppearanceSettings';
 
 const TABS = [
   { id: 'general' as const, label: 'General', icon: Settings },
+  { id: 'appearance' as const, label: 'Appearance', icon: Palette },
   { id: 'auth' as const, label: 'Auth & Models', icon: KeyRound },
   { id: 'project' as const, label: 'Project', icon: FolderCog },
   { id: 'files' as const, label: 'Files', icon: FolderOpen },
@@ -103,6 +106,7 @@ export default function SettingsPanel() {
           {/* Body */}
           <div className="flex-1 overflow-y-auto">
             {settingsTab === 'general' && <GeneralSettings />}
+            {settingsTab === 'appearance' && <AppearanceSettings />}
             {settingsTab === 'auth' && <AuthSettings />}
             {settingsTab === 'project' && <ProjectSettings />}
             {settingsTab === 'files' && <FilesSettings />}

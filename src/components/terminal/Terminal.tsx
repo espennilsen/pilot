@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import { useUIStore } from '../../stores/ui-store';
 import { useProjectStore } from '../../stores/project-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
+import { useThemeStore } from '../../stores/theme-store';
 import { resolveTheme } from '../../hooks/useTheme';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on, send } from '../../lib/ipc-client';
@@ -59,6 +60,36 @@ const XTERM_THEME_LIGHT = {
 
 function getXtermTheme(): typeof XTERM_THEME_DARK {
   const mode = useAppSettingsStore.getState().theme;
+  const customTheme = useThemeStore.getState().activeCustomTheme;
+
+  // If custom theme has terminal colors, use those
+  if (mode === 'custom' && customTheme?.terminal) {
+    const t = customTheme.terminal;
+    const base = customTheme.base === 'light' ? XTERM_THEME_LIGHT : XTERM_THEME_DARK;
+    return {
+      background: t.background ?? base.background,
+      foreground: t.foreground ?? base.foreground,
+      cursor: t.cursor ?? base.cursor,
+      selectionBackground: t.selectionBackground ?? base.selectionBackground,
+      black: t.black ?? base.black,
+      red: t.red ?? base.red,
+      green: t.green ?? base.green,
+      yellow: t.yellow ?? base.yellow,
+      blue: t.blue ?? base.blue,
+      magenta: t.magenta ?? base.magenta,
+      cyan: t.cyan ?? base.cyan,
+      white: t.white ?? base.white,
+      brightBlack: t.brightBlack ?? base.brightBlack,
+      brightRed: t.brightRed ?? base.brightRed,
+      brightGreen: t.brightGreen ?? base.brightGreen,
+      brightYellow: t.brightYellow ?? base.brightYellow,
+      brightBlue: t.brightBlue ?? base.brightBlue,
+      brightMagenta: t.brightMagenta ?? base.brightMagenta,
+      brightCyan: t.brightCyan ?? base.brightCyan,
+      brightWhite: t.brightWhite ?? base.brightWhite,
+    };
+  }
+
   return resolveTheme(mode) === 'light' ? XTERM_THEME_LIGHT : XTERM_THEME_DARK;
 }
 
@@ -234,12 +265,13 @@ export default function Terminal() {
 
   // Update xterm theme when app theme changes
   const theme = useAppSettingsStore((s) => s.theme);
+  const activeCustomTheme = useThemeStore((s) => s.activeCustomTheme);
   useEffect(() => {
     const xtermTheme = getXtermTheme();
     for (const [, instance] of instancesRef.current) {
       instance.xterm.options.theme = xtermTheme;
     }
-  }, [theme]);
+  }, [theme, activeCustomTheme]);
 
   const handleClose = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
