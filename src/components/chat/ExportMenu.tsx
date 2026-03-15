@@ -15,6 +15,7 @@ export default function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const copiedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -121,14 +122,16 @@ export default function ExportMenu() {
         <div className="absolute right-0 top-full mt-1 w-52 bg-bg-elevated border border-border rounded-lg shadow-lg z-50 py-1 overflow-hidden">
           <button
             onClick={() => doExport('markdown')}
-            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left"
+            disabled={isExporting}
+            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
           >
             <FileText className="w-4 h-4 text-text-secondary" />
             <span className="text-sm text-text-primary">Export as Markdown</span>
           </button>
           <button
             onClick={() => doExport('json')}
-            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left"
+            disabled={isExporting}
+            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
           >
             <FileJson className="w-4 h-4 text-text-secondary" />
             <span className="text-sm text-text-primary">Export as JSON</span>
@@ -136,7 +139,8 @@ export default function ExportMenu() {
           <div className="my-1 border-t border-border" />
           <button
             onClick={doCopy}
-            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left"
+            disabled={isExporting}
+            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-bg-surface transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
           >
             <Clipboard className="w-4 h-4 text-text-secondary" />
             <span className="text-sm text-text-primary">Copy to clipboard</span>
@@ -149,6 +153,11 @@ export default function ExportMenu() {
               </div>
             </>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
         </div>
       )}
     </div>
