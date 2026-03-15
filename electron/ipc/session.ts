@@ -1,5 +1,5 @@
 import { ipcMain, dialog, clipboard, BrowserWindow } from 'electron';
-import { writeFileSync } from 'fs';
+import { writeFile } from 'fs/promises';
 import { IPC } from '../../shared/ipc';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 import { updateSessionMeta, removeSessionMeta } from '../services/session-metadata';
@@ -58,7 +58,7 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
         .replace(/^-|-$/g, '')
         .slice(0, 60);
       const dateStamp = new Date().toISOString().split('T')[0];
-      const defaultName = `${slug}-${dateStamp}.${ext}`;
+      const defaultName = `${slug || 'chat-export'}-${dateStamp}.${ext}`;
 
       const win = BrowserWindow.getFocusedWindow();
       const result = await dialog.showSaveDialog(win ?? BrowserWindow.getAllWindows()[0], {
@@ -71,7 +71,7 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
         return { success: false };
       }
 
-      writeFileSync(result.filePath, content, 'utf-8');
+      await writeFile(result.filePath, content, 'utf-8');
       return { success: true, filePath: result.filePath };
     }
   );
@@ -97,7 +97,7 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
       const content = formatAsMarkdown(rawMessages, { ...options, format: 'markdown' }, exportMeta);
 
       clipboard.writeText(content);
-      return { success: true, content };
+      return { success: true };
     }
   );
 }

@@ -13,7 +13,6 @@ import type {
   AssistantMessage,
   ToolResultMessage,
   Message,
-  ImageContent,
 } from '@mariozechner/pi-ai';
 import type { SessionExportOptions } from '../../shared/types';
 

@@ -14,11 +14,22 @@ import { useTabStore } from '../../stores/tab-store';
 export default function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeTabId = useTabStore(s => s.activeTabId);
   const tabs = useTabStore(s => s.tabs);
   const activeTab = tabs.find(t => t.id === activeTabId);
+
+  // Clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+    };
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -44,10 +55,11 @@ export default function ExportMenu() {
 
   const doExport = useCallback(async (format: SessionExportFormat) => {
     if (!activeTabId) return;
+    setError(null);
     const options: SessionExportOptions = {
       format,
       includeThinking: true,
-      includeToolCalls: true,
+      includeToolCalls: false,
       includeTimestamps: true,
     };
     const meta = {
@@ -56,14 +68,16 @@ export default function ExportMenu() {
     };
     try {
       await window.api.invoke(IPC.SESSION_EXPORT, activeTabId, options, meta);
+      setOpen(false);
     } catch (err) {
       console.error('Export failed:', err);
+      setError(err instanceof Error ? err.message : 'Export failed');
     }
-    setOpen(false);
   }, [activeTabId, activeTab]);
 
   const doCopy = useCallback(async () => {
     if (!activeTabId) return;
+    setError(null);
     const options: SessionExportOptions = {
       format: 'markdown',
       includeThinking: false,
@@ -77,11 +91,15 @@ export default function ExportMenu() {
     try {
       await window.api.invoke(IPC.SESSION_EXPORT_CLIPBOARD, activeTabId, options, meta);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
+      setOpen(false);
     } catch (err) {
       console.error('Copy to clipboard failed:', err);
+      setError(err instanceof Error ? err.message : 'Copy to clipboard failed');
     }
-    setOpen(false);
   }, [activeTabId, activeTab]);
 
   return (
@@ -123,6 +141,14 @@ export default function ExportMenu() {
             <Clipboard className="w-4 h-4 text-text-secondary" />
             <span className="text-sm text-text-primary">Copy to clipboard</span>
           </button>
+          {error && (
+            <>
+              <div className="my-1 border-t border-border" />
+              <div className="px-3 py-2 text-xs text-error">
+                {error}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
