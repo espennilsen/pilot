@@ -59,6 +59,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   messageIndex: number;
   isEditing?: boolean;
+  isStreaming?: boolean;
   onRegenerate?: (messageIndex: number) => void;
   onEditAndResend?: (messageIndex: number, content: string) => void;
   onEditSubmit?: (editedContent: string) => void;
@@ -69,6 +70,7 @@ export default function MessageBubble({
   message,
   messageIndex,
   isEditing,
+  isStreaming,
   onRegenerate,
   onEditAndResend,
   onEditSubmit,
@@ -80,6 +82,7 @@ export default function MessageBubble({
         message={message}
         messageIndex={messageIndex}
         isEditing={isEditing}
+        isStreaming={isStreaming}
         onEditAndResend={onEditAndResend}
         onEditSubmit={onEditSubmit}
         onEditCancel={onEditCancel}
@@ -98,7 +101,7 @@ export default function MessageBubble({
 /** Match the image attachment prefix injected by MessageInput */
 const IMAGE_PREFIX_RE = /^The user attached (?:an image|(\d+) images) to this message\. Use the read tool to view (?:it|each one) before responding:\n([\s\S]*?)\n\n/;
 
-function UserMessage({ message, messageIndex, isEditing, onEditAndResend, onEditSubmit, onEditCancel }: MessageBubbleProps) {
+function UserMessage({ message, messageIndex, isEditing, isStreaming, onEditAndResend, onEditSubmit, onEditCancel }: MessageBubbleProps) {
   let displayContent = message.content;
   let imagePaths: string[] = [];
 
@@ -142,6 +145,7 @@ function UserMessage({ message, messageIndex, isEditing, onEditAndResend, onEdit
           role="user"
           content={displayContent}
           messageIndex={messageIndex}
+          isStreaming={isStreaming}
           onEditAndResend={onEditAndResend}
         />
       </div>

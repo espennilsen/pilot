@@ -85,8 +85,17 @@ export default function ChatView() {
       // Get fork points from the SDK session
       const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
       
-      // Find the entry ID for this user message by matching text
-      const forkPoint = forkPoints.find(fp => fp.text === userMsg.content);
+      // Find the entry ID for this user message by matching text.
+      // If the user sent the same message multiple times, count prior occurrences
+      // and pick the Nth matching fork point.
+      const sameTextBefore = messages
+        .slice(0, assistantMsgIndex)
+        .filter(m => m.role === 'user' && m.content === userMsg.content).length - 1;
+      let seen = 0;
+      const forkPoint = forkPoints.find(fp => {
+        if (fp.text !== userMsg.content) return false;
+        return seen++ === sameTextBefore;
+      });
       if (!forkPoint) {
         console.warn('[ChatView] Could not find fork point for user message');
         return;
@@ -101,6 +110,9 @@ export default function ChatView() {
 
       if (forkResult.cancelled) return;
 
+      // Snapshot original messages before clearing
+      const originalMessages = [...messages];
+
       // Clear renderer messages and reload from the forked session history
       const { clearMessages, addMessage } = useChatStore.getState();
       clearMessages(activeTabId);
@@ -114,7 +126,16 @@ export default function ChatView() {
       }
 
       // Re-prompt with the same text — this sends to the forked session
-      await sendMessage(forkResult.selectedText);
+      try {
+        await sendMessage(forkResult.selectedText);
+      } catch (sendErr) {
+        console.error('[ChatView] sendMessage failed during regenerate:', sendErr);
+        // Restore original messages
+        clearMessages(activeTabId);
+        for (const msg of originalMessages) {
+          addMessage(activeTabId, msg);
+        }
+      }
     } catch (err) {
       console.error('[ChatView] Regenerate failed:', err);
     }
@@ -140,7 +161,15 @@ export default function ChatView() {
       // Get fork points
       const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
       
-      const forkPoint = forkPoints.find(fp => fp.text === originalMsg.content);
+      // Count prior user messages with the same content up to editingIndex
+      const sameTextBefore = messages
+        .slice(0, editingIndex)
+        .filter(m => m.role === 'user' && m.content === originalMsg.content).length;
+      let seen = 0;
+      const forkPoint = forkPoints.find(fp => {
+        if (fp.text !== originalMsg.content) return false;
+        return seen++ === sameTextBefore;
+      });
       if (!forkPoint) {
         console.warn('[ChatView] Could not find fork point for user message');
         setEditingIndex(null);
@@ -159,6 +188,9 @@ export default function ChatView() {
         return;
       }
 
+      // Snapshot original messages before clearing
+      const originalMessages = [...messages];
+
       // Clear and reload from forked history
       const { clearMessages, addMessage } = useChatStore.getState();
       clearMessages(activeTabId);
@@ -174,7 +206,16 @@ export default function ChatView() {
       setEditingIndex(null);
 
       // Send the edited content
-      await sendMessage(editedContent);
+      try {
+        await sendMessage(editedContent);
+      } catch (sendErr) {
+        console.error('[ChatView] sendMessage failed during edit & resend:', sendErr);
+        // Restore original messages
+        clearMessages(activeTabId);
+        for (const msg of originalMessages) {
+          addMessage(activeTabId, msg);
+        }
+      }
     } catch (err) {
       console.error('[ChatView] Edit & resend failed:', err);
       setEditingIndex(null);
@@ -232,6 +273,7 @@ export default function ChatView() {
                 message={msg}
                 messageIndex={idx}
                 isEditing={editingIndex === idx}
+                isStreaming={isStreaming}
                 onRegenerate={handleRegenerate}
                 onEditAndResend={handleEditAndResend}
                 onEditSubmit={handleEditSubmit}

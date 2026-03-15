@@ -75,7 +75,7 @@ export default function EditMessageOverlay({ initialContent, onSubmit, onCancel 
           Cancel
         </button>
         <span className="text-text-secondary text-[10px] ml-auto">
-          {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to send · Esc to cancel
+          {window.api?.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter to send · Esc to cancel
         </span>
       </div>
     </div>
