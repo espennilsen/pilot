@@ -77,8 +77,9 @@ export default function ExportMenu() {
   }, [activeTabId, activeTab]);
 
   const doCopy = useCallback(async () => {
-    if (!activeTabId) return;
+    if (!activeTabId || isExporting) return;
     setError(null);
+    setIsExporting(true);
     const options: SessionExportOptions = {
       format: 'markdown',
       includeThinking: false,
@@ -100,8 +101,10 @@ export default function ExportMenu() {
     } catch (err) {
       console.error('Copy to clipboard failed:', err);
       setError(err instanceof Error ? err.message : 'Copy to clipboard failed');
+    } finally {
+      setIsExporting(false);
     }
-  }, [activeTabId, activeTab]);
+  }, [activeTabId, activeTab, isExporting]);
 
   return (
     <div className="relative" ref={menuRef}>
