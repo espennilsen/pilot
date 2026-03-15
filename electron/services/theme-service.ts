@@ -152,6 +152,7 @@ export class ThemeService {
 
   /** Get a single theme by slug. */
   get(slug: string): CustomTheme | null {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return null;
     const filePath = join(this.themesDir, `${slug}.json`);
     if (!existsSync(filePath)) return null;
 

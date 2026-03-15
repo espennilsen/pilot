@@ -212,12 +212,13 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
         theme.slug = slugify(theme.name);
       }
 
-      // Detect slug collision with a different existing user theme
+      // Detect slug collision with a different existing theme (including built-in)
       const collision = customThemes.find(
-        (t) => t.slug === theme.slug && t.slug !== initialTheme?.slug && !t.builtIn
+        (t) => t.slug === theme.slug && t.slug !== initialTheme?.slug
       );
       if (collision) {
-        setError(`A theme with the slug "${theme.slug}" already exists ("${collision.name}"). Please choose a different name.`);
+        const extra = collision.builtIn ? ' (built-in)' : '';
+        setError(`A theme with the slug "${theme.slug}" already exists ("${collision.name}"${extra}). Please choose a different name.`);
         setIsSaving(false);
         return;
       }
@@ -226,12 +227,16 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
       if (!showTerminal) delete theme.terminal;
       if (!showSyntax) delete theme.syntax;
 
-      // If renaming an existing theme changed its slug, delete the old file first
-      if (!isNew && initialTheme && theme.slug !== initialTheme.slug) {
-        await deleteTheme(initialTheme.slug);
-      }
-
+      // Save new file first, then clean up old slug (atomic-ish rename)
       await saveTheme(theme);
+
+      if (!isNew && initialTheme && theme.slug !== initialTheme.slug) {
+        try {
+          await deleteTheme(initialTheme.slug);
+        } catch {
+          // Old file cleanup failed — not critical, new file is already saved
+        }
+      }
       // Activate the saved theme
       setActiveCustomTheme(theme);
       await setCustomThemeSlug(theme.slug);
