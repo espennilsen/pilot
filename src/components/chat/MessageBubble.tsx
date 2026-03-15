@@ -6,6 +6,7 @@ import Markdown from '../../lib/markdown';
 import { attachmentUrl } from '../../lib/attachment-url';
 import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
+import CitationsBar, { extractCitations } from './Citations';
 
 /**
  * Markdown renderer optimised for streaming. During rapid text_delta events,
@@ -159,6 +160,11 @@ function AssistantMessage({ message }: MessageBubbleProps) {
         )}
         {message.isStreaming && <StreamingCursor />}
       </div>
+
+      {/* Citations from web search results */}
+      {!message.isStreaming && (
+        <CitationsBar citations={extractCitations(message.toolCalls)} />
+      )}
     </div>
   );
 }

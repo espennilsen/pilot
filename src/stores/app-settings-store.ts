@@ -9,6 +9,7 @@ import { invoke } from '../lib/ipc-client';
 interface AppSettingsStore {
   piAgentDir: string;
   theme: ThemeMode;
+  customThemeSlug: string;
   terminalApp: string | null;
   editorCli: string | null;
   onboardingComplete: boolean;
@@ -17,6 +18,8 @@ interface AppSettingsStore {
   keybindOverrides: Record<string, string | null>;
   hiddenPaths: string[];
   desktopEnabled: boolean;
+  webSearchEnabled: boolean;
+  webSearchApiKey: string;
   systemPrompt: string;
   commitMsgModel: string;
   commitMsgMaxTokens: number;
@@ -33,12 +36,15 @@ interface AppSettingsStore {
   update: (updates: Partial<PilotAppSettings>) => Promise<void>;
   setPiAgentDir: (dir: string) => Promise<void>;
   setTheme: (theme: ThemeMode) => Promise<void>;
+  setCustomThemeSlug: (slug: string) => Promise<void>;
   setTerminalApp: (app: string | null) => Promise<void>;
   setEditorCli: (cli: string | null) => Promise<void>;
   setDeveloperMode: (enabled: boolean) => Promise<void>;
   setAutoStartDevServer: (enabled: boolean) => Promise<void>;
   setHiddenPaths: (paths: string[]) => Promise<void>;
   setDesktopEnabled: (enabled: boolean) => Promise<void>;
+  setWebSearchEnabled: (enabled: boolean) => Promise<void>;
+  setWebSearchApiKey: (apiKey: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   setKeybindOverride: (id: string, combo: string | null) => Promise<void>;
   clearKeybindOverride: (id: string) => Promise<void>;
@@ -73,6 +79,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
   return {
     piAgentDir: DEFAULT_PI_AGENT_DIR,
     theme: (localStorage.getItem('pilot-theme') as ThemeMode) || 'dark',
+    customThemeSlug: localStorage.getItem('pilot-custom-theme-slug') || '',
     terminalApp: null,
     editorCli: null,
     onboardingComplete: false,
@@ -81,6 +88,8 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
     keybindOverrides: {},
     hiddenPaths: [],
     desktopEnabled: false,
+    webSearchEnabled: false,
+    webSearchApiKey: '',
     systemPrompt: `You are Pilot, an AI agent.
 
 Additional tools:
@@ -116,10 +125,13 @@ Guidelines:
     try {
       const settings = await invoke(IPC.APP_SETTINGS_GET) as PilotAppSettings;
       const theme = (settings.theme as ThemeMode) || 'dark';
+      const customThemeSlug = settings.customThemeSlug ?? '';
       localStorage.setItem('pilot-theme', theme);
+      localStorage.setItem('pilot-custom-theme-slug', customThemeSlug);
       set({
         piAgentDir: settings.piAgentDir || DEFAULT_PI_AGENT_DIR,
         theme,
+        customThemeSlug,
         terminalApp: settings.terminalApp ?? null,
         editorCli: settings.editorCli ?? null,
         onboardingComplete: settings.onboardingComplete ?? false,
@@ -129,6 +141,8 @@ Guidelines:
         hiddenPaths: settings.hiddenPaths ?? [],
         desktopEnabled: settings.desktopEnabled ?? false,
         customThemeSlug: settings.customThemeSlug ?? undefined,
+        webSearchEnabled: settings.webSearch?.enabled ?? false,
+        webSearchApiKey: settings.webSearch?.apiKey ?? '',
         systemPrompt: settings.systemPrompt ?? '',
         commitMsgModel: settings.commitMsgModel ?? '',
         commitMsgMaxTokens: settings.commitMsgMaxTokens ?? 4096,
@@ -149,10 +163,13 @@ Guidelines:
     try {
       const updated = await invoke(IPC.APP_SETTINGS_UPDATE, updates) as PilotAppSettings;
       const theme = (updated.theme as ThemeMode) || 'dark';
+      const customThemeSlug = updated.customThemeSlug ?? '';
       localStorage.setItem('pilot-theme', theme);
+      localStorage.setItem('pilot-custom-theme-slug', customThemeSlug);
       set({
         piAgentDir: updated.piAgentDir || DEFAULT_PI_AGENT_DIR,
         theme,
+        customThemeSlug,
         terminalApp: updated.terminalApp ?? null,
         editorCli: updated.editorCli ?? null,
         onboardingComplete: updated.onboardingComplete ?? false,
@@ -162,6 +179,8 @@ Guidelines:
         hiddenPaths: updated.hiddenPaths ?? [],
         desktopEnabled: updated.desktopEnabled ?? false,
         customThemeSlug: updated.customThemeSlug ?? undefined,
+        webSearchEnabled: updated.webSearch?.enabled ?? false,
+        webSearchApiKey: updated.webSearch?.apiKey ?? '',
         systemPrompt: updated.systemPrompt ?? '',
         commitMsgModel: updated.commitMsgModel ?? '',
         commitMsgMaxTokens: updated.commitMsgMaxTokens ?? 4096,
@@ -182,12 +201,30 @@ Guidelines:
       localStorage.setItem('pilot-theme', theme);
       return updateSetting({ theme }, true);
     },
+    setCustomThemeSlug: async (slug: string) => {
+      localStorage.setItem('pilot-custom-theme-slug', slug);
+      return updateSetting({ customThemeSlug: slug }, true);
+    },
     setTerminalApp: async (app: string | null) => updateSetting({ terminalApp: app }),
     setEditorCli: async (cli: string | null) => updateSetting({ editorCli: cli }),
     setDeveloperMode: async (enabled: boolean) => updateSetting({ developerMode: enabled }, true),
     setAutoStartDevServer: async (enabled: boolean) => updateSetting({ autoStartDevServer: enabled }, true),
     setHiddenPaths: async (paths: string[]) => updateSetting({ hiddenPaths: paths }, true),
     setDesktopEnabled: async (enabled: boolean) => updateSetting({ desktopEnabled: enabled }, true),
+
+    setWebSearchEnabled: async (enabled: boolean) => {
+      // Read apiKey at call time (not from a prior snapshot) to avoid race with setWebSearchApiKey
+      const apiKey = get().webSearchApiKey || undefined;
+      set({ webSearchEnabled: enabled });
+      await updateSetting({ webSearch: { enabled, apiKey } });
+    },
+
+    setWebSearchApiKey: async (apiKey: string) => {
+      // Read enabled at call time (not from a prior snapshot) to avoid race with setWebSearchEnabled
+      const enabled = get().webSearchEnabled;
+      set({ webSearchApiKey: apiKey });
+      await updateSetting({ webSearch: { enabled, apiKey: apiKey || undefined } });
+    },
     completeOnboarding: async () => updateSetting({ onboardingComplete: true }),
     setKeybindOverride: async (id: string, combo: string | null) => {
       const overrides = { ...get().keybindOverrides, [id]: combo };

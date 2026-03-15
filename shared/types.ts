@@ -93,6 +93,13 @@ export interface PilotAppSettings {
   desktopEnabled?: boolean;
   /** Slug of the active custom theme (only used when theme === 'custom'). */
   customThemeSlug?: string;
+  /** Web search configuration */
+  webSearch?: {
+    /** Enable web search tool in agent sessions. Default: false */
+    enabled: boolean;
+    /** Brave Search API key. Get one free at https://api.search.brave.com/ */
+    apiKey?: string;
+  };
 }
 
 // MCP (Model Context Protocol) types
@@ -642,6 +649,29 @@ export interface PromptUpdateInput {
   icon?: string;
   command?: string | null;
   hidden?: boolean;
+}
+
+// ─── Artifacts ──────────────────────────────────────────────────────────
+
+/** Supported artifact content types. */
+export type ArtifactType = 'html' | 'react' | 'svg' | 'mermaid';
+
+/** An artifact created from a code block in chat. */
+export interface Artifact {
+  /** Unique ID. */
+  id: string;
+  /** Display title (derived from language/content). */
+  title: string;
+  /** Content type. */
+  type: ArtifactType;
+  /** Raw source code. */
+  source: string;
+  /** Tab ID this artifact belongs to. */
+  tabId: string;
+  /** Timestamp when created. */
+  createdAt: number;
+  /** Version counter (incremented on updates). */
+  version: number;
 }
 
 // ─── Subagents ──────────────────────────────────────────────────────────

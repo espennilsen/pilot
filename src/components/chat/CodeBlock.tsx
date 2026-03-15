@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { highlightCode } from '../../lib/syntax-highlight';
+import { useTabStore } from '../../stores/tab-store';
+import { useArtifactStore } from '../../stores/artifact-store';
+import type { ArtifactType } from '../../../shared/types';
 
 // Common aliases LLMs use → hljs language names
 const LANG_ALIASES: Record<string, string> = {
@@ -37,10 +40,31 @@ interface CodeBlockProps {
   code: string;
 }
 
+/** Languages that can be opened as artifacts. */
+const ARTIFACT_LANGUAGES: Record<string, ArtifactType> = {
+  html: 'html',
+  htm: 'html',
+  svg: 'svg',
+  mermaid: 'mermaid',
+  jsx: 'react',
+  tsx: 'react',
+};
+
+function getArtifactType(lang: string): ArtifactType | null {
+  const lower = lang.toLowerCase().trim();
+  return ARTIFACT_LANGUAGES[lower] ?? null;
+}
+
 export default function CodeBlock({ language, code }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const [highlightedLines, setHighlightedLines] = useState<string[] | null>(null);
   const resolvedLang = resolveLanguage(language);
+  const activeTabId = useTabStore(s => s.activeTabId);
+  const createArtifact = useArtifactStore(s => s.createArtifact);
+  const getArtifacts = useArtifactStore(s => s.getArtifacts);
+  const setActiveArtifact = useArtifactStore(s => s.setActiveArtifact);
+  const showPanel = useArtifactStore(s => s.showPanel);
+  const artifactType = getArtifactType(language);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +75,13 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
   }, [code, resolvedLang]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard write can fail if document loses focus or permissions denied
+    }
   };
 
   const lines = highlightedLines ?? code.split('\n');
@@ -63,12 +91,31 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
       {/* Header */}
       <div className="flex justify-between items-center px-3 py-1.5 bg-bg-surface border-b border-border text-text-secondary text-xs">
         <span className="font-mono">{language}</span>
-        <button
-          onClick={handleCopy}
-          className="hover:text-text-primary transition-colors px-2 py-0.5 rounded hover:bg-bg-elevated"
-        >
-          {copied ? '✓ Copied!' : '📋 Copy'}
-        </button>
+        <div className="flex items-center gap-1">
+          {artifactType && activeTabId && (
+            <button
+              onClick={() => {
+                const existing = getArtifacts(activeTabId!).find(a => a.type === artifactType && a.source === code);
+                if (existing) {
+                  setActiveArtifact(activeTabId!, existing.id);
+                  showPanel();
+                } else {
+                  createArtifact(activeTabId!, artifactType, code);
+                }
+              }}
+              className="hover:text-text-primary transition-colors px-2 py-0.5 rounded hover:bg-bg-elevated"
+              title="Open as live preview"
+            >
+              ▶ Preview
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="hover:text-text-primary transition-colors px-2 py-0.5 rounded hover:bg-bg-elevated"
+          >
+            {copied ? '✓ Copied!' : '📋 Copy'}
+          </button>
+        </div>
       </div>
 
       {/* Code */}
