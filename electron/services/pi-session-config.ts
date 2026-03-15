@@ -153,7 +153,10 @@ export async function buildSessionConfig(
   // The getApiKey closure calls loadAppSettings() live so key updates mid-session are picked up.
   const webSearchEnabled = appSettings.webSearch?.enabled && appSettings.webSearch?.apiKey;
   const webSearchTools: ToolDefinition[] = webSearchEnabled
-    ? [createWebSearchTool(() => loadAppSettings().webSearch?.apiKey)]
+    ? [createWebSearchTool(() => {
+        const s = loadAppSettings();
+        return (s.webSearch?.enabled && s.webSearch?.apiKey) ? s.webSearch.apiKey : undefined;
+      })]
     : [];
 
   const customTools: ToolDefinition[] = [
