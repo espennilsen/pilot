@@ -267,6 +267,10 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
     if (!initialTheme) return;
     try {
       await deleteTheme(initialTheme.slug);
+      // Reset mode if we just deleted the active theme
+      if (useThemeStore.getState().activeCustomTheme === null) {
+        await setTheme('dark');
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

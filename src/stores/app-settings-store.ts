@@ -25,6 +25,7 @@ interface AppSettingsStore {
     file?: { enabled: boolean; maxSizeMB?: number; retainDays?: number };
     syslog?: { enabled: boolean; host: string; port: number; facility?: number; appName?: string };
   };
+  customThemeSlug: string | undefined;
   isLoading: boolean;
   error: string | null;
 
@@ -105,6 +106,7 @@ Guidelines:
       file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
       syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
     },
+    customThemeSlug: undefined,
     isLoading: false,
     error: null,
 
@@ -125,6 +127,7 @@ Guidelines:
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
         desktopEnabled: settings.desktopEnabled ?? false,
+        customThemeSlug: settings.customThemeSlug ?? undefined,
         systemPrompt: settings.systemPrompt ?? '',
         commitMsgModel: settings.commitMsgModel ?? '',
         commitMsgMaxTokens: settings.commitMsgMaxTokens ?? 4096,
@@ -157,6 +160,7 @@ Guidelines:
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
         desktopEnabled: updated.desktopEnabled ?? false,
+        customThemeSlug: updated.customThemeSlug ?? undefined,
         systemPrompt: updated.systemPrompt ?? '',
         commitMsgModel: updated.commitMsgModel ?? '',
         commitMsgMaxTokens: updated.commitMsgMaxTokens ?? 4096,
@@ -201,6 +205,7 @@ Guidelines:
       const current = get().logging;
       return updateSetting({ logging: { ...current, file: { ...current.file, enabled } } }, true);
     },
+    setCustomThemeSlug: async (slug) => updateSetting({ customThemeSlug: slug }, true),
     setSyslogConfig: async (config) => {
       const current = get().logging;
       const merged = { ...current.syslog, ...config } as typeof current.syslog;

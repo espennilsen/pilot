@@ -17,8 +17,21 @@ export interface SessionMetadata {
 }
 
 // Pilot app settings (stored in ~/.config/pilot/app-settings.json)
-/** Theme mode — 'dark', 'light', or 'system' (follows OS preference). */
-export type ThemeMode = 'dark' | 'light' | 'system';
+/** Theme mode — 'dark', 'light', 'system' (follows OS preference), or 'custom'. */
+export type ThemeMode = 'dark' | 'light' | 'system' | 'custom';
+
+/** A user-defined or built-in custom color theme. */
+export interface CustomTheme {
+  name: string;
+  slug: string;
+  author: string;
+  base: 'dark' | 'light';
+  version: number;
+  builtIn?: boolean;
+  colors: Record<string, string>;
+  terminal?: Record<string, string>;
+  syntax?: Record<string, string>;
+}
 
 export interface PilotAppSettings {
   /** Custom pi agent config directory. Default: ~/.config/pilot */
