@@ -127,7 +127,11 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   if (typeof settings.companionAutoStart === 'boolean') validated.companionAutoStart = settings.companionAutoStart;
   if (typeof settings.desktopEnabled === 'boolean') validated.desktopEnabled = settings.desktopEnabled;
   if (typeof settings.theme === 'string' && ['dark', 'light', 'system', 'custom'].includes(settings.theme)) validated.theme = settings.theme;
-  if (typeof settings.customThemeSlug === 'string' || settings.customThemeSlug === undefined) validated.customThemeSlug = settings.customThemeSlug;
+  if (settings.customThemeSlug === undefined) {
+    validated.customThemeSlug = undefined;
+  } else if (typeof settings.customThemeSlug === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(settings.customThemeSlug)) {
+    validated.customThemeSlug = settings.customThemeSlug;
+  }
   if (typeof settings.systemPrompt === 'string' || settings.systemPrompt === undefined) validated.systemPrompt = settings.systemPrompt;
   if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
   if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;

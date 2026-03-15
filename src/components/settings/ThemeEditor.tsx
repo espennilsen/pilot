@@ -162,7 +162,7 @@ interface ThemeEditorProps {
 }
 
 export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
-  const { saveTheme, deleteTheme } = useThemeStore();
+  const { saveTheme, deleteTheme, customThemes } = useThemeStore();
   const { setTheme, setCustomThemeSlug } = useAppSettingsStore();
   const { setActiveCustomTheme } = useThemeStore();
 
@@ -212,9 +212,24 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
         theme.slug = slugify(theme.name);
       }
 
+      // Detect slug collision with a different existing user theme
+      const collision = customThemes.find(
+        (t) => t.slug === theme.slug && t.slug !== initialTheme?.slug && !t.builtIn
+      );
+      if (collision) {
+        setError(`A theme with the slug "${theme.slug}" already exists ("${collision.name}"). Please choose a different name.`);
+        setIsSaving(false);
+        return;
+      }
+
       // Ensure terminal and syntax are included only when enabled
       if (!showTerminal) delete theme.terminal;
       if (!showSyntax) delete theme.syntax;
+
+      // If renaming an existing theme changed its slug, delete the old file first
+      if (!isNew && initialTheme && theme.slug !== initialTheme.slug) {
+        await deleteTheme(initialTheme.slug);
+      }
 
       await saveTheme(theme);
       // Activate the saved theme

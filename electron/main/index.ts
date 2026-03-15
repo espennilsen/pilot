@@ -170,7 +170,7 @@ function createWindow() {
   if (settings.theme === 'custom' && settings.customThemeSlug) {
     // Try to read the custom theme for its bg-base color
     try {
-      const ts = themeService ?? new ThemeService();
+      const ts = themeService!;
       const ct = ts.get(settings.customThemeSlug);
       windowBg = ct?.colors['bg-base'] ?? '#1a1b1e';
       // Estimate foreground from base type
@@ -295,6 +295,9 @@ app.whenReady().then(async () => {
 
     return net.fetch(`file://${resolved}`);
   });
+  // Initialize theme service before createWindow so it can read custom theme colors
+  themeService = new ThemeService();
+
   // Create window first (needed by terminal service)
   createWindow();
 
@@ -328,9 +331,8 @@ app.whenReady().then(async () => {
   registerMcpIpc(mcpManager);
   registerAttachmentIpc();
 
-  // Custom themes
-  themeService = new ThemeService();
-  registerThemeIpc(themeService);
+  // Custom themes (themeService already initialized before createWindow)
+  registerThemeIpc(themeService!);
 
   // Docker sandbox — always register IPC handlers so the renderer gets
   // graceful responses even when Docker is unavailable or init fails.

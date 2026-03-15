@@ -115,6 +115,9 @@ function applyTheme(mode: ThemeMode, customTheme: CustomTheme | null): void {
       bgColor: customTheme.colors['bg-base'],
       fgColor: customTheme.colors['text-primary'],
     });
+  } else if (mode === 'custom') {
+    // Custom theme selected but not yet loaded — leave applyThemeEarly() output intact
+    return;
   } else {
     // Standard theme — clear any custom overrides
     clearCustomThemeColors();
@@ -182,8 +185,8 @@ export function applyThemeEarly(): void {
     if (mode === 'custom') {
       // Try to restore custom theme colors from cache
       const colorsJson = localStorage.getItem('pilot-custom-theme-colors');
-      const base = localStorage.getItem('pilot-custom-theme-base') as 'dark' | 'light' | null;
-      if (colorsJson && base) {
+      const base = localStorage.getItem('pilot-custom-theme-base');
+      if (colorsJson && (base === 'dark' || base === 'light')) {
         const colors = JSON.parse(colorsJson) as Record<string, string>;
         document.documentElement.setAttribute('data-theme', base);
         applyCustomThemeColors(colors);

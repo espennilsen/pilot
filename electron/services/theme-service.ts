@@ -41,6 +41,7 @@ function validateTheme(theme: unknown): theme is CustomTheme {
 
   if (typeof t.name !== 'string' || !t.name.trim()) return false;
   if (typeof t.slug !== 'string' || !t.slug.trim()) return false;
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(t.slug)) return false;
   if (typeof t.author !== 'string') return false;
   if (t.base !== 'dark' && t.base !== 'light') return false;
   if (typeof t.version !== 'number') return false;
@@ -182,6 +183,10 @@ export class ThemeService {
 
   /** Delete a custom theme by slug. */
   delete(slug: string): void {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+      throw new Error(`Invalid theme slug: ${slug}`);
+    }
+
     const existing = this.get(slug);
     if (existing?.builtIn) {
       throw new Error(`Cannot delete built-in theme "${existing.name}"`);
