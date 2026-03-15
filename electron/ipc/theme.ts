@@ -26,6 +26,7 @@ export function registerThemeIpc(themeService: ThemeService): void {
 
   ipcMain.handle(IPC.THEME_DELETE, async (_event, slug: string) => {
     if (typeof slug !== 'string') throw new Error('slug must be a string');
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error('Invalid theme slug');
     themeService.delete(slug);
   });
 

@@ -173,6 +173,7 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   const isNew = !initialTheme;
   const isDirty = JSON.stringify(draft) !== JSON.stringify(original);
@@ -230,7 +231,7 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
       // Save new file first, then clean up old slug (atomic-ish rename)
       await saveTheme(theme);
 
-      if (!isNew && initialTheme && theme.slug !== initialTheme.slug) {
+      if (!isNew && !isDuplicate && initialTheme && theme.slug !== initialTheme.slug) {
         try {
           await deleteTheme(initialTheme.slug);
         } catch {
@@ -255,6 +256,7 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
     dupe.slug = slugify(dupe.name);
     dupe.builtIn = false;
     setDraft(dupe);
+    setIsDuplicate(true);
   };
 
   const handleReset = () => {
