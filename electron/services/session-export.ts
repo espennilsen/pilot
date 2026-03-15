@@ -184,7 +184,9 @@ export function formatAsMarkdown(
         lines.push('<details>');
         lines.push('<summary>💭 Thinking</summary>');
         lines.push('');
-        lines.push(msg.thinking);
+        lines.push('```');
+        lines.push(msg.thinking.replace(/```/g, '` ` `'));
+        lines.push('```');
         lines.push('');
         lines.push('</details>');
         lines.push('');

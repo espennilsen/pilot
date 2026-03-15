@@ -105,7 +105,7 @@ export default function ExportMenu() {
   return (
     <div className="relative" ref={menuRef}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => { if (!open) setError(null); setOpen(!open); }}
         className="p-1 rounded hover:bg-bg-elevated transition-colors text-text-secondary hover:text-text-primary"
         aria-label="Export conversation"
         title="Export conversation"
