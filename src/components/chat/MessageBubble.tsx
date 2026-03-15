@@ -8,6 +8,7 @@ import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
 import MessageActions from './MessageActions';
 import EditMessageOverlay from './EditMessageOverlay';
+import CitationsBar, { extractCitations } from './Citations';
 
 /**
  * Markdown renderer optimised for streaming. During rapid text_delta events,
@@ -213,6 +214,11 @@ function AssistantMessage({ message, messageIndex, onRegenerate }: MessageBubble
         )}
         {message.isStreaming && <StreamingCursor />}
       </div>
+
+      {/* Citations from web search results */}
+      {!message.isStreaming && (
+        <CitationsBar citations={extractCitations(message.toolCalls)} />
+      )}
 
       {/* Action bar */}
       {!message.isStreaming && message.content && (

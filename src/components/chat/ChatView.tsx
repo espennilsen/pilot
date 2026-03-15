@@ -11,6 +11,7 @@ import { FolderOpen } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import ChatHeader from './ChatHeader';
+import SuggestionChips from './SuggestionChips';
 import WelcomeScreen from '../onboarding/WelcomeScreen';
 
 export default function ChatView() {
@@ -18,6 +19,7 @@ export default function ChatView() {
   const messagesByTab = useChatStore(s => s.messagesByTab);
   const messages = useMemo(() => (activeTabId ? messagesByTab[activeTabId] ?? [] : []), [messagesByTab, activeTabId]);
   const isStreaming = useChatStore(s => activeTabId ? s.streamingByTab[activeTabId] : false);
+  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? [] : []);
   const { sendMessage, steerAgent, followUpAgent, abortAgent, cycleModel, selectModel, cycleThinking } = useAgentSession();
   const { hasAnyAuth, loadStatus: loadAuthStatus } = useAuthStore();
   const { onboardingComplete, load: loadAppSettings } = useAppSettingsStore();
@@ -280,6 +282,10 @@ export default function ChatView() {
                 onEditCancel={handleEditCancel}
               />
             ))}
+            {/* Follow-up suggestion chips */}
+            {!isStreaming && suggestions.length > 0 && (
+              <SuggestionChips suggestions={suggestions} onSelect={sendMessage} />
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}

@@ -1,16 +1,17 @@
 import { useAppSettingsStore } from '../../../stores/app-settings-store';
 import { useMemoryStore } from '../../../stores/memory-store';
 import { useEffect, useState } from 'react';
-import { FolderOpen, Monitor, Brain, Sparkles, ScrollText, Container } from 'lucide-react';
+import { FolderOpen, Brain, Sparkles, ScrollText, Container, Globe } from 'lucide-react';
 import { SettingRow, Toggle } from '../settings-helpers';
 import { IPC } from '../../../../shared/ipc';
 import { invoke } from '../../../lib/ipc-client';
 
 export function GeneralSettings() {
-  const { piAgentDir, theme, setTheme, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig, desktopEnabled, setDesktopEnabled } = useAppSettingsStore();
+  const { piAgentDir, load: loadAppSettings, setPiAgentDir, commitMsgModel, commitMsgMaxTokens, update: updateAppSettings, logging, setLogLevel, setFileLogging, setSyslogConfig, desktopEnabled, setDesktopEnabled, webSearchEnabled, webSearchApiKey, setWebSearchEnabled, setWebSearchApiKey } = useAppSettingsStore();
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const [dirInput, setDirInput] = useState(piAgentDir);
   const [dirDirty, setDirDirty] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(webSearchApiKey);
   const [availableModels, setAvailableModels] = useState<Array<{ provider: string; id: string; name: string }>>([]);
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export function GeneralSettings() {
     setDirInput(piAgentDir);
     setDirDirty(false);
   }, [piAgentDir]);
+
+  useEffect(() => {
+    setApiKeyInput(webSearchApiKey);
+  }, [webSearchApiKey]);
 
   const handleDirChange = (value: string) => {
     setDirInput(value);
@@ -71,22 +76,6 @@ export function GeneralSettings() {
       </SettingRow>
 
       <SettingRow
-        icon={<Monitor className="w-4 h-4 text-accent" />}
-        label="Theme"
-        description="Choose dark, light, or follow your system preference."
-      >
-        <select
-          value={theme}
-          onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'system')}
-          className="text-xs bg-bg-surface border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:border-accent"
-        >
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-          <option value="system">System</option>
-        </select>
-      </SettingRow>
-
-      <SettingRow
         icon={<Brain className="w-4 h-4 text-accent" />}
         label="Memory"
         description="When enabled, memory files are injected into the agent's system prompt. Manage memory contents in the sidebar Memory pane."
@@ -101,6 +90,38 @@ export function GeneralSettings() {
       >
         <Toggle checked={desktopEnabled} onChange={setDesktopEnabled} />
       </SettingRow>
+
+      {/* ── Web Search ── */}
+      <div className="border-t border-border pt-4 mt-2">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-4">Web Search</h3>
+
+        <div className="space-y-4">
+          <SettingRow
+            icon={<Globe className="w-4 h-4 text-accent" />}
+            label="Enable Web Search"
+            description="Give the agent a web_search tool powered by Brave Search. Requires a free API key."
+          >
+            <Toggle checked={webSearchEnabled} onChange={setWebSearchEnabled} />
+          </SettingRow>
+
+          {webSearchEnabled && (
+            <SettingRow
+              icon={<Globe className="w-4 h-4 text-text-secondary" />}
+              label="Brave Search API Key"
+              description={<>Get a free key at <a href="https://api.search.brave.com/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">api.search.brave.com</a></>}
+            >
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onBlur={() => { if (apiKeyInput !== webSearchApiKey) setWebSearchApiKey(apiKeyInput); }}
+                placeholder="BSA-xxxxxxxxxx"
+                className="w-64 px-3 py-1.5 bg-bg-base border border-border rounded-md text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </SettingRow>
+          )}
+        </div>
+      </div>
 
       {/* ── AI Commit Messages ── */}
       <div className="border-t border-border pt-4 mt-2">
