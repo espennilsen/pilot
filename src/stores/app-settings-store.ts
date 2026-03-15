@@ -45,6 +45,7 @@ interface AppSettingsStore {
   setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<void>;
   setFileLogging: (enabled: boolean) => Promise<void>;
   setSystemPrompt: (prompt: string) => Promise<void>;
+  setCustomThemeSlug: (slug: string | undefined) => Promise<void>;
   setSyslogConfig: (config: Partial<{ enabled: boolean; host: string; port: number }>) => Promise<void>;
 }
 

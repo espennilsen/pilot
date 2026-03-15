@@ -91,6 +91,8 @@ export interface PilotAppSettings {
   };
   /** Enable Desktop feature globally. Per-project .pilot/settings.json overrides this. Default: false */
   desktopEnabled?: boolean;
+  /** Slug of the active custom theme (only used when theme === 'custom'). */
+  customThemeSlug?: string;
 }
 
 // MCP (Model Context Protocol) types
