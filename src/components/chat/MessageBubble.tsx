@@ -6,6 +6,8 @@ import Markdown from '../../lib/markdown';
 import { attachmentUrl } from '../../lib/attachment-url';
 import { ToolResult } from './ToolResult';
 import StreamingCursor from './StreamingCursor';
+import MessageActions from './MessageActions';
+import EditMessageOverlay from './EditMessageOverlay';
 import CitationsBar, { extractCitations } from './Citations';
 
 /**
@@ -56,31 +58,75 @@ function StreamingMarkdown({ text }: { text: string }) {
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  messageIndex: number;
+  isEditing?: boolean;
+  isStreaming?: boolean;
+  onRegenerate?: (messageIndex: number) => void;
+  onEditAndResend?: (messageIndex: number, content: string) => void;
+  onEditSubmit?: (editedContent: string) => void;
+  onEditCancel?: () => void;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({
+  message,
+  messageIndex,
+  isEditing,
+  isStreaming,
+  onRegenerate,
+  onEditAndResend,
+  onEditSubmit,
+  onEditCancel,
+}: MessageBubbleProps) {
   if (message.role === 'user') {
-    return <UserMessage message={message} />;
+    return (
+      <UserMessage
+        message={message}
+        messageIndex={messageIndex}
+        isEditing={isEditing}
+        isStreaming={isStreaming}
+        onEditAndResend={onEditAndResend}
+        onEditSubmit={onEditSubmit}
+        onEditCancel={onEditCancel}
+      />
+    );
   }
-  return <AssistantMessage message={message} />;
+  return (
+    <AssistantMessage
+      message={message}
+      messageIndex={messageIndex}
+      onRegenerate={onRegenerate}
+    />
+  );
 }
 
 /** Match the image attachment prefix injected by MessageInput */
 const IMAGE_PREFIX_RE = /^The user attached (?:an image|(\d+) images) to this message\. Use the read tool to view (?:it|each one) before responding:\n([\s\S]*?)\n\n/;
 
-function UserMessage({ message }: MessageBubbleProps) {
+function UserMessage({ message, messageIndex, isEditing, isStreaming, onEditAndResend, onEditSubmit, onEditCancel }: MessageBubbleProps) {
   let displayContent = message.content;
   let imagePaths: string[] = [];
 
   const match = displayContent.match(IMAGE_PREFIX_RE);
+  const imagePrefix = match ? match[0] : '';
   if (match) {
     // Extract paths (one per line) and strip the prefix from displayed text
     imagePaths = match[2].split('\n').map(p => p.trim()).filter(Boolean);
     displayContent = displayContent.slice(match[0].length);
   }
 
+  // Edit mode
+  if (isEditing && onEditSubmit && onEditCancel) {
+    return (
+      <EditMessageOverlay
+        initialContent={displayContent}
+        onSubmit={(editedContent) => onEditSubmit(imagePrefix + editedContent)}
+        onCancel={onEditCancel}
+      />
+    );
+  }
+
   return (
-    <div className="border-l-2 border-accent pl-4 py-2">
+    <div className="group relative border-l-2 border-accent pl-4 py-2">
       {imagePaths.length > 0 && (
         <div className="flex gap-2 mb-2 flex-wrap">
           {imagePaths.map((p, i) => (
@@ -96,13 +142,23 @@ function UserMessage({ message }: MessageBubbleProps) {
       {displayContent && (
         <div className="text-text-primary whitespace-pre-wrap">{displayContent}</div>
       )}
+      <div className="absolute -bottom-3 right-0">
+        <MessageActions
+          role="user"
+          content={displayContent}
+          messageIndex={messageIndex}
+          isStreaming={isStreaming}
+          onEditAndResend={onEditAndResend}
+        />
+      </div>
     </div>
   );
 }
 
-function AssistantMessage({ message }: MessageBubbleProps) {
+function AssistantMessage({ message, messageIndex, onRegenerate }: MessageBubbleProps) {
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
-  
+  const citations = useMemo(() => extractCitations(message.toolCalls), [message.toolCalls]);
+
   if (message.isError) {
     return (
       <div className="text-error bg-error/10 rounded-md p-3 border border-error/30">
@@ -113,7 +169,7 @@ function AssistantMessage({ message }: MessageBubbleProps) {
   }
   
   return (
-    <div className="py-2">
+    <div className="group relative py-2">
       {/* Thinking section */}
       {message.thinkingContent && (
         <div className="mb-3">
@@ -163,7 +219,20 @@ function AssistantMessage({ message }: MessageBubbleProps) {
 
       {/* Citations from web search results */}
       {!message.isStreaming && (
-        <CitationsBar citations={extractCitations(message.toolCalls)} />
+        <CitationsBar citations={citations} />
+      )}
+
+      {/* Action bar */}
+      {!message.isStreaming && message.content && (
+        <div className="absolute -bottom-3 right-0">
+          <MessageActions
+            role="assistant"
+            content={message.content}
+            messageIndex={messageIndex}
+            isStreaming={message.isStreaming}
+            onRegenerate={onRegenerate}
+          />
+        </div>
       )}
     </div>
   );

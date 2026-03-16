@@ -1,10 +1,12 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useChatStore, type ChatMessage } from '../../stores/chat-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useProjectStore } from '../../stores/project-store';
 import { useAgentSession } from '../../hooks/useAgentSession';
+import { invoke } from '../../lib/ipc-client';
+import { IPC } from '../../../shared/ipc';
 import { FolderOpen } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
@@ -61,6 +63,172 @@ export default function ChatView() {
     setAutoScroll(isAtBottom);
   };
 
+  // ── Message actions: regenerate & edit ──────────────────────────────
+
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Reset editing state when tab switches
+  useEffect(() => {
+    setEditingIndex(null);
+  }, [activeTabId]);
+
+  /**
+   * Regenerate: fork the session at the user message that preceded this assistant message,
+   * then re-prompt with the same user text.
+   */
+  const handleRegenerate = useCallback(async (assistantMsgIndex: number) => {
+    if (!activeTabId || isStreaming) return;
+    setEditingIndex(null);
+
+    // Find the user message that preceded this assistant message
+    const userMsg = messages.slice(0, assistantMsgIndex).findLast(m => m.role === 'user');
+    if (!userMsg) return;
+
+    try {
+      // Get fork points from the SDK session
+      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
+      
+      // Find the entry ID for this user message by matching text.
+      // If the user sent the same message multiple times, count prior occurrences
+      // and pick the Nth matching fork point.
+      const sameTextBefore = messages
+        .slice(0, assistantMsgIndex)
+        .filter(m => m.role === 'user' && m.content === userMsg.content).length - 1;
+      let seen = 0;
+      const forkPoint = forkPoints.find(fp => {
+        if (fp.text !== userMsg.content) return false;
+        return seen++ === sameTextBefore;
+      });
+      if (!forkPoint) {
+        console.warn('[ChatView] Could not find fork point for user message');
+        return;
+      }
+
+      // Fork the session at this entry
+      const forkResult = await invoke(IPC.SESSION_FORK, activeTabId, forkPoint.entryId) as {
+        selectedText: string;
+        cancelled: boolean;
+        history: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }>;
+      };
+
+      if (forkResult.cancelled) return;
+
+      // Snapshot original messages before clearing
+      const originalMessages = [...messages];
+
+      // Clear renderer messages and reload from the forked session history
+      const { clearMessages, addMessage } = useChatStore.getState();
+      clearMessages(activeTabId);
+      for (const h of forkResult.history) {
+        addMessage(activeTabId, {
+          id: crypto.randomUUID(),
+          role: h.role,
+          content: h.content,
+          timestamp: h.timestamp || Date.now(),
+        });
+      }
+
+      // Re-prompt with the same text — this sends to the forked session
+      try {
+        await sendMessage(forkResult.selectedText);
+      } catch (sendErr) {
+        console.error('[ChatView] sendMessage failed during regenerate:', sendErr);
+        // Restore original messages
+        clearMessages(activeTabId);
+        for (const msg of originalMessages) {
+          addMessage(activeTabId, msg);
+        }
+      }
+    } catch (err) {
+      console.error('[ChatView] Regenerate failed:', err);
+    }
+  }, [activeTabId, messages, isStreaming, sendMessage]);
+
+  /**
+   * Edit & resend: enter editing mode for a user message.
+   */
+  const handleEditAndResend = useCallback((messageIndex: number, _content: string) => {
+    setEditingIndex(messageIndex);
+  }, []);
+
+  /**
+   * Submit the edited message: fork at the original user message, then send the edited text.
+   */
+  const handleEditSubmit = useCallback(async (editedContent: string) => {
+    if (!activeTabId || editingIndex === null || isStreaming) return;
+
+    const originalMsg = messages[editingIndex];
+    if (!originalMsg || originalMsg.role !== 'user') return;
+
+    try {
+      // Get fork points
+      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
+      
+      // Count prior user messages with the same content up to editingIndex
+      const sameTextBefore = messages
+        .slice(0, editingIndex)
+        .filter(m => m.role === 'user' && m.content === originalMsg.content).length;
+      let seen = 0;
+      const forkPoint = forkPoints.find(fp => {
+        if (fp.text !== originalMsg.content) return false;
+        return seen++ === sameTextBefore;
+      });
+      if (!forkPoint) {
+        console.warn('[ChatView] Could not find fork point for user message');
+        setEditingIndex(null);
+        return;
+      }
+
+      // Fork the session
+      const forkResult = await invoke(IPC.SESSION_FORK, activeTabId, forkPoint.entryId) as {
+        selectedText: string;
+        cancelled: boolean;
+        history: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }>;
+      };
+
+      if (forkResult.cancelled) {
+        setEditingIndex(null);
+        return;
+      }
+
+      // Snapshot original messages before clearing
+      const originalMessages = [...messages];
+
+      // Clear and reload from forked history
+      const { clearMessages, addMessage } = useChatStore.getState();
+      clearMessages(activeTabId);
+      for (const h of forkResult.history) {
+        addMessage(activeTabId, {
+          id: crypto.randomUUID(),
+          role: h.role,
+          content: h.content,
+          timestamp: h.timestamp || Date.now(),
+        });
+      }
+
+      setEditingIndex(null);
+
+      // Send the edited content
+      try {
+        await sendMessage(editedContent);
+      } catch (sendErr) {
+        console.error('[ChatView] sendMessage failed during edit & resend:', sendErr);
+        // Restore original messages
+        clearMessages(activeTabId);
+        for (const msg of originalMessages) {
+          addMessage(activeTabId, msg);
+        }
+      }
+    } catch (err) {
+      console.error('[ChatView] Edit & resend failed:', err);
+      setEditingIndex(null);
+    }
+  }, [activeTabId, editingIndex, messages, isStreaming, sendMessage]);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingIndex(null);
+  }, []);
+
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-bg-base">
       {/* Chat Header */}
@@ -102,8 +270,18 @@ export default function ChatView() {
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+            {messages.map((msg, idx) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                messageIndex={idx}
+                isEditing={editingIndex === idx}
+                isStreaming={isStreaming}
+                onRegenerate={handleRegenerate}
+                onEditAndResend={handleEditAndResend}
+                onEditSubmit={handleEditSubmit}
+                onEditCancel={handleEditCancel}
+              />
             ))}
             {/* Follow-up suggestion chips */}
             {!isStreaming && suggestions.length > 0 && (
