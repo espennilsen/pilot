@@ -37,6 +37,7 @@ export const IPC = {
   SESSION_FORK: 'session:fork',
   SESSION_EXPORT: 'session:export',
   SESSION_EXPORT_CLIPBOARD: 'session:export-clipboard',
+  SESSION_SUGGESTIONS: 'session:suggestions', // main → renderer push
 
   // App Settings (Pilot-level, stored in ~/.config/pilot/)
   APP_SETTINGS_GET: 'app-settings:get',
