@@ -164,25 +164,37 @@ export function AppearanceSettings() {
   };
 
   const handleDeleteTheme = async (slug: string) => {
-    // If deleting the active custom theme, switch to dark
-    if (theme === 'custom' && customThemeSlug === slug) {
-      await setTheme('dark');
-      setActiveCustomTheme(null);
+    try {
+      // If deleting the active custom theme, switch to dark
+      if (theme === 'custom' && customThemeSlug === slug) {
+        await setTheme('dark');
+        setActiveCustomTheme(null);
+      }
+      await deleteTheme(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete theme');
+    } finally {
+      setConfirmDelete(null);
     }
-    await deleteTheme(slug);
-    setConfirmDelete(null);
   };
 
   const handleImport = async () => {
-    const imported = await importTheme();
-    if (imported) {
-      // Optionally activate the imported theme
-      await handleSelectCustom(imported);
+    try {
+      const imported = await importTheme();
+      if (imported) {
+        await handleSelectCustom(imported);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import theme');
     }
   };
 
   const handleExport = async (slug: string) => {
-    await exportTheme(slug);
+    try {
+      await exportTheme(slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export theme');
+    }
   };
 
   // If editing a theme, show the full editor
@@ -200,6 +212,12 @@ export function AppearanceSettings() {
 
   return (
     <div className="p-5 space-y-6">
+      {error && (
+        <div className="px-3 py-2 text-sm text-error bg-error/10 border border-error/30 rounded-md flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-error hover:text-error/80 ml-2 text-xs">✕</button>
+        </div>
+      )}
       {/* Standard Themes */}
       <div>
         <div className="flex items-center gap-2 mb-3">

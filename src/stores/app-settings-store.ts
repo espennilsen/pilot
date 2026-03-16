@@ -9,7 +9,7 @@ import { invoke } from '../lib/ipc-client';
 interface AppSettingsStore {
   piAgentDir: string;
   theme: ThemeMode;
-  customThemeSlug: string;
+  customThemeSlug: string | undefined;
   terminalApp: string | null;
   editorCli: string | null;
   onboardingComplete: boolean;
@@ -28,7 +28,6 @@ interface AppSettingsStore {
     file?: { enabled: boolean; maxSizeMB?: number; retainDays?: number };
     syslog?: { enabled: boolean; host: string; port: number; facility?: number; appName?: string };
   };
-  customThemeSlug: string | undefined;
   isLoading: boolean;
   error: string | null;
 
@@ -36,7 +35,7 @@ interface AppSettingsStore {
   update: (updates: Partial<PilotAppSettings>) => Promise<void>;
   setPiAgentDir: (dir: string) => Promise<void>;
   setTheme: (theme: ThemeMode) => Promise<void>;
-  setCustomThemeSlug: (slug: string) => Promise<void>;
+  setCustomThemeSlug: (slug: string | undefined) => Promise<void>;
   setTerminalApp: (app: string | null) => Promise<void>;
   setEditorCli: (cli: string | null) => Promise<void>;
   setDeveloperMode: (enabled: boolean) => Promise<void>;
@@ -51,7 +50,6 @@ interface AppSettingsStore {
   setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<void>;
   setFileLogging: (enabled: boolean) => Promise<void>;
   setSystemPrompt: (prompt: string) => Promise<void>;
-  setCustomThemeSlug: (slug: string | undefined) => Promise<void>;
   setSyslogConfig: (config: Partial<{ enabled: boolean; host: string; port: number }>) => Promise<void>;
 }
 
@@ -79,7 +77,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
   return {
     piAgentDir: DEFAULT_PI_AGENT_DIR,
     theme: (localStorage.getItem('pilot-theme') as ThemeMode) || 'dark',
-    customThemeSlug: localStorage.getItem('pilot-custom-theme-slug') || '',
+    customThemeSlug: localStorage.getItem('pilot-custom-theme-slug') || undefined,
     terminalApp: null,
     editorCli: null,
     onboardingComplete: false,
@@ -116,7 +114,6 @@ Guidelines:
       file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
       syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
     },
-    customThemeSlug: undefined,
     isLoading: false,
     error: null,
 
@@ -140,7 +137,6 @@ Guidelines:
         keybindOverrides: settings.keybindOverrides ?? {},
         hiddenPaths: settings.hiddenPaths ?? [],
         desktopEnabled: settings.desktopEnabled ?? false,
-        customThemeSlug: settings.customThemeSlug ?? undefined,
         webSearchEnabled: settings.webSearch?.enabled ?? false,
         webSearchApiKey: settings.webSearch?.apiKey ?? '',
         systemPrompt: settings.systemPrompt ?? '',
@@ -178,7 +174,6 @@ Guidelines:
         keybindOverrides: updated.keybindOverrides ?? {},
         hiddenPaths: updated.hiddenPaths ?? [],
         desktopEnabled: updated.desktopEnabled ?? false,
-        customThemeSlug: updated.customThemeSlug ?? undefined,
         webSearchEnabled: updated.webSearch?.enabled ?? false,
         webSearchApiKey: updated.webSearch?.apiKey ?? '',
         systemPrompt: updated.systemPrompt ?? '',
@@ -201,8 +196,12 @@ Guidelines:
       localStorage.setItem('pilot-theme', theme);
       return updateSetting({ theme }, true);
     },
-    setCustomThemeSlug: async (slug: string) => {
-      localStorage.setItem('pilot-custom-theme-slug', slug);
+    setCustomThemeSlug: async (slug: string | undefined) => {
+      if (slug) {
+        localStorage.setItem('pilot-custom-theme-slug', slug);
+      } else {
+        localStorage.removeItem('pilot-custom-theme-slug');
+      }
       return updateSetting({ customThemeSlug: slug }, true);
     },
     setTerminalApp: async (app: string | null) => updateSetting({ terminalApp: app }),
@@ -243,11 +242,14 @@ Guidelines:
       const current = get().logging;
       return updateSetting({ logging: { ...current, file: { ...current.file, enabled } } }, true);
     },
-    setCustomThemeSlug: async (slug) => updateSetting({ customThemeSlug: slug }, true),
     setSyslogConfig: async (config) => {
       const current = get().logging;
       const merged = { ...current.syslog, ...config } as typeof current.syslog;
       return updateSetting({ logging: { ...current, syslog: merged } }, true);
+    },
+  };
+});
+ed } }, true);
     },
   };
 });
