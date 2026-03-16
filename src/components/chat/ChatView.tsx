@@ -78,6 +78,7 @@ export default function ChatView() {
    */
   const handleRegenerate = useCallback(async (assistantMsgIndex: number) => {
     if (!activeTabId || isStreaming) return;
+    setEditingIndex(null);
 
     // Find the user message that preceded this assistant message
     const userMsg = messages.slice(0, assistantMsgIndex).findLast(m => m.role === 'user');

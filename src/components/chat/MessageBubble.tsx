@@ -107,6 +107,7 @@ function UserMessage({ message, messageIndex, isEditing, isStreaming, onEditAndR
   let imagePaths: string[] = [];
 
   const match = displayContent.match(IMAGE_PREFIX_RE);
+  const imagePrefix = match ? match[0] : '';
   if (match) {
     // Extract paths (one per line) and strip the prefix from displayed text
     imagePaths = match[2].split('\n').map(p => p.trim()).filter(Boolean);
@@ -118,7 +119,7 @@ function UserMessage({ message, messageIndex, isEditing, isStreaming, onEditAndR
     return (
       <EditMessageOverlay
         initialContent={displayContent}
-        onSubmit={onEditSubmit}
+        onSubmit={(editedContent) => onEditSubmit(imagePrefix + editedContent)}
         onCancel={onEditCancel}
       />
     );
@@ -156,7 +157,8 @@ function UserMessage({ message, messageIndex, isEditing, isStreaming, onEditAndR
 
 function AssistantMessage({ message, messageIndex, onRegenerate }: MessageBubbleProps) {
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
-  
+  const citations = useMemo(() => extractCitations(message.toolCalls), [message.toolCalls]);
+
   if (message.isError) {
     return (
       <div className="text-error bg-error/10 rounded-md p-3 border border-error/30">
@@ -217,7 +219,7 @@ function AssistantMessage({ message, messageIndex, onRegenerate }: MessageBubble
 
       {/* Citations from web search results */}
       {!message.isStreaming && (
-        <CitationsBar citations={extractCitations(message.toolCalls)} />
+        <CitationsBar citations={citations} />
       )}
 
       {/* Action bar */}
