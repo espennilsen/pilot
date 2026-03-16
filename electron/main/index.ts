@@ -27,7 +27,9 @@ import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
 import { registerDesktopIpc } from '../ipc/desktop';
+import { registerThemeIpc } from '../ipc/theme';
 import { DesktopService } from '../services/desktop-service';
+import { ThemeService } from '../services/theme-service';
 import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
@@ -53,6 +55,7 @@ let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
 let desktopService: DesktopService | null = null;
+let themeService: ThemeService | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -162,9 +165,25 @@ function buildApplicationMenu() {
 function createWindow() {
   // Read persisted theme to set correct initial window chrome (avoid flash)
   const settings = loadAppSettings();
-  const isLightTheme = settings.theme === 'light';
-  const windowBg = isLightTheme ? '#ffffff' : '#1a1b1e';
-  const windowFg = isLightTheme ? '#1a1b1e' : '#ffffff';
+  let windowBg: string;
+  let windowFg: string;
+  if (settings.theme === 'custom' && settings.customThemeSlug) {
+    // Try to read the custom theme for its bg-base color
+    try {
+      const ts = themeService!;
+      const ct = ts.get(settings.customThemeSlug);
+      windowBg = ct?.colors['bg-base'] ?? '#1a1b1e';
+      // Estimate foreground from base type
+      windowFg = ct?.base === 'light' ? '#1a1b1e' : '#ffffff';
+    } catch {
+      windowBg = '#1a1b1e';
+      windowFg = '#ffffff';
+    }
+  } else {
+    const isLightTheme = settings.theme === 'light';
+    windowBg = isLightTheme ? '#ffffff' : '#1a1b1e';
+    windowFg = isLightTheme ? '#1a1b1e' : '#ffffff';
+  }
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -276,6 +295,9 @@ app.whenReady().then(async () => {
 
     return net.fetch(`file://${resolved}`);
   });
+  // Initialize theme service before createWindow so it can read custom theme colors
+  themeService = new ThemeService();
+
   // Create window first (needed by terminal service)
   createWindow();
 
@@ -308,6 +330,9 @@ app.whenReady().then(async () => {
   registerSubagentIpc(sessionManager.subagentManager);
   registerMcpIpc(mcpManager);
   registerAttachmentIpc();
+
+  // Custom themes (themeService already initialized before createWindow)
+  registerThemeIpc(themeService!);
 
   // Docker sandbox — always register IPC handlers so the renderer gets
   // graceful responses even when Docker is unavailable or init fails.
@@ -516,9 +541,18 @@ app.whenReady().then(async () => {
   });
 
   // Theme changed — update window chrome (background, titlebar overlay)
-  ipcMain.on(IPC.APP_THEME_CHANGED, (_event, resolved: string) => {
-    const bg = resolved === 'light' ? '#ffffff' : '#1a1b1e';
-    const fg = resolved === 'light' ? '#1a1b1e' : '#ffffff';
+  // Payload: { resolved: 'dark' | 'light', bgColor?: string, fgColor?: string }
+  ipcMain.on(IPC.APP_THEME_CHANGED, (_event, payload: string | { resolved: string; bgColor?: string; fgColor?: string }) => {
+    // Support both legacy string payload and new object payload
+    let bg: string;
+    let fg: string;
+    if (typeof payload === 'string') {
+      bg = payload === 'light' ? '#ffffff' : '#1a1b1e';
+      fg = payload === 'light' ? '#1a1b1e' : '#ffffff';
+    } else {
+      bg = payload.bgColor ?? (payload.resolved === 'light' ? '#ffffff' : '#1a1b1e');
+      fg = payload.fgColor ?? (payload.resolved === 'light' ? '#1a1b1e' : '#ffffff');
+    }
     if (mainWindow) {
       mainWindow.setBackgroundColor(bg);
       if (isWin) {

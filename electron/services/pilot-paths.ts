@@ -73,6 +73,9 @@ export const PILOT_EXTENSION_REGISTRY_FILE = join(PILOT_APP_DIR, 'extension-regi
 // Prompt library
 export const PILOT_PROMPTS_DIR = join(PILOT_APP_DIR, 'prompts');
 
+// Custom themes
+export const PILOT_THEMES_DIR = join(PILOT_APP_DIR, 'themes');
+
 // Log files directory
 export const PILOT_LOGS_DIR = join(PILOT_APP_DIR, 'logs');
 
@@ -91,6 +94,7 @@ export function ensurePilotAppDirs(): void {
     PILOT_EXTENSIONS_DIR,
     PILOT_SKILLS_DIR,
     PILOT_PROMPTS_DIR,
+    PILOT_THEMES_DIR,
     PILOT_LOGS_DIR,
   ];
   for (const dir of dirs) {

@@ -9,7 +9,7 @@ import { invoke } from '../lib/ipc-client';
 interface AppSettingsStore {
   piAgentDir: string;
   theme: ThemeMode;
-  customThemeSlug: string;
+  customThemeSlug: string | undefined;
   terminalApp: string | null;
   editorCli: string | null;
   onboardingComplete: boolean;
@@ -35,7 +35,7 @@ interface AppSettingsStore {
   update: (updates: Partial<PilotAppSettings>) => Promise<void>;
   setPiAgentDir: (dir: string) => Promise<void>;
   setTheme: (theme: ThemeMode) => Promise<void>;
-  setCustomThemeSlug: (slug: string) => Promise<void>;
+  setCustomThemeSlug: (slug: string | undefined) => Promise<void>;
   setTerminalApp: (app: string | null) => Promise<void>;
   setEditorCli: (cli: string | null) => Promise<void>;
   setDeveloperMode: (enabled: boolean) => Promise<void>;
@@ -77,7 +77,7 @@ export const useAppSettingsStore = create<AppSettingsStore>((set, get) => {
   return {
     piAgentDir: DEFAULT_PI_AGENT_DIR,
     theme: (localStorage.getItem('pilot-theme') as ThemeMode) || 'dark',
-    customThemeSlug: localStorage.getItem('pilot-custom-theme-slug') || '',
+    customThemeSlug: localStorage.getItem('pilot-custom-theme-slug') || undefined,
     terminalApp: null,
     editorCli: null,
     onboardingComplete: false,
@@ -196,8 +196,12 @@ Guidelines:
       localStorage.setItem('pilot-theme', theme);
       return updateSetting({ theme }, true);
     },
-    setCustomThemeSlug: async (slug: string) => {
-      localStorage.setItem('pilot-custom-theme-slug', slug);
+    setCustomThemeSlug: async (slug: string | undefined) => {
+      if (slug) {
+        localStorage.setItem('pilot-custom-theme-slug', slug);
+      } else {
+        localStorage.removeItem('pilot-custom-theme-slug');
+      }
       return updateSetting({ customThemeSlug: slug }, true);
     },
     setTerminalApp: async (app: string | null) => updateSetting({ terminalApp: app }),
@@ -242,6 +246,10 @@ Guidelines:
       const current = get().logging;
       const merged = { ...current.syslog, ...config } as typeof current.syslog;
       return updateSetting({ logging: { ...current, syslog: merged } }, true);
+    },
+  };
+});
+ed } }, true);
     },
   };
 });

@@ -81,6 +81,8 @@ export function loadAppSettings(): PilotAppSettings {
     const parsed = JSON.parse(raw);
     cachedSettings = {
       piAgentDir: parsed.piAgentDir || DEFAULT_PI_AGENT_DIR,
+      theme: parsed.theme ?? undefined,
+      customThemeSlug: parsed.customThemeSlug ?? undefined,
       terminalApp: parsed.terminalApp ?? null,
       editorCli: parsed.editorCli ?? null,
       onboardingComplete: parsed.onboardingComplete ?? false,
@@ -124,6 +126,12 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   if (typeof settings.companionProtocol === 'string') validated.companionProtocol = settings.companionProtocol;
   if (typeof settings.companionAutoStart === 'boolean') validated.companionAutoStart = settings.companionAutoStart;
   if (typeof settings.desktopEnabled === 'boolean') validated.desktopEnabled = settings.desktopEnabled;
+  if (typeof settings.theme === 'string' && ['dark', 'light', 'system', 'custom'].includes(settings.theme)) validated.theme = settings.theme;
+  if (settings.customThemeSlug === undefined) {
+    validated.customThemeSlug = undefined;
+  } else if (typeof settings.customThemeSlug === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(settings.customThemeSlug)) {
+    validated.customThemeSlug = settings.customThemeSlug;
+  }
   if (typeof settings.systemPrompt === 'string' || settings.systemPrompt === undefined) validated.systemPrompt = settings.systemPrompt;
   if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
   if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;
