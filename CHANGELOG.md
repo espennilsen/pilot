@@ -2,6 +2,24 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-03-15
+
+### Added
+- **Custom themes** — full theme editor with color pickers, live preview, built-in presets, and import/export as JSON files. Themes persist across restarts via localStorage early-apply to prevent flash. (#23)
+- **Session export** — export conversations to Markdown or JSON files, or copy to clipboard. Includes optional thinking blocks (fenced in code blocks for safe HTML) and timestamps. (#18)
+- **Message actions** — copy, regenerate, and edit & resend on individual chat messages. Regenerate forks the session at the preceding user message. Edit preserves image attachments through the round-trip. (#19)
+
+### Fixed
+- **Theme editor delete** — deleting the active custom theme now resets mode to dark instead of leaving the user stuck in an unresolvable custom mode
+- **Theme path traversal** — hardened slug validation and path resolution in theme get/save/delete/export to prevent directory traversal
+- **Theme slug collisions** — prevent overwriting built-in themes; atomic rename for slug changes
+- **Export menu stale error** — error state clears when reopening the menu so previous failures don't flash
+- **Export double-click** — added in-flight guard to prevent spawning duplicate save dialogs or clipboard writes
+- **Regenerate with edit overlay** — editing index is cleared before fork so the overlay doesn't attach to a stale message
+- **Edit drops images** — image attachment prefix is preserved when editing and resending a message with attachments
+- **Citations performance** — memoized `extractCitations` to avoid re-running regex on every streaming tick
+- **Appearance settings error handling** — import, export, and delete theme handlers now surface errors via a dismissible banner instead of silently failing
+
 ## 2026-03-13
 
 ### Fixed
