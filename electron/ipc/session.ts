@@ -125,7 +125,11 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
       throw new Error('No messages to export — the session is empty.');
     }
     const context = buildSessionContext(entries);
-    return (context.messages ?? []) as Message[];
+    const messages = (context.messages ?? []) as Message[];
+    if (messages.length === 0) {
+      throw new Error('No messages to export — the session is empty.');
+    }
+    return messages;
   }
 
   /** Export a historical session (by file path) to a file. */

@@ -14,7 +14,7 @@ import type { CustomTheme } from '../../shared/types';
 // ─── Validation ──────────────────────────────────────────────────────────
 
 /** Only allow valid hex color values (3, 4, 6, or 8 hex digits). */
-const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /** Required keys in the colors object. */
 const REQUIRED_COLOR_KEYS = [
