@@ -102,8 +102,6 @@ export interface PilotAppSettings {
   };
   /** Enable Desktop feature globally. Per-project .pilot/settings.json overrides this. Default: false */
   desktopEnabled?: boolean;
-  /** Slug of the active custom theme (only used when theme === 'custom'). */
-  customThemeSlug?: string;
   /** Web search configuration */
   webSearch?: {
     /** Enable web search tool in agent sessions. Default: false */

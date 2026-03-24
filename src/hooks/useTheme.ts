@@ -164,7 +164,7 @@ export function useTheme(): void {
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
-  // Cleanup custom theme overrides when switching away from custom mode
+  // On unmount, remove any lingering custom CSS variable overrides
   useEffect(() => {
     return () => {
       clearCustomThemeColors();

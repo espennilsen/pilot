@@ -226,6 +226,7 @@ export class ThemeService {
       let slug = theme.slug;
       let counter = 1;
       while (existsSync(join(this.themesDir, `${slug}.json`))) {
+        if (counter > 1000) throw new Error('Too many slug collisions during import');
         const existing = this.get(slug);
         if (existing?.builtIn) {
           slug = `${theme.slug}-${counter++}`;

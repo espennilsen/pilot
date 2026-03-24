@@ -55,8 +55,9 @@ export default function ExportMenu() {
   }, [open]);
 
   const doExport = useCallback(async (format: SessionExportFormat) => {
-    if (!activeTabId) return;
+    if (!activeTabId || isExporting) return;
     setError(null);
+    setIsExporting(true);
     const options: SessionExportOptions = {
       format,
       includeThinking: true,
@@ -73,8 +74,10 @@ export default function ExportMenu() {
     } catch (err) {
       console.error('Export failed:', err);
       setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setIsExporting(false);
     }
-  }, [activeTabId, activeTab]);
+  }, [activeTabId, activeTab, isExporting]);
 
   const doCopy = useCallback(async () => {
     if (!activeTabId || isExporting) return;

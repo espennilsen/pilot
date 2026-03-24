@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useSessionStore } from '../../stores/session-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useProjectStore } from '../../stores/project-store';
@@ -38,6 +38,19 @@ export function SessionList() {
   }, [loadSessions, projectPath]);
 
   const filteredSessions = getFilteredSessions();
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportErrorTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-dismiss export errors after 4 seconds
+  const showExportError = useCallback((msg: string) => {
+    setExportError(msg);
+    if (exportErrorTimer.current) clearTimeout(exportErrorTimer.current);
+    exportErrorTimer.current = setTimeout(() => setExportError(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (exportErrorTimer.current) clearTimeout(exportErrorTimer.current); };
+  }, []);
 
   // Get current active tab's session path
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -80,9 +93,9 @@ export function SessionList() {
     try {
       await window.api.invoke(IPC.SESSION_EXPORT_BY_PATH, session.path, options, meta);
     } catch (err) {
-      console.error('Export failed:', err);
+      showExportError(err instanceof Error ? err.message : 'Export failed');
     }
-  }, []);
+  }, [showExportError]);
 
   const handleCopySession = useCallback(async (
     session: { path: string; title: string; projectPath: string }
@@ -97,12 +110,20 @@ export function SessionList() {
     try {
       await window.api.invoke(IPC.SESSION_EXPORT_CLIPBOARD_BY_PATH, session.path, options, meta);
     } catch (err) {
-      console.error('Copy to clipboard failed:', err);
+      showExportError(err instanceof Error ? err.message : 'Copy to clipboard failed');
     }
-  }, []);
+  }, [showExportError]);
 
   return (
     <div className="flex flex-col h-full">
+      {/* Export error banner */}
+      {exportError && (
+        <div className="mx-2 mt-2 px-2.5 py-1.5 bg-error/10 border border-error/30 rounded text-xs text-error flex items-center justify-between">
+          <span className="truncate">{exportError}</span>
+          <button onClick={() => setExportError(null)} className="ml-1 text-error hover:text-error/80 flex-shrink-0">✕</button>
+        </div>
+      )}
+
       {/* Search input + archive toggle */}
       <div className="px-3 py-2 border-b border-border space-y-2">
         <div className="relative">
