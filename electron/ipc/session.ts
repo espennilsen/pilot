@@ -1,6 +1,7 @@
 import { ipcMain, dialog, clipboard, BrowserWindow } from 'electron';
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { join, resolve } from 'path';
 import { IPC } from '../../shared/ipc';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 import { updateSessionMeta, removeSessionMeta } from '../services/session-metadata';
@@ -9,6 +10,8 @@ import type { SessionExportOptions, SessionExportResult } from '../../shared/typ
 import type { Message } from '@mariozechner/pi-ai';
 import { parseSessionEntries, buildSessionContext } from '@mariozechner/pi-coding-agent';
 import { formatAsMarkdown, formatAsJson } from '../services/session-export';
+import { getPiAgentDir } from '../services/app-settings';
+import { isWithinDir } from '../utils/paths';
 
 export function registerSessionIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.SESSION_LIST, async (_event, projectPath: string) => {
@@ -107,10 +110,16 @@ export function registerSessionIpc(sessionManager: PilotSessionManager) {
 
   /** Load messages from a session file on disk. */
   async function loadMessagesFromPath(sessionPath: string): Promise<Message[]> {
-    if (!existsSync(sessionPath)) {
+    // Validate the path is within the sessions directory to prevent path traversal
+    const sessionsDir = join(getPiAgentDir(), 'sessions');
+    const resolved = resolve(sessionPath);
+    if (!isWithinDir(sessionsDir, resolved)) {
+      throw new Error('Invalid session path — must be within the sessions directory.');
+    }
+    if (!existsSync(resolved)) {
       throw new Error('Session file not found.');
     }
-    const content = await readFile(sessionPath, 'utf-8');
+    const content = await readFile(resolved, 'utf-8');
     const entries = parseSessionEntries(content);
     if (entries.length === 0) {
       throw new Error('No messages to export — the session is empty.');

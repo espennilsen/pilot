@@ -197,28 +197,28 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorMode]);
 
-  // Parse JSON text back into a draft theme
-  const applyJsonToDraft = useCallback(() => {
+  // Parse JSON text back into a draft theme. Returns the parsed theme, or null on failure.
+  const applyJsonToDraft = useCallback((): CustomTheme | null => {
     try {
       const parsed = JSON.parse(jsonText);
       // Validate required fields
       if (!parsed.name || typeof parsed.name !== 'string') {
         setJsonError('Missing or invalid "name" field');
-        return false;
+        return null;
       }
       if (!parsed.base || (parsed.base !== 'dark' && parsed.base !== 'light')) {
         setJsonError('Missing or invalid "base" field (must be "dark" or "light")');
-        return false;
+        return null;
       }
       if (!parsed.colors || typeof parsed.colors !== 'object') {
         setJsonError('Missing or invalid "colors" object');
-        return false;
+        return null;
       }
       const requiredColors = ['bg-base', 'bg-surface', 'bg-elevated', 'text-primary', 'text-secondary', 'accent', 'success', 'error', 'warning', 'border'];
       const missing = requiredColors.filter(k => !parsed.colors[k]);
       if (missing.length > 0) {
         setJsonError(`Missing required colors: ${missing.join(', ')}`);
-        return false;
+        return null;
       }
       // Build theme from parsed JSON
       const theme: CustomTheme = {
@@ -240,10 +240,10 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
       setShowTerminal(!!theme.terminal);
       setShowSyntax(!!theme.syntax);
       setJsonError(null);
-      return true;
+      return theme;
     } catch (err) {
       setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
-      return false;
+      return null;
     }
   }, [jsonText, draft.builtIn]);
 
@@ -273,15 +273,18 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
   }, []);
 
   const handleSave = async () => {
-    // If in code mode, apply JSON to draft before saving
-    if (editorMode === 'code' && !applyJsonToDraft()) {
-      return; // JSON parse/validation failed
+    // If in code mode, apply JSON to draft before saving — use the returned
+    // theme directly since setDraft won't have flushed yet.
+    let parsedFromJson: CustomTheme | null = null;
+    if (editorMode === 'code') {
+      parsedFromJson = applyJsonToDraft();
+      if (!parsedFromJson) return; // JSON parse/validation failed
     }
     setIsSaving(true);
     setError(null);
     try {
       // Auto-generate slug from name if creating new or name changed
-      const theme = { ...draft };
+      const theme = { ...(parsedFromJson ?? draft) };
       if (isNew || theme.name !== original.name) {
         theme.slug = slugify(theme.name);
       }
@@ -339,9 +342,10 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
   const handleDelete = async () => {
     if (!initialTheme) return;
     try {
+      const wasActive = useThemeStore.getState().activeCustomTheme?.slug === initialTheme.slug;
       await deleteTheme(initialTheme.slug);
-      // Reset mode if we just deleted the active theme
-      if (useThemeStore.getState().activeCustomTheme === null) {
+      // Only reset mode if we just deleted the currently active theme
+      if (wasActive) {
         await setTheme('dark');
       }
       onClose();
@@ -582,8 +586,9 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
               </span>
               <button
                 onClick={() => {
-                  if (applyJsonToDraft()) {
-                    setJsonText(draftToJson(draft));
+                  const applied = applyJsonToDraft();
+                  if (applied) {
+                    setJsonText(draftToJson(applied));
                   }
                 }}
                 disabled={isReadOnly}
