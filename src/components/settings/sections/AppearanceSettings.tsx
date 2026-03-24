@@ -145,6 +145,7 @@ function CustomThemeCard({
 export function AppearanceSettings() {
   const { theme, setTheme, customThemeSlug, setCustomThemeSlug } = useAppSettingsStore();
   const { customThemes, activeCustomTheme, loadThemes, setActiveCustomTheme, importTheme, exportTheme, deleteTheme } = useThemeStore();
+  const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editingTheme, setEditingTheme] = useState<CustomTheme | null | 'new'>(null);
 

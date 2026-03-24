@@ -37,6 +37,8 @@ export const IPC = {
   SESSION_FORK: 'session:fork',
   SESSION_EXPORT: 'session:export',
   SESSION_EXPORT_CLIPBOARD: 'session:export-clipboard',
+  SESSION_EXPORT_BY_PATH: 'session:export-by-path',
+  SESSION_EXPORT_CLIPBOARD_BY_PATH: 'session:export-clipboard-by-path',
   SESSION_GET_FORK_POINTS: 'session:get-fork-points',
   SESSION_SUGGESTIONS: 'session:suggestions', // main → renderer push
 

@@ -1,5 +1,5 @@
 import { useUIStore } from '../../stores/ui-store';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   X, Settings, FolderCog, Puzzle, BookOpen, Terminal, Keyboard,
   Shield, FolderOpen, KeyRound, FileText, Smartphone, MessageSquareText, Plug,
@@ -48,6 +48,63 @@ export default function SettingsPanel() {
     return () => window.removeEventListener('keydown', handler);
   }, [settingsOpen, closeSettings]);
 
+  // ─── Resizable panel state ───────────────────────────────────────────
+  const MIN_W = 600;
+  const MIN_H = 400;
+  const MAX_W_RATIO = 0.92;
+  const MAX_H_RATIO = 0.90;
+
+  const [size, setSize] = useState<{ w: number; h: number }>(() => {
+    try {
+      const saved = localStorage.getItem('pilot-settings-size');
+      if (saved) {
+        const { w, h } = JSON.parse(saved);
+        if (typeof w === 'number' && typeof h === 'number') {
+          return {
+            w: Math.max(MIN_W, Math.min(w, window.innerWidth * MAX_W_RATIO)),
+            h: Math.max(MIN_H, Math.min(h, window.innerHeight * MAX_H_RATIO)),
+          };
+        }
+      }
+    } catch { /* ignore */ }
+    return { w: 780, h: 560 };
+  });
+
+  const resizing = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+
+  const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = { startX: e.clientX, startY: e.clientY, startW: size.w, startH: size.h };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      const { startX, startY, startW, startH } = resizing.current;
+      const newW = Math.max(MIN_W, Math.min(startW + (ev.clientX - startX) * 2, window.innerWidth * MAX_W_RATIO));
+      const newH = Math.max(MIN_H, Math.min(startH + (ev.clientY - startY) * 2, window.innerHeight * MAX_H_RATIO));
+      setSize({ w: newW, h: newH });
+    };
+
+    const onMouseUp = () => {
+      if (resizing.current) {
+        // Persist on release
+        setSize(prev => {
+          try { localStorage.setItem('pilot-settings-size', JSON.stringify(prev)); } catch { /* ignore */ }
+          return prev;
+        });
+      }
+      resizing.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'nwse-resize';
+    document.body.style.userSelect = 'none';
+  }, [size.w, size.h]);
+
   if (!settingsOpen) return null;
 
   return (
@@ -59,7 +116,10 @@ export default function SettingsPanel() {
       />
 
       {/* Panel */}
-      <div className="relative w-[700px] max-w-[90vw] h-[520px] max-h-[80vh] bg-bg-elevated border border-border rounded-lg shadow-2xl flex overflow-hidden">
+      <div
+        className="relative bg-bg-elevated border border-border rounded-lg shadow-2xl flex overflow-hidden"
+        style={{ width: size.w, height: size.h }}
+      >
         {/* Left nav */}
         <nav className="w-[180px] bg-bg-surface border-r border-border flex flex-col py-2">
           <div className="px-4 py-3 mb-1">
@@ -119,6 +179,23 @@ export default function SettingsPanel() {
             {settingsTab === 'mcp' && <McpSettings />}
             {settingsTab === 'developer' && <DeveloperSettings />}
           </div>
+        </div>
+
+        {/* Resize handle — bottom-right corner */}
+        <div
+          onMouseDown={onResizeMouseDown}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-10 group"
+          title="Drag to resize"
+        >
+          <svg
+            className="w-3 h-3 absolute bottom-0.5 right-0.5 text-text-secondary/40 group-hover:text-text-secondary/70 transition-colors"
+            viewBox="0 0 12 12"
+            fill="currentColor"
+          >
+            <circle cx="9" cy="9" r="1.2" />
+            <circle cx="5" cy="9" r="1.2" />
+            <circle cx="9" cy="5" r="1.2" />
+          </svg>
         </div>
       </div>
     </div>

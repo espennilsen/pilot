@@ -5,6 +5,8 @@ import { useProjectStore } from '../../stores/project-store';
 import { SessionItem } from './SessionItem';
 import { Icon } from '../shared/Icon';
 import { openTabSession, useWiredSessionsStore } from '../../hooks/useWorkspacePersistence';
+import { IPC } from '../../../shared/ipc';
+import type { SessionExportOptions } from '../../../shared/types';
 
 export function SessionList() {
   const {
@@ -63,6 +65,41 @@ export function SessionList() {
       console.error('Failed to open session:', err);
     }
   }, [tabs, switchTab, addWiredSession]);
+
+  const handleExportSession = useCallback(async (
+    session: { path: string; title: string; projectPath: string },
+    format: 'markdown' | 'json'
+  ) => {
+    const options: SessionExportOptions = {
+      format,
+      includeThinking: true,
+      includeToolCalls: false,
+      includeTimestamps: true,
+    };
+    const meta = { title: session.title, projectPath: session.projectPath };
+    try {
+      await window.api.invoke(IPC.SESSION_EXPORT_BY_PATH, session.path, options, meta);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  }, []);
+
+  const handleCopySession = useCallback(async (
+    session: { path: string; title: string; projectPath: string }
+  ) => {
+    const options: SessionExportOptions = {
+      format: 'markdown',
+      includeThinking: false,
+      includeToolCalls: false,
+      includeTimestamps: true,
+    };
+    const meta = { title: session.title, projectPath: session.projectPath };
+    try {
+      await window.api.invoke(IPC.SESSION_EXPORT_CLIPBOARD_BY_PATH, session.path, options, meta);
+    } catch (err) {
+      console.error('Copy to clipboard failed:', err);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -128,6 +165,9 @@ export function SessionList() {
                   ? unarchiveSession(session.path)
                   : archiveSession(session.path)
                 }
+                onExportMarkdown={() => handleExportSession(session, 'markdown')}
+                onExportJson={() => handleExportSession(session, 'json')}
+                onCopyClipboard={() => handleCopySession(session)}
                 onDelete={() => {
                   if (confirm(`Delete session "${session.title}"? This cannot be undone.`)) {
                     deleteSession(session.path);

@@ -14,12 +14,14 @@ import ChatHeader from './ChatHeader';
 import SuggestionChips from './SuggestionChips';
 import WelcomeScreen from '../onboarding/WelcomeScreen';
 
+const EMPTY_SUGGESTIONS: string[] = [];
+
 export default function ChatView() {
   const activeTabId = useTabStore(s => s.activeTabId);
   const messagesByTab = useChatStore(s => s.messagesByTab);
   const messages = useMemo(() => (activeTabId ? messagesByTab[activeTabId] ?? [] : []), [messagesByTab, activeTabId]);
   const isStreaming = useChatStore(s => activeTabId ? s.streamingByTab[activeTabId] : false);
-  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? [] : []);
+  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? EMPTY_SUGGESTIONS : EMPTY_SUGGESTIONS);
   const { sendMessage, steerAgent, followUpAgent, abortAgent, cycleModel, selectModel, cycleThinking } = useAgentSession();
   const { hasAnyAuth, loadStatus: loadAuthStatus } = useAuthStore();
   const { onboardingComplete, load: loadAppSettings } = useAppSettingsStore();
