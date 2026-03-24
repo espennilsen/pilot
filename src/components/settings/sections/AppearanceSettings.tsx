@@ -169,6 +169,7 @@ export function AppearanceSettings() {
       // If deleting the active custom theme, switch to dark
       if (theme === 'custom' && customThemeSlug === slug) {
         await setTheme('dark');
+        await setCustomThemeSlug(undefined);
         setActiveCustomTheme(null);
       }
       await deleteTheme(slug);

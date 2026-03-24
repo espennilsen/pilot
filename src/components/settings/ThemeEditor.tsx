@@ -347,6 +347,7 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
       // Only reset mode if we just deleted the currently active theme
       if (wasActive) {
         await setTheme('dark');
+        await setCustomThemeSlug(undefined);
       }
       onClose();
     } catch (err) {
