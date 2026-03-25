@@ -34,7 +34,7 @@ export default function ChatView() {
   }, [loadAuthStatus, loadAppSettings]);
 
   const showWelcome = !onboardingComplete;
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
