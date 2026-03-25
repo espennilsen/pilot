@@ -171,10 +171,8 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    ...(isMac ? {
-      frame: false,
-      titleBarStyle: 'hiddenInset' as const
-    } : {}),
+    ...(!isWin ? { frame: false } : {}),
+    ...(isMac ? { titleBarStyle: 'hiddenInset' as const } : {}),
     ...(isWin ? {
       titleBarStyle: 'hidden' as const,
       titleBarOverlay: {
