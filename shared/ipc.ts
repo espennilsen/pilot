@@ -295,4 +295,11 @@ export const IPC = {
   // Web Tab (agent → renderer)
   WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
   WEB_TAB_LOAD_FAILED: 'web-tab:load-failed', // main → renderer
+
+  // Ollama
+  OLLAMA_STATUS: 'ollama:status',                 // main → renderer push
+  OLLAMA_GET_STATUS: 'ollama:get-status',
+  OLLAMA_CHECK_CONNECTION: 'ollama:check-connection',
+  OLLAMA_SAVE_SETTINGS: 'ollama:save-settings',
+  OLLAMA_REFRESH_MODELS: 'ollama:refresh-models'
 } as const;

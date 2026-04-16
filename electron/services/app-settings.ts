@@ -95,6 +95,7 @@ export function loadAppSettings(): PilotAppSettings {
       desktopEnabled: parsed.desktopEnabled ?? false,
       systemPrompt: parsed.systemPrompt ?? undefined,
       logging: parsed.logging ?? DEFAULT_APP_SETTINGS.logging,
+      ollama: parsed.ollama ?? undefined,
     };
     return cachedSettings;
   } catch (err) {
@@ -136,6 +137,7 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
   if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;
   if (Array.isArray(settings.hiddenPaths)) validated.hiddenPaths = settings.hiddenPaths;
+  if (typeof settings.ollama === 'object' && settings.ollama !== null) validated.ollama = settings.ollama;
 
   const merged: PilotAppSettings = {
     ...current,

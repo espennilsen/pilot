@@ -30,6 +30,8 @@ import { registerDesktopIpc } from '../ipc/desktop';
 import { registerThemeIpc } from '../ipc/theme';
 import { DesktopService } from '../services/desktop-service';
 import { ThemeService } from '../services/theme-service';
+import { OllamaService } from '../services/ollama-service';
+import { registerOllamaIpc } from '../ipc/ollama';
 import { McpManager } from '../services/mcp-manager';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
@@ -56,6 +58,7 @@ let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
 let desktopService: DesktopService | null = null;
 let themeService: ThemeService | null = null;
+let ollamaService: OllamaService | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -310,6 +313,10 @@ app.whenReady().then(async () => {
   sessionManager.mcpManager = mcpManager;
   terminalService = mainWindow ? new TerminalService(mainWindow) : null;
 
+  // Initialize Ollama service (registers models in the ModelRegistry if enabled)
+  ollamaService = new OllamaService();
+  ollamaService.init(sessionManager.getModelRegistry());
+
   // Register IPC handlers
   registerAgentIpc(sessionManager);
   registerModelIpc(sessionManager);
@@ -330,6 +337,7 @@ app.whenReady().then(async () => {
   registerTasksIpc(sessionManager.taskManager);
   registerSubagentIpc(sessionManager.subagentManager);
   registerMcpIpc(mcpManager);
+  registerOllamaIpc(ollamaService!);
   registerAttachmentIpc();
 
   // Custom themes (themeService already initialized before createWindow)
@@ -609,6 +617,7 @@ app.on('before-quit', async (e) => {
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
   mcpManager?.disposeAll();
+  ollamaService?.dispose();
   devService?.dispose();
   terminalService?.disposeAll();
   promptLibrary?.dispose();

@@ -15,11 +15,23 @@ export interface ProviderAuthInfo {
   authType: 'api_key' | 'oauth' | 'env' | 'none';
 }
 
+/** Ollama status pushed from main process */
+export interface OllamaStatusInfo {
+  available: boolean;
+  endpoint: string;
+  modelCount: number;
+  version?: string;
+  error?: string;
+}
+
 interface AuthStore {
   providers: ProviderAuthInfo[];
   hasAnyAuth: boolean;
   isLoading: boolean;
   error: string | null;
+
+  // Ollama status
+  ollamaStatus: OllamaStatusInfo | null;
 
   // OAuth flow state
   oauthInProgress: string | null; // provider id
@@ -34,6 +46,7 @@ interface AuthStore {
   cancelOAuthPrompt: () => void;
   logout: (provider: string) => Promise<void>;
   clearError: () => void;
+  setOllamaStatus: (status: OllamaStatusInfo) => void;
 }
 
 /**
@@ -74,6 +87,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   oauthInProgress: null,
   oauthMessage: null,
   oauthPrompt: null,
+  ollamaStatus: null,
 
   loadStatus: async () => {
     set({ isLoading: true, error: null });
@@ -141,4 +155,5 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+  setOllamaStatus: (status: OllamaStatusInfo) => set({ ollamaStatus: status }),
 }));
