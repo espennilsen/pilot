@@ -2,6 +2,14 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-04-16
+
+### Changed
+- **Top bar shows projects instead of chats** — the tab bar is now a project bar, showing one compact pill per project (folder icon, name, status dot) instead of individual chat tabs. This maximises the number of visible projects at once. Chat navigation moved entirely to the sidebar Sessions pane, which now shows active chats above historical sessions with a clear section split. Keyboard shortcuts updated: `Cmd+1-9` and `Ctrl+Tab` cycle projects instead of individual tabs.
+
+### Fixed
+- **Zustand selector infinite loop** — replaced unstable object/array-returning selectors with primitive-value subscriptions (`tabs.length`, sorted key strings, booleans) to prevent `useSyncExternalStore` from detecting spurious state changes and re-rendering in an infinite loop.
+
 ## 2026-03-15
 
 ### Added
