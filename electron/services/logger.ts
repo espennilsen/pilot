@@ -133,8 +133,12 @@ export function getLogger(source: string): Logger {
 
 function buildConfig(s: PilotAppSettings): Config {
   const l = s.logging ?? {};
+  // In dev mode (electron-vite), force debug level unless user explicitly set something else
+  const isDev = !!process.env.ELECTRON_RENDERER_URL;
+  const effectiveLevel = isDev ? (l.level === 'warn' || !l.level ? 'debug' : l.level) : (l.level ?? 'warn');
+
   return {
-    level: parseLevel(l.level ?? (process.env.ELECTRON_RENDERER_URL ? 'debug' : 'warn')),
+    level: parseLevel(effectiveLevel),
     file: {
       enabled: l.file?.enabled ?? true,
       dir: PILOT_LOGS_DIR,
