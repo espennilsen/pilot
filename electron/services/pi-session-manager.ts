@@ -184,13 +184,22 @@ export class PilotSessionManager {
     const session = this.sessions.get(tabId);
     if (!session) throw new Error(`No session for tab ${tabId}`);
 
+    const modelInfo = session.model;
+    const log = getLogger('session');
+    log.info(`Prompt on tab ${tabId}: model=${modelInfo ? modelInfo.provider + '/' + modelInfo.id : 'none'}, streaming=${session.state.isStreaming}`);
+
     // Track the user message for auto-extraction
     this.lastUserMessages.set(tabId, text);
 
-    if (session.state.isStreaming) {
-      await session.followUp(text);
-    } else {
-      await session.prompt(text);
+    try {
+      if (session.state.isStreaming) {
+        await session.followUp(text);
+      } else {
+        await session.prompt(text);
+      }
+    } catch (err) {
+      log.error(`Prompt failed on tab ${tabId}: ${err}`);
+      throw err;
     }
   }
 

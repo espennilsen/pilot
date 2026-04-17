@@ -12,6 +12,10 @@ export function setPromptLibraryRef(lib: PromptLibrary): void {
   promptLibraryRef = lib;
 }
 
+import { getLogger } from '../services/logger';
+
+const log = getLogger('agent-ipc');
+
 export function registerAgentIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.AGENT_CREATE_SESSION, async (_event, tabId: string, projectPath: string) => {
     await sessionManager.createSession(tabId, projectPath);
@@ -210,7 +214,12 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
       companionBridge.forwardEvent(IPC.AGENT_EVENT, userMessageEvent);
     }
 
-    await sessionManager.prompt(tabId, text);
+    try {
+      await sessionManager.prompt(tabId, text);
+    } catch (err) {
+      log.error(`AGENT_PROMPT failed: tab=${tabId}, error=${err}`);
+      throw err;
+    }
   });
 
   ipcMain.handle(IPC.AGENT_STEER, async (_event, tabId: string, text: string) => {
