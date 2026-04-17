@@ -10,7 +10,7 @@ import {
 import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import { extractLastAssistantText } from '../utils/message-utils';
 import { StagedDiffManager } from './staged-diffs';
-import { getPiAgentDir } from './app-settings';
+import { getPiAgentDir, loadAppSettings } from './app-settings';
 import { getLogger } from './logger';
 import { MemoryManager } from './memory-manager';
 import {
@@ -210,17 +210,23 @@ export class PilotSessionManager {
     session.on('text', onFirstEvent);
     session.on('thinking', onFirstEvent);
 
+    // Timeout ID for cleanup
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const promptPromise = session.state.isStreaming
         ? session.followUp(text)
         : session.prompt(text);
 
-      const result = await Promise.race([
-        promptPromise,
-        new Promise<'timeout'>((resolve) =>
-          setTimeout(() => resolve('timeout'), isOllama && !receivedFirstEvent ? PROMPT_TIMEOUT_MS : 300_000)
-        ),
-      ]);
+      // Two-phase timeout: short deadline for first byte, then 5min for full response
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), isOllama ? PROMPT_TIMEOUT_MS : 300_000);
+      });
+
+      const result = await Promise.race([promptPromise, timeoutPromise]);
+
+      // Clear timeout if prompt won the race
+      if (timeoutId !== null) clearTimeout(timeoutId);
 
       if (result === 'timeout' && !receivedFirstEvent) {
         log.warn(`Prompt timed out after ${PROMPT_TIMEOUT_MS / 1000}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
@@ -237,6 +243,8 @@ export class PilotSessionManager {
         });
         // Clear the streaming state so the user can try again
         this.forwardEventToRenderer(tabId, { type: 'turn_end' });
+        // Suppress unhandled rejection from the still-running promptPromise
+        promptPromise.catch(() => {});
       }
     } catch (err) {
       log.error(`Prompt failed on tab ${tabId}: ${err}`);
@@ -250,7 +258,15 @@ export class PilotSessionManager {
   /** Pre-flight validation for Ollama models — catches "model not found" before the SDK hangs */
   private async preflightOllamaModel(tabId: string, model: { provider: string; id: string }): Promise<boolean> {
     try {
-      const resp = await fetch('http://localhost:11434/v1/chat/completions', {
+      // Read configured endpoint from app settings (not hardcoded localhost)
+      const settings = loadAppSettings();
+      const endpoint = (settings.ollama?.endpoint || 'http://localhost:11434').replace(/\/+$/, '') + '/v1';
+      const apiKey = settings.ollama?.apiKey || undefined;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+      const resp = await fetch(`${endpoint}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

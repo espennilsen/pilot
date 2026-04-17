@@ -222,7 +222,7 @@ export class OllamaService {
       if (/fetch failed|ETIMEDOUT|Timeout/i.test(msg)) {
         return { ok: false, error: 'Connection timed out' };
       }
-      return { ok: false, error: msg };
+      return { ok: false, error: 'Connection failed' };
     }
   }
 
@@ -270,7 +270,7 @@ export class OllamaService {
       if (/ECONNREFUSED|fetch failed/i.test(msg)) {
         return { valid: false, error: 'Cannot connect to Ollama — is it running?' };
       }
-      return { valid: false, error: msg };
+      return { valid: false, error: 'Validation request failed' };
     }
   }
 
@@ -424,7 +424,8 @@ export class OllamaService {
       };
     });
 
-    // Deduplicate: cloud models override local models with the same id
+    // Deduplicate: local models win over cloud models with the same id
+    // (user may have pulled a local version of a cloud model with better latency)
     const localIds = new Set(localDefs.map(m => m.id));
     const merged = [...localDefs, ...cloudDefs.filter(cm => !localIds.has(cm.id))];
 
