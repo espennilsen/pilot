@@ -21,6 +21,9 @@ import { IPC } from '../../shared/ipc';
 import type { OllamaCloudModel } from '../../shared/types';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { getLogger } from './logger';
+
+const log = getLogger('ollama');
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -102,6 +105,7 @@ export class OllamaService {
       headers['Authorization'] = `Bearer ${key}`;
     }
 
+    log.debug(`Creating Ollama client: host=${host}, hasApiKey=${!!key}`);
     return new Ollama({ host, headers });
   }
 
@@ -139,6 +143,8 @@ export class OllamaService {
     const newCloudModels = updates.cloudModels ?? current.cloudModels;
     const newDefaultModel = updates.defaultModel !== undefined ? updates.defaultModel : current.defaultModel;
 
+    log.info(`Saving settings: enabled=${newEnabled}, endpoint=${newEndpoint}, apiKey=${newApiKey ? '***' : '(none)'}, cloudModels=${newCloudModels.length}, defaultModel=${newDefaultModel || '(none)'}`);
+
     saveAppSettings({
       ollama: {
         enabled: newEnabled,
@@ -174,6 +180,8 @@ export class OllamaService {
     const settings = this.getSettings();
     this.client = this.createClient(settings.endpoint, settings.apiKey);
 
+    log.info(`Initializing: enabled=${settings.enabled}, endpoint=${settings.endpoint}, cloudModels=${settings.cloudModels.length}`);
+
     if (settings.enabled) {
       this.refreshModels().catch(() => {});
       this.startPeriodicRefresh();
@@ -183,6 +191,7 @@ export class OllamaService {
   /** Start periodic model list refresh */
   startPeriodicRefresh(intervalMs = 60_000): void {
     this.stopPeriodicRefresh();
+    log.info(`Starting periodic refresh every ${intervalMs / 1000}s`);
     this.refreshTimer = setInterval(() => {
       this.refreshModels().catch(() => {});
     }, intervalMs);
@@ -191,6 +200,7 @@ export class OllamaService {
   /** Stop periodic refresh */
   stopPeriodicRefresh(): void {
     if (this.refreshTimer) {
+      log.info('Stopping periodic refresh');
       clearInterval(this.refreshTimer);
       this.refreshTimer = null;
     }
@@ -201,9 +211,11 @@ export class OllamaService {
     const client = this.createClient(endpoint, apiKey);
     try {
       const versionResp = await client.version();
+      log.info(`Connection check OK: version=${versionResp.version}`);
       return { ok: true, version: versionResp.version };
     } catch (err: any) {
       const msg = err?.message || String(err);
+      log.warn(`Connection check failed: ${msg}`);
       if (/ECONNREFUSED/i.test(msg)) {
         return { ok: false, error: 'Connection refused — is Ollama running?' };
       }
@@ -237,16 +249,19 @@ export class OllamaService {
 
     // Try to fetch local models (may fail if Ollama isn't running, that's fine — cloud still works)
     try {
+      log.info('Fetching local model list from Ollama...');
       const listResponse: ListResponse = await this.client.list();
       localModels = listResponse.models || [];
       localAvailable = true;
+      log.info(`Found ${localModels.length} local models: ${localModels.map(m => m.name).join(', ')}`);
 
       try {
         const v = await this.client.version();
         version = v.version;
+        log.debug(`Ollama version: ${version}`);
       } catch { /* non-critical */ }
-    } catch {
-      // Local Ollama not reachable — cloud models still work independently
+    } catch (err: any) {
+      log.warn(`Local Ollama not reachable: ${err?.message || err}. Cloud models (${cloudModels.length}) will still be registered.`);
     }
 
     // Fetch capabilities for local models
@@ -265,6 +280,7 @@ export class OllamaService {
       version,
     };
 
+    log.info(`Refresh complete: available=${this._status.available}, localModels=${localModels.length}, cloudModels=${cloudModels.length}, total=${totalModels}`);
     this.broadcastStatus();
     return this._status;
   }
@@ -273,6 +289,8 @@ export class OllamaService {
   private async fetchModelCapabilities(models: ModelResponse[]): Promise<Map<string, ShowResponse>> {
     const capabilities = new Map<string, ShowResponse>();
     const CONCURRENCY = 3;
+
+    log.debug(`Fetching capabilities for ${models.length} models (concurrency=${CONCURRENCY})`);
 
     // Process in batches
     for (let i = 0; i < models.length; i += CONCURRENCY) {
@@ -287,10 +305,13 @@ export class OllamaService {
       for (const r of results) {
         if (r.status === 'fulfilled' && r.value.show) {
           capabilities.set(r.value.name, r.value.show);
+        } else if (r.status === 'rejected') {
+          log.debug(`Failed to get capabilities for model: ${r.reason?.message || r.reason}`);
         }
       }
     }
 
+    log.debug(`Got capabilities for ${capabilities.size}/${models.length} models`);
     return capabilities;
   }
 
@@ -307,7 +328,6 @@ export class OllamaService {
     // Build the OpenAI-compatible base URL (append /v1 for the completions API)
     const baseUrl = endpoint.replace(/\/+$/, '') + '/v1';
 
-    // The SDK requires apiKey or oauth for dynamic providers.
     // Use "ollama" as sentinel key (matches working Pi CLI models.json config).
     // Ollama ignores the Authorization header for local requests.
     const effectiveApiKey = apiKey || OLLAMA_LOCAL_KEY;
@@ -325,6 +345,8 @@ export class OllamaService {
       const familySettings = this.getModelFamilySettings(m, showResp);
       const supportsImages = this.modelSupportsImages(m, showResp);
 
+      log.debug(`Local model: ${m.name} -> ctx=${familySettings.contextWindow}, maxTokens=${familySettings.maxTokens}, reasoning=${familySettings.reasoning}, vision=${supportsImages}`);
+
       return {
         id: m.name,
         name: this.formatModelName(m),
@@ -339,21 +361,27 @@ export class OllamaService {
     });
 
     // Build cloud model defs
-    const cloudDefs = cloudModels.map((cm) => ({
-      id: cm.id,
-      name: cm.name || cm.id,
-      baseUrl,
-      reasoning: cm.reasoning ?? false,
-      input: cm.vision ? ['text' as const, 'image' as const] : ['text' as const],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: cm.contextWindow ?? 131072,
-      maxTokens: cm.maxTokens ?? 16384,
-      compat: OLLAMA_COMPAT,
-    }));
+    const cloudDefs = cloudModels.map((cm) => {
+      log.info(`Cloud model: ${cm.id} (name=${cm.name || cm.id}, ctx=${cm.contextWindow ?? 131072}, vision=${cm.vision ?? false})`);
+      return {
+        id: cm.id,
+        name: cm.name || cm.id,
+        baseUrl,
+        reasoning: cm.reasoning ?? false,
+        input: cm.vision ? ['text' as const, 'image' as const] : ['text' as const],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: cm.contextWindow ?? 131072,
+        maxTokens: cm.maxTokens ?? 16384,
+        compat: OLLAMA_COMPAT,
+      };
+    });
 
     // Deduplicate: cloud models override local models with the same id
     const localIds = new Set(localDefs.map(m => m.id));
     const merged = [...localDefs, ...cloudDefs.filter(cm => !localIds.has(cm.id))];
+
+    log.info(`Registering ${merged.length} models with provider "${PROVIDER_NAME}": baseUrl=${baseUrl}, apiKey=${effectiveApiKey === OLLAMA_LOCAL_KEY ? '(local)' : '***'}, authHeader=true, api=openai-completions`);
+    log.debug(`Model IDs: ${merged.map(m => m.id).join(', ')}`);
 
     try {
       this.modelRegistry.registerProvider(PROVIDER_NAME, {
@@ -363,8 +391,9 @@ export class OllamaService {
         authHeader: true, // Always include Authorization header (Ollama ignores it locally)
         models: merged,
       });
+      log.info(`Successfully registered ${merged.length} Ollama models`);
     } catch (err) {
-      console.error('[OllamaService] Failed to register models:', err);
+      log.error(`Failed to register models: ${err}`);
     }
   }
 
@@ -373,6 +402,7 @@ export class OllamaService {
     if (!this.modelRegistry) return;
     try {
       this.modelRegistry.unregisterProvider(PROVIDER_NAME);
+      log.info('Unregistered Ollama models');
     } catch {
       // Provider may not be registered yet
     }
@@ -479,6 +509,7 @@ export class OllamaService {
   /** Apply default Ollama model to pi settings (used by new sessions) */
   private applyDefaultModel(defaultModel: string | null): void {
     if (!defaultModel) return;
+    log.info(`Applying default model: ${PROVIDER_NAME}/${defaultModel}`);
     try {
       const piAgentDir = getPiAgentDir();
       const settingsPath = join(piAgentDir, 'settings.json');
@@ -491,13 +522,15 @@ export class OllamaService {
       const merged = { ...current, defaultProvider: PROVIDER_NAME, defaultModel };
       if (!existsSync(piAgentDir)) mkdirSync(piAgentDir, { recursive: true });
       writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+      log.info(`Default model written to ${settingsPath}`);
     } catch (err) {
-      console.warn('[OllamaService] Failed to apply default model:', err);
+      log.warn(`Failed to apply default model: ${err}`);
     }
   }
 
   /** Clean up on app quit */
   dispose(): void {
+    log.info('Disposing Ollama service');
     this.stopPeriodicRefresh();
     this.unregisterModels();
   }
