@@ -11,6 +11,7 @@ import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import { extractLastAssistantText } from '../utils/message-utils';
 import { StagedDiffManager } from './staged-diffs';
 import { getPiAgentDir } from './app-settings';
+import { getLogger } from './logger';
 import { MemoryManager } from './memory-manager';
 import {
   PILOT_AUTH_FILE,
