@@ -219,8 +219,9 @@ export class PilotSessionManager {
         : session.prompt(text);
 
       // Two-phase timeout: short deadline for first byte, then 5min for full response
+      const actualTimeoutMs = isOllama ? PROMPT_TIMEOUT_MS : 300_000;
       const timeoutPromise = new Promise<'timeout'>((resolve) => {
-        timeoutId = setTimeout(() => resolve('timeout'), isOllama ? PROMPT_TIMEOUT_MS : 300_000);
+        timeoutId = setTimeout(() => resolve('timeout'), actualTimeoutMs);
       });
 
       const result = await Promise.race([promptPromise, timeoutPromise]);
@@ -229,7 +230,8 @@ export class PilotSessionManager {
       if (timeoutId !== null) clearTimeout(timeoutId);
 
       if (result === 'timeout' && !receivedFirstEvent) {
-        log.warn(`Prompt timed out after ${PROMPT_TIMEOUT_MS / 1000}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
+        const timeoutSec = actualTimeoutMs / 1000;
+        log.warn(`Prompt timed out after ${timeoutSec}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
         session.abort();
         const hint = isOllama
           ? ` The model "${modelInfo?.id}" may not exist in Ollama. Check the name matches exactly (Ollama treats colons as tag separators, e.g. "model:tag"), or run \`ollama list\` to see available models.`
@@ -238,7 +240,7 @@ export class PilotSessionManager {
           tabId,
           event: {
             type: 'system_message',
-            content: `⚠️ No response received from ${modelInfo?.provider}/${modelInfo?.id} after ${PROMPT_TIMEOUT_MS / 1000}s. The request may have failed.${hint}`,
+            content: `⚠️ No response received from ${modelInfo?.provider}/${modelInfo?.id} after ${timeoutSec}s. The request may have failed.${hint}`,
           },
         });
         // Clear the streaming state so the user can try again
@@ -268,7 +270,7 @@ export class PilotSessionManager {
 
       const resp = await fetch(`${endpoint}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           model: model.id,
           messages: [{ role: 'user', content: 'ok' }],

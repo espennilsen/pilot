@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore, type ProviderAuthInfo, type OllamaStatusInfo } from '../../../stores/auth-store';
 import { IPC } from '../../../../shared/ipc';
 import { invoke } from '../../../lib/ipc-client';
@@ -115,13 +115,7 @@ function OllamaCard({
   const status = ollamaStatus;
 
   // Auto-test connection when initially enabled
-  useEffect(() => {
-    if (isConnected && !testResult && !testing) {
-      handleTest();
-    }
-  }, [isConnected]);
-
-  const handleTest = async () => {
+  const handleTest = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
     try {
@@ -131,7 +125,7 @@ function OllamaCard({
       setTestResult({ ok: false, error: err?.message || 'Unknown error' });
     }
     setTesting(false);
-  };
+  }, []);
 
   const handleEnable = async () => {
     // Quick test then enable
@@ -149,6 +143,13 @@ function OllamaCard({
     }
     setTesting(false);
   };
+
+  // Auto-test connection when initially enabled
+  useEffect(() => {
+    if (isConnected && !testResult && !testing) {
+      handleTest();
+    }
+  }, [isConnected, testResult, testing, handleTest]);
 
   return (
     <div className={`border rounded-lg transition-colors ${

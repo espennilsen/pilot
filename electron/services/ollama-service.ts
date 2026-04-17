@@ -210,7 +210,12 @@ export class OllamaService {
   async checkConnection(endpoint?: string, apiKey?: string | null): Promise<{ ok: boolean; version?: string; error?: string }> {
     const client = this.createClient(endpoint, apiKey);
     try {
-      const versionResp = await client.version();
+      const versionResp = await Promise.race([
+        client.version(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timed out')), 10_000)
+        ),
+      ]);
       log.info(`Connection check OK: version=${versionResp.version}`);
       return { ok: true, version: versionResp.version };
     } catch (err: any) {

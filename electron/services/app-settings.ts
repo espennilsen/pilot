@@ -137,7 +137,16 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
   if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;
   if (Array.isArray(settings.hiddenPaths)) validated.hiddenPaths = settings.hiddenPaths;
-  if (typeof settings.ollama === 'object' && settings.ollama !== null) validated.ollama = settings.ollama;
+  if (typeof settings.ollama === 'object' && settings.ollama !== null) {
+    const o = settings.ollama as any;
+    validated.ollama = {
+      enabled: typeof o.enabled === 'boolean' ? o.enabled : false,
+      endpoint: typeof o.endpoint === 'string' && /^https?:\/\//.test(o.endpoint) ? o.endpoint : 'http://localhost:11434',
+      apiKey: typeof o.apiKey === 'string' ? o.apiKey : '',
+      cloudModels: Array.isArray(o.cloudModels) ? o.cloudModels : [],
+      defaultModel: typeof o.defaultModel === 'string' ? o.defaultModel : undefined,
+    };
+  }
 
   const merged: PilotAppSettings = {
     ...current,
