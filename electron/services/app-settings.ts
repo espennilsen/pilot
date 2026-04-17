@@ -56,7 +56,7 @@ const DEFAULT_APP_SETTINGS: PilotAppSettings = {
   keybindOverrides: {},
   hiddenPaths: DEFAULT_HIDDEN_PATHS,
   logging: {
-    level: 'warn',
+    level: process.env.ELECTRON_RENDERER_URL ? 'debug' : 'warn',
     file: { enabled: true, maxSizeMB: 10, retainDays: 14 },
     syslog: { enabled: false, host: 'localhost', port: 514, facility: 16, appName: 'pilot' },
   },
