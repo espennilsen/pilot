@@ -93,7 +93,7 @@ export function SessionList() {
       activeChats.map(t => t.sessionPath).filter(Boolean) as string[]
     );
     return getFilteredSessions().filter(s => !activeSessionPaths.has(s.path));
-  }, [activeChats, getFilteredSessions]);
+  }, [activeChats, getFilteredSessions, searchQuery, showArchived]);
 
   // Apply search to active chats too
   const displayChats = useMemo(() => {
