@@ -192,15 +192,91 @@ export class PilotSessionManager {
     // Track the user message for auto-extraction
     this.lastUserMessages.set(tabId, text);
 
+    // For Ollama models, do a quick pre-flight check to catch "model not found" errors
+    // before the SDK hangs on a streaming request that returns 404
+    if (modelInfo?.provider === 'ollama') {
+      const valid = await this.preflightOllamaModel(tabId, modelInfo);
+      if (!valid) return; // error already sent to renderer
+    }
+
+    // Race the prompt against a timeout — the SDK can hang silently if the
+    // LLM provider returns an HTTP error during streaming (e.g. Ollama 404)
+    const PROMPT_TIMEOUT_MS = 30_000;
+    const isOllama = modelInfo?.provider === 'ollama';
+    let receivedFirstEvent = false;
+
+    // Listen for the first streaming event to confirm the model responded
+    const onFirstEvent = () => { receivedFirstEvent = true; };
+    session.on('text', onFirstEvent);
+    session.on('thinking', onFirstEvent);
+
     try {
-      if (session.state.isStreaming) {
-        await session.followUp(text);
-      } else {
-        await session.prompt(text);
+      const promptPromise = session.state.isStreaming
+        ? session.followUp(text)
+        : session.prompt(text);
+
+      const result = await Promise.race([
+        promptPromise,
+        new Promise<'timeout'>((resolve) =>
+          setTimeout(() => resolve('timeout'), isOllama && !receivedFirstEvent ? PROMPT_TIMEOUT_MS : 300_000)
+        ),
+      ]);
+
+      if (result === 'timeout' && !receivedFirstEvent) {
+        log.warn(`Prompt timed out after ${PROMPT_TIMEOUT_MS / 1000}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
+        session.abort();
+        const hint = isOllama
+          ? ` The model "${modelInfo?.id}" may not exist in Ollama. Check the name matches exactly (Ollama treats colons as tag separators, e.g. "model:tag"), or run \`ollama list\` to see available models.`
+          : '';
+        this.sendToRenderer(IPC.AGENT_EVENT, {
+          tabId,
+          event: {
+            type: 'system_message',
+            content: `⚠️ No response received from ${modelInfo?.provider}/${modelInfo?.id} after ${PROMPT_TIMEOUT_MS / 1000}s. The request may have failed.${hint}`,
+          },
+        });
+        // Clear the streaming state so the user can try again
+        this.forwardEventToRenderer(tabId, { type: 'turn_end' });
       }
     } catch (err) {
       log.error(`Prompt failed on tab ${tabId}: ${err}`);
       throw err;
+    } finally {
+      session.off('text', onFirstEvent);
+      session.off('thinking', onFirstEvent);
+    }
+  }
+
+  /** Pre-flight validation for Ollama models — catches "model not found" before the SDK hangs */
+  private async preflightOllamaModel(tabId: string, model: { provider: string; id: string }): Promise<boolean> {
+    try {
+      const resp = await fetch('http://localhost:11434/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model.id,
+          messages: [{ role: 'user', content: 'ok' }],
+          max_tokens: 1,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (resp.status === 404) {
+        const body = await resp.text().catch(() => '');
+        const match = body.match(/model.*not found/i);
+        const hint = `The model "${model.id}" was not found in Ollama. Ollama treats colons as tag separators (e.g. "model:tag"), so check the name matches exactly. Run \`ollama list\` to see available models.`;
+        getLogger('session').warn(`Ollama pre-flight failed: ${match ? body : resp.status}`);
+        this.sendToRenderer(IPC.AGENT_EVENT, {
+          tabId,
+          event: { type: 'system_message', content: `❌ ${hint}` },
+        });
+        this.forwardEventToRenderer(tabId, { type: 'turn_end' });
+        return false;
+      }
+      return true;
+    } catch {
+      // Pre-flight is best-effort — if it fails, let the prompt proceed
+      return true;
     }
   }
 

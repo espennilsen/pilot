@@ -226,6 +226,54 @@ export class OllamaService {
     }
   }
 
+  /** Validate that a model exists in Ollama — works for both local and cloud models */
+  async validateModel(modelId: string, endpoint?: string, apiKey?: string | null): Promise<{ valid: boolean; error?: string }> {
+    const ep = (endpoint || this.getSettings().endpoint).replace(/\/+$/, '') + '/v1';
+    const key = apiKey !== undefined ? apiKey : this.getSettings().apiKey;
+    log.info(`Validating model "${modelId}" against ${ep}`);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (key) headers['Authorization'] = `Bearer ${key}`;
+
+      const resp = await fetch(`${ep}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: 'ok' }],
+          max_tokens: 1,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (resp.status === 404) {
+        const body = await resp.text().catch(() => '');
+        const match = body.match(/model.*not found/i);
+        const hint = `Model "${modelId}" not found in Ollama. Ollama treats colons as tag separators (e.g. "model:tag"), so check the name matches exactly. Run \`ollama list\` to see local models.`;
+        log.warn(`Model validation failed: ${match ? body : resp.status}`);
+        return { valid: false, error: hint };
+      }
+
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        log.warn(`Model validation unexpected error: HTTP ${resp.status} ${body.slice(0, 200)}`);
+        return { valid: false, error: `HTTP ${resp.status}: ${body.slice(0, 200)}` };
+      }
+
+      log.info(`Model "${modelId}" validated successfully`);
+      return { valid: true };
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      log.warn(`Model validation request failed: ${msg}`);
+      if (/ECONNREFUSED|fetch failed/i.test(msg)) {
+        return { valid: false, error: 'Cannot connect to Ollama — is it running?' };
+      }
+      return { valid: false, error: msg };
+    }
+  }
+
   /** Fetch models from Ollama and register them in the ModelRegistry */
   async refreshModels(): Promise<OllamaStatus> {
     if (!this.modelRegistry || !this.client) {

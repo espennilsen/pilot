@@ -35,6 +35,8 @@ export function AuthSettings() {
   // Cloud model adder
   const [newCloudId, setNewCloudId] = useState('');
   const [newCloudName, setNewCloudName] = useState('');
+  const [cloudModelError, setCloudModelError] = useState<string | null>(null);
+  const [cloudModelValidating, setCloudModelValidating] = useState(false);
 
   useEffect(() => {
     loadStatus();
@@ -129,6 +131,22 @@ export function AuthSettings() {
     if (!id) return;
     const existing = cloudModels.find(m => m.id === id);
     if (existing) return; // duplicate
+
+    // Validate the model exists in Ollama before adding
+    setCloudModelValidating(true);
+    setCloudModelError(null);
+    try {
+      const result = await invoke(IPC.OLLAMA_VALIDATE_MODEL, id) as { valid: boolean; error?: string };
+      if (!result.valid) {
+        setCloudModelError(result.error || 'Model not found');
+        setCloudModelValidating(false);
+        return;
+      }
+    } catch {
+      // Validation request failed (Ollama might be down) — add anyway, user will see error at chat time
+    }
+    setCloudModelValidating(false);
+
     const newModel: OllamaCloudModel = {
       id,
       name: newCloudName.trim() || undefined,
@@ -137,6 +155,7 @@ export function AuthSettings() {
     setCloudModels(updated);
     setNewCloudId('');
     setNewCloudName('');
+    setCloudModelError(null);
     await ollamaSave({ cloudModels: updated });
   };
 
@@ -326,13 +345,20 @@ export function AuthSettings() {
               />
               <button
                 onClick={handleAddCloudModel}
-                disabled={!newCloudId.trim()}
+                disabled={!newCloudId.trim() || cloudModelValidating}
                 className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent/90 rounded transition-colors disabled:opacity-40"
               >
-                <Plus className="w-3 h-3" />
-                Add
+                {cloudModelValidating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Plus className="w-3 h-3" />
+                )}
+                {cloudModelValidating ? 'Checking…' : 'Add'}
               </button>
             </div>
+            {cloudModelError && (
+              <p className="text-xs text-error mt-1">⚠️ {cloudModelError}</p>
+            )}
           </div>
 
           {/* ─── Default Model ──────────────────────────────────────── */}

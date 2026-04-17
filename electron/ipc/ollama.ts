@@ -28,6 +28,11 @@ export function registerOllamaIpc(ollamaService: OllamaService) {
     return ollamaService.saveSettings(updates);
   });
 
+  // Validate a model name against Ollama (checks if the model exists)
+  ipcMain.handle(IPC.OLLAMA_VALIDATE_MODEL, async (_event, modelId: string, endpoint?: string, apiKey?: string | null) => {
+    return ollamaService.validateModel(modelId, endpoint, apiKey);
+  });
+
   // Manually refresh model list
   ipcMain.handle(IPC.OLLAMA_REFRESH_MODELS, async () => {
     return ollamaService.refreshModels();

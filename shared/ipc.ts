@@ -301,5 +301,6 @@ export const IPC = {
   OLLAMA_GET_STATUS: 'ollama:get-status',
   OLLAMA_CHECK_CONNECTION: 'ollama:check-connection',
   OLLAMA_SAVE_SETTINGS: 'ollama:save-settings',
+  OLLAMA_VALIDATE_MODEL: 'ollama:validate-model',
   OLLAMA_REFRESH_MODELS: 'ollama:refresh-models'
 } as const;
