@@ -162,7 +162,6 @@ function log(level: Level, source: string, msg: string, data?: unknown): void {
   // Console
   const fn = level === Level.ERROR ? console.error
            : level === Level.WARN  ? console.warn
-           : level === Level.DEBUG ? console.debug
            : console.log;
   fn(line);
 

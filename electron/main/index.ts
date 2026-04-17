@@ -274,7 +274,7 @@ app.whenReady().then(async () => {
   // Initialize logger first
   initLogger();
   const log = getLogger('main');
-  log.info('Pilot starting', { version: app.getVersion(), platform: process.platform });
+  log.info('Pilot starting', { version: app.getVersion(), platform: process.platform, dev: !!process.env.ELECTRON_RENDERER_URL });
 
   // Handle pilot-attachment:// URLs → read local files
   protocol.handle('pilot-attachment', (request) => {
