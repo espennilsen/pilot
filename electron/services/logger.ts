@@ -134,7 +134,7 @@ export function getLogger(source: string): Logger {
 function buildConfig(s: PilotAppSettings): Config {
   const l = s.logging ?? {};
   return {
-    level: parseLevel(l.level ?? 'warn'),
+    level: parseLevel(l.level ?? (process.env.ELECTRON_RENDERER_URL ? 'debug' : 'warn')),
     file: {
       enabled: l.file?.enabled ?? true,
       dir: PILOT_LOGS_DIR,
