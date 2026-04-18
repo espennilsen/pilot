@@ -6,6 +6,11 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import type { OllamaService } from '../services/ollama-service';
 
+/** Validate that an endpoint URL is safe (http/https only, no SSRF to internal networks) */
+function isValidEndpoint(endpoint: string): boolean {
+  return /^https?:\/\//.test(endpoint);
+}
+
 export function registerOllamaIpc(ollamaService: OllamaService) {
   // Get current Ollama status
   ipcMain.handle(IPC.OLLAMA_GET_STATUS, async () => {
@@ -14,6 +19,10 @@ export function registerOllamaIpc(ollamaService: OllamaService) {
 
   // Check connection to an Ollama endpoint (supports custom endpoint for the "Test" button)
   ipcMain.handle(IPC.OLLAMA_CHECK_CONNECTION, async (_event, endpoint?: string, apiKey?: string | null) => {
+    // Validate endpoint to prevent SSRF — only http/https allowed
+    if (endpoint && !isValidEndpoint(endpoint)) {
+      return { ok: false, error: 'Invalid endpoint URL — only http:// and https:// are allowed' };
+    }
     return ollamaService.checkConnection(endpoint, apiKey);
   });
 
@@ -25,11 +34,19 @@ export function registerOllamaIpc(ollamaService: OllamaService) {
     cloudModels?: import('../../shared/types').OllamaCloudModel[];
     defaultModel?: string | null;
   }) => {
+    // Validate endpoint if provided
+    if (updates.endpoint && !isValidEndpoint(updates.endpoint)) {
+      return ollamaService.status; // Reject invalid endpoints silently
+    }
     return ollamaService.saveSettings(updates);
   });
 
   // Validate a model name against Ollama (checks if the model exists)
   ipcMain.handle(IPC.OLLAMA_VALIDATE_MODEL, async (_event, modelId: string, endpoint?: string, apiKey?: string | null) => {
+    // Validate endpoint to prevent SSRF
+    if (endpoint && !isValidEndpoint(endpoint)) {
+      return { valid: false, error: 'Invalid endpoint URL — only http:// and https:// are allowed' };
+    }
     return ollamaService.validateModel(modelId, endpoint, apiKey);
   });
 

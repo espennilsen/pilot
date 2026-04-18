@@ -143,7 +143,7 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
       enabled: typeof o.enabled === 'boolean' ? o.enabled : false,
       endpoint: typeof o.endpoint === 'string' && /^https?:\/\//.test(o.endpoint) ? o.endpoint : 'http://localhost:11434',
       apiKey: typeof o.apiKey === 'string' ? o.apiKey : '',
-      cloudModels: Array.isArray(o.cloudModels) ? o.cloudModels : [],
+      cloudModels: Array.isArray(o.cloudModels) ? o.cloudModels.filter((m: any) => m && typeof m.id === 'string') : [],
       defaultModel: typeof o.defaultModel === 'string' ? o.defaultModel : undefined,
     };
   }

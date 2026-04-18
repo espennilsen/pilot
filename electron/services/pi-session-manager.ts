@@ -245,7 +245,11 @@ export class PilotSessionManager {
         });
         // Clear the streaming state so the user can try again
         this.forwardEventToRenderer(tabId, { type: 'turn_end' });
-        // Suppress unhandled rejection from the still-running promptPromise
+      }
+
+      // Suppress unhandled rejection from the still-running promptPromise
+      // when timeout wins the race (regardless of whether first event was received)
+      if (result === 'timeout') {
         promptPromise.catch(() => {});
       }
     } catch (err) {

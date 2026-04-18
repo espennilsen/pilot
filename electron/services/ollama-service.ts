@@ -209,16 +209,19 @@ export class OllamaService {
   /** Check if Ollama is reachable at the given (or configured) endpoint */
   async checkConnection(endpoint?: string, apiKey?: string | null): Promise<{ ok: boolean; version?: string; error?: string }> {
     const client = this.createClient(endpoint, apiKey);
+    let checkTimerId: ReturnType<typeof setTimeout> | undefined;
     try {
       const versionResp = await Promise.race([
         client.version(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timed out')), 10_000)
-        ),
+        new Promise<never>((_, reject) => {
+          checkTimerId = setTimeout(() => reject(new Error('Connection timed out')), 10_000);
+        }),
       ]);
+      if (checkTimerId !== undefined) clearTimeout(checkTimerId);
       log.info(`Connection check OK: version=${versionResp.version}`);
       return { ok: true, version: versionResp.version };
     } catch (err: any) {
+      if (checkTimerId !== undefined) clearTimeout(checkTimerId);
       const msg = err?.message || String(err);
       log.warn(`Connection check failed: ${msg}`);
       if (/ECONNREFUSED/i.test(msg)) {
