@@ -6,7 +6,7 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc';
 import type { OllamaService } from '../services/ollama-service';
 
-/** Validate that an endpoint URL uses http or https scheme only (SSRF protection for IPC inputs) */
+/** Validate that an endpoint URL uses http or https scheme only (prevents non-HTTP protocol smuggling). Does NOT block private/internal IPs — this is acceptable for a desktop app where the user explicitly configures the endpoint. */
 function isValidEndpoint(endpoint: string): boolean {
   return /^https?:\/\//.test(endpoint);
 }
@@ -34,7 +34,8 @@ export function registerOllamaIpc(ollamaService: OllamaService) {
     cloudModels?: import('../../shared/types').OllamaCloudModel[];
     defaultModel?: string | null;
   }) => {
-    // Validate endpoint to prevent invalid saves — return explicit error so the renderer can show feedback
+    // Validate endpoint — reject non-HTTP schemes and return an explicit error object
+    // so the renderer can surface feedback to the user.
     if (updates.endpoint && !isValidEndpoint(updates.endpoint)) {
       return { ...ollamaService.status, error: 'Invalid endpoint URL — only http:// and https:// are allowed' };
     }

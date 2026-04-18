@@ -171,7 +171,7 @@ export class OllamaService {
       this.stopPeriodicRefresh();
     }
 
-    return this._status;
+    return { ...this._status };
   }
 
   /** Set the model registry and perform initial detection */
@@ -209,19 +209,11 @@ export class OllamaService {
   /** Check if Ollama is reachable at the given (or configured) endpoint */
   async checkConnection(endpoint?: string, apiKey?: string | null): Promise<{ ok: boolean; version?: string; error?: string }> {
     const client = this.createClient(endpoint, apiKey);
-    let checkTimerId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const versionResp = await Promise.race([
-        client.version(),
-        new Promise<never>((_, reject) => {
-          checkTimerId = setTimeout(() => reject(new Error('Connection timed out')), 10_000);
-        }),
-      ]);
-      if (checkTimerId !== undefined) clearTimeout(checkTimerId);
+      const versionResp = await client.version();
       log.info(`Connection check OK: version=${versionResp.version}`);
       return { ok: true, version: versionResp.version };
     } catch (err: any) {
-      if (checkTimerId !== undefined) clearTimeout(checkTimerId);
       const msg = err?.message || String(err);
       log.warn(`Connection check failed: ${msg}`);
       if (/ECONNREFUSED/i.test(msg)) {
@@ -282,8 +274,24 @@ export class OllamaService {
     }
   }
 
+  private _isRefreshing = false;
+
   /** Fetch models from Ollama and register them in the ModelRegistry */
   async refreshModels(): Promise<OllamaStatus> {
+    // Guard against concurrent refresh calls (e.g. periodic refresh + saveSettings)
+    if (this._isRefreshing) {
+      log.debug('refreshModels already in progress — skipping');
+      return this._status;
+    }
+    this._isRefreshing = true;
+    try {
+      return await this._doRefreshModels();
+    } finally {
+      this._isRefreshing = false;
+    }
+  }
+
+  private async _doRefreshModels(): Promise<OllamaStatus> {
     if (!this.modelRegistry || !this.client) {
       this._status = { available: false, endpoint: this.getSettings().endpoint, modelCount: 0, error: 'Not initialized' };
       this.broadcastStatus();

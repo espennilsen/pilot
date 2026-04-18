@@ -218,7 +218,8 @@ export class PilotSessionManager {
         ? session.followUp(text)
         : session.prompt(text);
 
-      // Two-phase timeout: short deadline for first byte, then 5min for full response
+      // Timeout: if no first byte received, abort and show error; if partial response
+      // received, abort and notify the user that the response timed out after partial output.
       const actualTimeoutMs = isOllama ? PROMPT_TIMEOUT_MS : 300_000;
       const timeoutPromise = new Promise<'timeout'>((resolve) => {
         timeoutId = setTimeout(() => resolve('timeout'), actualTimeoutMs);
@@ -229,27 +230,38 @@ export class PilotSessionManager {
       // Clear timeout if prompt won the race
       if (timeoutId !== null) clearTimeout(timeoutId);
 
-      if (result === 'timeout' && !receivedFirstEvent) {
+      if (result === 'timeout') {
         const timeoutSec = actualTimeoutMs / 1000;
-        log.warn(`Prompt timed out after ${timeoutSec}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
-        session.abort();
-        const hint = isOllama
-          ? ` The model "${modelInfo?.id}" may not exist in Ollama. Check the name matches exactly (Ollama treats colons as tag separators, e.g. "model:tag"), or run \`ollama list\` to see available models.`
-          : '';
-        this.sendToRenderer(IPC.AGENT_EVENT, {
-          tabId,
-          event: {
-            type: 'system_message',
-            content: `⚠️ No response received from ${modelInfo?.provider}/${modelInfo?.id} after ${timeoutSec}s. The request may have failed.${hint}`,
-          },
-        });
+        if (!receivedFirstEvent) {
+          // No response at all — abort and show error
+          log.warn(`Prompt timed out after ${timeoutSec}s with no response for model ${modelInfo?.provider}/${modelInfo?.id}`);
+          session.abort();
+          const hint = isOllama
+            ? ` The model "${modelInfo?.id}" may not exist in Ollama. Check the name matches exactly (Ollama treats colons as tag separators, e.g. "model:tag"), or run \`ollama list\` to see available models.`
+            : '';
+          this.sendToRenderer(IPC.AGENT_EVENT, {
+            tabId,
+            event: {
+              type: 'system_message',
+              content: `⚠️ No response received from ${modelInfo?.provider}/${modelInfo?.id} after ${timeoutSec}s. The request may have failed.${hint}`,
+            },
+          });
+        } else {
+          // Partial response received — abort and notify that output was truncated
+          log.warn(`Prompt timed out after ${timeoutSec}s with partial response for model ${modelInfo?.provider}/${modelInfo?.id}`);
+          session.abort();
+          this.sendToRenderer(IPC.AGENT_EVENT, {
+            tabId,
+            event: {
+              type: 'system_message',
+              content: `⚠️ Response from ${modelInfo?.provider}/${modelInfo?.id} timed out after ${timeoutSec}s. The output may be incomplete.`,
+            },
+          });
+        }
         // Clear the streaming state so the user can try again
         this.forwardEventToRenderer(tabId, { type: 'turn_end' });
-      }
 
-      // Suppress unhandled rejection from the still-running promptPromise
-      // when timeout wins the race (regardless of whether first event was received)
-      if (result === 'timeout') {
+        // Suppress unhandled rejection from the still-running promptPromise
         promptPromise.catch(() => {});
       }
     } catch (err) {
