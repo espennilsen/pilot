@@ -281,7 +281,7 @@ export class OllamaService {
     // Guard against concurrent refresh calls (e.g. periodic refresh + saveSettings)
     if (this._isRefreshing) {
       log.debug('refreshModels already in progress — skipping');
-      return this._status;
+      return { ...this._status };
     }
     this._isRefreshing = true;
     try {
@@ -295,7 +295,7 @@ export class OllamaService {
     if (!this.modelRegistry || !this.client) {
       this._status = { available: false, endpoint: this.getSettings().endpoint, modelCount: 0, error: 'Not initialized' };
       this.broadcastStatus();
-      return this._status;
+      return { ...this._status };
     }
 
     const { enabled, endpoint, apiKey, cloudModels } = this.getSettings();
@@ -304,7 +304,7 @@ export class OllamaService {
       this.unregisterModels();
       this._status = { available: false, endpoint, modelCount: 0 };
       this.broadcastStatus();
-      return this._status;
+      return { ...this._status };
     }
 
     let localModels: ModelResponse[] = [];
@@ -346,7 +346,7 @@ export class OllamaService {
 
     log.info(`Refresh complete: available=${this._status.available}, localModels=${localModels.length}, cloudModels=${cloudModels.length}, total=${totalModels}`);
     this.broadcastStatus();
-    return this._status;
+    return { ...this._status };
   }
 
   /** Fetch capabilities for each model via ollama.show() in parallel (limited concurrency) */
