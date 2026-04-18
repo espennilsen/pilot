@@ -101,7 +101,9 @@ export function SessionList() {
   const displayChats = useMemo(() => {
     if (!searchQuery.trim()) return activeChats;
     const q = searchQuery.toLowerCase();
-    return activeChats.filter(t => t.title.toLowerCase().includes(q));
+    return activeChats.filter(t =>
+      t.title.toLowerCase().includes(q) || t.projectPath?.toLowerCase().includes(q)
+    );
   }, [activeChats, searchQuery]);
 
   const [exportError, setExportError] = useState<string | null>(null);
