@@ -87,13 +87,18 @@ function useProjectStatus(projectPath: string | null): ProjectStatus {
 }
 
 export function TabBar() {
-  const { tabs, activeTabId, addTab, closeTab, reopenClosedTab, switchTab, getGroupedTabs } = useTabStore();
+  const { tabs, activeTabId, addTab, closeTab, reopenClosedTab, switchTab } = useTabStore();
   const { openProjectDialog } = useProjectStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  const groups = useMemo(() => getGroupedTabs(), [tabs, getGroupedTabs]);
+  // getGroupedTabs reads from store state, so call via getState() inside the memo
+  // to avoid an unstable function reference in the dependency array.
+  const groups = useMemo(
+    () => useTabStore.getState().getGroupedTabs(),
+    [tabs] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeProjectPath = activeTab?.projectPath ?? null;
 
