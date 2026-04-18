@@ -87,7 +87,7 @@ export function SessionList() {
     [tabs, projectPath]
   );
 
-  const sessionsCount = useSessionStore(s => s.sessions.length);
+  const sessionsRef = useSessionStore(s => s.sessions);
 
   // Historical sessions, excluding sessions that are currently open as active chats
   const filteredSessions = useMemo(() => {
@@ -95,7 +95,7 @@ export function SessionList() {
       activeChats.map(t => t.sessionPath).filter(Boolean) as string[]
     );
     return getFilteredSessions().filter(s => !activeSessionPaths.has(s.path));
-  }, [activeChats, getFilteredSessions, searchQuery, showArchived, sessionsCount]);
+  }, [activeChats, getFilteredSessions, searchQuery, showArchived, sessionsRef]);
 
   // Apply search to active chats too
   const displayChats = useMemo(() => {
