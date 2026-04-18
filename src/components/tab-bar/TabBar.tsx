@@ -93,7 +93,7 @@ export function TabBar() {
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  const groups = getGroupedTabs();
+  const groups = useMemo(() => getGroupedTabs(), [tabs, getGroupedTabs]);
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeProjectPath = activeTab?.projectPath ?? null;
 
@@ -313,7 +313,7 @@ function ProjectPill({ group, isActive, onClick, onClose }: ProjectPillProps) {
       label: 'Copy Path',
       icon: <Icon name="Clipboard" size={14} />,
       action: () => {
-        if (group.projectPath) navigator.clipboard.writeText(group.projectPath);
+        if (group.projectPath) navigator.clipboard.writeText(group.projectPath).catch(() => {});
       },
       disabled: !group.projectPath,
     },

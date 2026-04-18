@@ -87,19 +87,24 @@ export function SessionList() {
     [tabs, projectPath]
   );
 
+  // Subscribe to sessions array reference so useMemo recomputes when sessions load or change
+  const sessionsRef = useSessionStore(s => s.sessions);
+
   // Historical sessions, excluding sessions that are currently open as active chats
   const filteredSessions = useMemo(() => {
     const activeSessionPaths = new Set(
       activeChats.map(t => t.sessionPath).filter(Boolean) as string[]
     );
     return getFilteredSessions().filter(s => !activeSessionPaths.has(s.path));
-  }, [activeChats, getFilteredSessions]);
+  }, [activeChats, getFilteredSessions, searchQuery, showArchived, sessionsRef]);
 
   // Apply search to active chats too
   const displayChats = useMemo(() => {
     if (!searchQuery.trim()) return activeChats;
     const q = searchQuery.toLowerCase();
-    return activeChats.filter(t => t.title.toLowerCase().includes(q));
+    return activeChats.filter(t =>
+      t.title.toLowerCase().includes(q) || t.projectPath?.toLowerCase().includes(q)
+    );
   }, [activeChats, searchQuery]);
 
   const [exportError, setExportError] = useState<string | null>(null);
