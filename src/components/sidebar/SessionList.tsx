@@ -87,7 +87,7 @@ export function SessionList() {
     [tabs, projectPath]
   );
 
-  // Subscribe to sessions array reference so useMemo recomputes when sessions load or change
+
   const sessionsRef = useSessionStore(s => s.sessions);
 
   // Historical sessions, excluding sessions that are currently open as active chats
