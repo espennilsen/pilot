@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useRef } from 'react';
 import TitleBar from './components/shared/TitleBar';
 import { CompanionTitleBar } from './components/companion/CompanionTitleBar';
-import { TabBar } from './components/tab-bar/TabBar';
+import { TabBar, ProjectTabRow } from './components/tab-bar';
 import MainLayout from './components/layout/MainLayout';
 import { CommandPalette } from './components/command-palette/CommandPalette';
 import StatusBar from './components/status-bar/StatusBar';
@@ -318,12 +318,18 @@ function App() {
 
   useKeyboardShortcuts(shortcuts);
 
+  const activeProjectPath = useMemo(() => {
+    const tab = tabs.find(t => t.id === activeTabId);
+    return tab?.projectPath ?? null;
+  }, [tabs, activeTabId]);
+
   const companion = isCompanionMode();
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
       {companion ? <CompanionTitleBar /> : <TitleBar />}
       <TabBar />
+      <ProjectTabRow projectPath={activeProjectPath} />
       <MainLayout />
       {developerMode && terminalTabs.length > 0 && <Terminal />}
       <StatusBar />
