@@ -203,17 +203,22 @@ export class PilotSessionManager {
     // LLM provider returns an HTTP error during streaming (e.g. Ollama 404)
     const PROMPT_TIMEOUT_MS = 30_000;
     const isOllama = modelInfo?.provider === 'ollama';
-    let receivedFirstEvent = false;
 
-    // Listen for the first streaming event to confirm the model responded
-    const onFirstEvent = () => { receivedFirstEvent = true; };
-    session.on('text', onFirstEvent);
-    session.on('thinking', onFirstEvent);
+    // Track first response via existing subscription (session has no .on()/.off() methods)
+    let receivedFirstEvent = false;
+    let firstEventUnsub: (() => void) | null = null;
 
     // Timeout ID for cleanup
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     try {
+      // Subscribe for first-streaming-event detection before sending prompt
+      firstEventUnsub = session.subscribe((event) => {
+        if (event.type === 'text_delta' || event.type === 'thinking_delta') {
+          receivedFirstEvent = true;
+        }
+      });
+
       const promptPromise = session.state.isStreaming
         ? session.followUp(text)
         : session.prompt(text);
@@ -268,8 +273,7 @@ export class PilotSessionManager {
       log.error(`Prompt failed on tab ${tabId}: ${err}`);
       throw err;
     } finally {
-      session.off('text', onFirstEvent);
-      session.off('thinking', onFirstEvent);
+      firstEventUnsub?.();
     }
   }
 
