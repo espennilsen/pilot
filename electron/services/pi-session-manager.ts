@@ -214,7 +214,7 @@ export class PilotSessionManager {
     try {
       // Subscribe for first-streaming-event detection before sending prompt
       firstEventUnsub = session.subscribe((event) => {
-        if (event.type === 'text_delta' || event.type === 'thinking_delta') {
+        if (event.type === 'message_start' || event.type === 'message_update') {
           receivedFirstEvent = true;
         }
       });
