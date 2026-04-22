@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
+import * as icons from 'lucide-react';
 import { useTabStore, type TabState } from '../../stores/tab-store';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
 
-const TAB_ICON: Record<TabState['type'], string> = {
+const TAB_ICON: Record<TabState['type'], keyof typeof icons> = {
   chat: 'MessageSquare',
   file: 'FileText',
   tasks: 'CheckSquare',
@@ -49,7 +50,7 @@ export function ProjectTabRow({ projectPath }: ProjectTabRowProps) {
                 }
               `}
             >
-              <Icon name={iconName as any} size={13} className="flex-shrink-0" />
+              <Icon name={iconName} size={13} className="flex-shrink-0" />
               <span className="truncate">{tab.title}</span>
               {tab.hasUnread && (
                 <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
@@ -64,7 +65,6 @@ export function ProjectTabRow({ projectPath }: ProjectTabRowProps) {
                   hover:bg-bg-elevated transition-opacity ml-0.5
                   ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
                 `}
-                role="button"
                 aria-label={`Close ${tab.title}`}
               >
                 <Icon name="X" size={10} />
