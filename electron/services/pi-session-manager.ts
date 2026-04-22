@@ -274,6 +274,7 @@ export class PilotSessionManager {
       throw err;
     } finally {
       firstEventUnsub?.();
+      if (timeoutId !== null) clearTimeout(timeoutId);
     }
   }
 
