@@ -847,3 +847,158 @@ export interface WebTabOpenPayload {
   title?: string;
   projectPath: string | null;
 }
+
+// ─── Plugin System ───────────────────────────────────────────────────────
+
+/** Permissions a plugin requests. Each maps to a capability gate in PluginBridge. */
+export type PluginPermission =
+  | 'ui:sidebar'
+  | 'ui:panel'
+  | 'ui:status-bar'
+  | 'ui:context-menu'
+  | 'ui:settings'
+  | 'ui:tabs'
+  | 'ui:chat-renderer'
+  | 'agent:tools'
+  | 'agent:skills'
+  | 'agent:events'
+  | `network:${string}`
+  | 'fs:read'
+  | 'fs:write'
+  | 'git:status'
+  | 'git:write'
+  | 'shell:exec';
+
+/** Manifest extracted from a plugin's package.json under the "pilot" key. */
+export interface PluginManifest {
+  /** Entry files relative to package root (e.g. ["./dist/plugin.js"]) */
+  plugins: string[];
+  /** Permissions the plugin needs */
+  permissions: PluginPermission[];
+  /** Minimum Pilot version (semver) */
+  minPilotVersion?: string;
+}
+
+/** A plugin installed on disk. */
+export interface InstalledPlugin {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  source: 'npm' | 'git' | 'local';
+  sourceUrl: string;
+  installedAt: number;
+  enabled: boolean;
+  manifest: PluginManifest;
+  path: string;        // absolute path on disk
+  hasErrors: boolean;
+  errorMessage?: string;
+}
+
+/** Result of a plugin install operation. */
+export interface PluginInstallResult {
+  success: boolean;
+  id?: string;
+  name?: string;
+  version?: string;
+  error?: string;
+}
+
+// ─── Plugin Contributions (sent from Extension Host → renderer via PluginBridge) ──
+
+/** A tree view item for sidebar/panel contributions. */
+export interface PluginTreeItem {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  collapsible?: boolean;
+  command?: { id: string; args?: unknown[] };
+}
+
+/** Registered tree view contributed by a plugin. */
+export interface PluginTreeView {
+  pluginId: string;
+  viewId: string;
+  title: string;
+  icon?: string;
+  location: 'sidebar' | 'panel';
+}
+
+/** Status bar item contributed by a plugin. */
+export interface PluginStatusBarItem {
+  pluginId: string;
+  itemId: string;
+  text: string;
+  tooltip?: string;
+  alignment: 'left' | 'right';
+  priority: number;
+  command?: { id: string; args?: unknown[] };
+}
+
+/** Context menu contribution. */
+export interface PluginContextMenuContribution {
+  pluginId: string;
+  when: string;
+  group: string;
+  items: Array<{
+    label: string;
+    command: { id: string; args?: unknown[] };
+  }>;
+}
+
+/** Registered command from a plugin. */
+export interface PluginCommand {
+  pluginId: string;
+  id: string;
+  label: string;
+  keybinding?: string;
+}
+
+/** Settings section contribution. */
+export interface PluginSettingsSection {
+  pluginId: string;
+  sectionId: string;
+  title: string;
+  icon?: string;
+}
+
+/** A tab type registered by a plugin. */
+export interface PluginTabType {
+  pluginId: string;
+  typeId: string;
+  label: string;
+  icon?: string;
+}
+
+/** Chat message renderer contribution. */
+export interface PluginMessageRenderer {
+  pluginId: string;
+  rendererId: string;
+  matchToolName?: string;
+  matchCustomType?: string;
+}
+
+/** Event forwarded from PluginBridge → renderer about plugin state changes. */
+export interface PluginEventPayload {
+  type: 'plugin-activated' | 'plugin-deactivated' | 'plugin-error' | 'contribution-updated';
+  pluginId: string;
+  data?: unknown;
+}
+
+/** Registered interest in an agent event. */
+export interface PluginAgentEventSubscription {
+  pluginId: string;
+  event: string;   // 'tool_call' | 'tool_result' | 'agent_start' | etc.
+}
+
+/** Serialised agent event forwarded to plugins. */
+export interface SerialisedAgentEvent {
+  name: string;
+  toolName?: string;
+  toolCallId?: string;
+  input?: Record<string, unknown>;
+  result?: unknown;
+  message?: unknown;
+  prompt?: string;
+}
