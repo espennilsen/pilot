@@ -28,11 +28,14 @@ import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
 import { registerDesktopIpc } from '../ipc/desktop';
 import { registerThemeIpc } from '../ipc/theme';
+import { registerPluginsIpc } from '../ipc/plugins';
 import { DesktopService } from '../services/desktop-service';
 import { ThemeService } from '../services/theme-service';
 import { OllamaService } from '../services/ollama-service';
 import { registerOllamaIpc } from '../ipc/ollama';
 import { McpManager } from '../services/mcp-manager';
+import { pluginBridge, PluginBridge } from '../services/plugin-bridge';
+import { PluginInstaller } from '../services/plugin-installer';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
 import { CompanionAuth } from '../services/companion-auth';
@@ -59,6 +62,7 @@ let mcpManager: McpManager | null = null;
 let desktopService: DesktopService | null = null;
 let themeService: ThemeService | null = null;
 let ollamaService: OllamaService | null = null;
+let pluginInstaller: PluginInstaller | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -499,6 +503,26 @@ app.whenReady().then(async () => {
   registerPromptsIpc(promptLibrary);
   setPromptLibraryRef(promptLibrary);
 
+  // Initialize plugin system
+  pluginInstaller = new PluginInstaller();
+  registerPluginsIpc(pluginBridge, pluginInstaller);
+
+  // Start the Extension Host
+  pluginBridge.start();
+
+  // Activate installed plugins that are enabled
+  const installedPlugins = pluginInstaller.listPlugins();
+  pluginBridge.setInstalledPlugins(installedPlugins);
+  for (const plugin of installedPlugins) {
+    if (plugin.enabled) {
+      try {
+        pluginBridge.registerPlugin(plugin);
+      } catch (err) {
+        console.error(`Failed to activate plugin ${plugin.id}:`, err);
+      }
+    }
+  }
+
   // Window control IPC handlers
   ipcMain.handle('window:minimize', () => {
     mainWindow?.minimize();
@@ -642,5 +666,6 @@ app.on('will-quit', () => {
   companionDiscovery?.stop();
   companionRemote?.dispose();
   companionBridge.shutdown();
+  pluginBridge.stop();
   shutdownLogger();
 });
