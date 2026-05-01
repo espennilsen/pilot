@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Save, Undo2, AlertTriangle, Eye, Pencil, Globe } from 'lucide-react';
 import { useHighlight } from '../../hooks/useHighlight';
+import FindReplacePanel from './FindReplacePanel';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
 import Markdown from '../../lib/markdown';
@@ -22,6 +23,10 @@ interface FileEditorState {
   hasConflict: boolean;
   /** Markdown preview mode (only for .md/.mdx files) */
   isPreview: boolean;
+  /** Find/replace panel visibility */
+  findVisible: boolean;
+  /** Whether replace row is shown in find panel */
+  findReplaceMode: boolean;
 }
 
 /** Check if a file path is a markdown file */
@@ -67,7 +72,10 @@ export default function FileEditor() {
     baseContent: null,
     hasConflict: false,
     isPreview: false,
+    findVisible: false,
+    findReplaceMode: false,
   });
+  const [findFocusTrigger, setFindFocusTrigger] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumberRef = useRef<HTMLDivElement>(null);
@@ -112,7 +120,7 @@ export default function FileEditor() {
     if (!filePath) return;
 
     let cancelled = false;
-    setState(s => ({ ...s, isLoading: true, error: null, saveError: null, hasConflict: false, isPreview: false }));
+    setState(s => ({ ...s, isLoading: true, error: null, saveError: null, hasConflict: false, isPreview: false, findVisible: false, findReplaceMode: false }));
 
     (async () => {
       try {
@@ -326,22 +334,71 @@ export default function FileEditor() {
     }
   }, [state.isLoading, state.error, state.content, state.isPreview]);
 
-  // Keyboard shortcuts: Cmd+S to save, Escape to revert
+  // Close find panel when switching to preview mode
+  useEffect(() => {
+    if (state.isPreview && state.findVisible) {
+      setState(s => ({ ...s, findVisible: false }));
+    }
+  }, [state.isPreview, state.findVisible]);
+
+  // Find/replace helpers
+  const handleFindClose = useCallback(() => {
+    setState(s => ({ ...s, findVisible: false }));
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleReplace = useCallback((newContent: string, selectionStart: number, selectionEnd: number) => {
+    setState(s => ({ ...s, editContent: newContent }));
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.setSelectionRange(selectionStart, selectionEnd);
+        textareaRef.current.focus();
+      }
+    });
+  }, []);
+
+  // Keyboard shortcuts: Cmd+F find, Cmd+H replace, Cmd+S save, Escape to revert/close find
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Find: Cmd/Ctrl+F
+      if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        setState(s => ({ ...s, findVisible: true, findReplaceMode: false }));
+        setFindFocusTrigger(t => t + 1);
+        return;
+      }
+      // Replace: Cmd/Ctrl+H
+      if (e.key === 'h' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        setState(s => ({ ...s, findVisible: true, findReplaceMode: true }));
+        setFindFocusTrigger(t => t + 1);
+        return;
+      }
+      // Save
       if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         saveFile();
+        return;
       }
-      if (e.key === 'Escape' && isDirty && !state.isPreview) {
-        e.preventDefault();
-        revertChanges();
+      // Escape: close find if visible, else revert if dirty
+      if (e.key === 'Escape') {
+        if (state.findVisible && !state.isPreview) {
+          e.preventDefault();
+          setState(s => ({ ...s, findVisible: false }));
+          textareaRef.current?.focus();
+          return;
+        }
+        if (isDirty && !state.isPreview) {
+          e.preventDefault();
+          revertChanges();
+          return;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [saveFile, revertChanges, isDirty, state.isPreview]);
+  }, [saveFile, revertChanges, isDirty, state.isPreview, state.findVisible]);
 
   // Update tab dirty indicator
   useEffect(() => {
@@ -454,7 +511,19 @@ export default function FileEditor() {
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
+        {state.findVisible && !state.isPreview && state.content != null && (
+          <FindReplacePanel
+            content={state.editContent}
+            onReplace={handleReplace}
+            textareaRef={textareaRef}
+            onScrollSync={handleScroll}
+            visible={state.findVisible}
+            onClose={handleFindClose}
+            replaceMode={state.findReplaceMode}
+            focusTrigger={findFocusTrigger}
+          />
+        )}
         {state.isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />

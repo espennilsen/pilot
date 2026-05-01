@@ -253,6 +253,13 @@ function createWindow() {
     mainWindow?.webContents.send(IPC.WEB_TAB_LOAD_FAILED, { url: validatedURL, errorCode });
   });
 
+  // Forward found-in-page results from webContents to renderer for WebView find bar
+  mainWindow.webContents.on('found-in-page', (_event, result) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC.WEBVIEW_FOUND_IN_PAGE, result);
+    }
+  });
+
   // Build application menu
   buildApplicationMenu();
 }
@@ -540,6 +547,16 @@ app.whenReady().then(async () => {
   });
 
   // Sync all IPC handlers to the companion bridge registry.
+  ipcMain.handle(IPC.WEBVIEW_FIND_IN_PAGE, (_event, query: string, options: { forward?: boolean; findNext?: boolean; matchCase?: boolean } = {}) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.findInPage(query, options);
+  });
+
+  ipcMain.handle(IPC.WEBVIEW_STOP_FIND_IN_PAGE, (_event, action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection') => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.stopFindInPage(action);
+  });
+
   // This must happen AFTER all ipcMain.handle() registrations above.
   syncAllHandlers();
 

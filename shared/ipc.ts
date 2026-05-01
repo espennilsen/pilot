@@ -296,6 +296,11 @@ export const IPC = {
   WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
   WEB_TAB_LOAD_FAILED: 'web-tab:load-failed', // main → renderer
 
+  // WebView in-page find
+  WEBVIEW_FIND_IN_PAGE: 'webview:find-in-page',
+  WEBVIEW_STOP_FIND_IN_PAGE: 'webview:stop-find-in-page',
+  WEBVIEW_FOUND_IN_PAGE: 'webview:found-in-page', // main → renderer
+
   // Ollama
   OLLAMA_STATUS: 'ollama:status',                 // main → renderer push
   OLLAMA_GET_STATUS: 'ollama:get-status',

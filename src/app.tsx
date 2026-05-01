@@ -34,6 +34,7 @@ import { useDesktopEvents } from './hooks/useDesktopEvents';
 import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
+import { useGitStore } from './stores/git-store';
 import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
 
@@ -60,7 +61,18 @@ function App() {
   // On startup, useWorkspacePersistence opens all sessions first and registers them
   // in the wired sessions store. This effect only handles subsequent tab switches.
   useEffect(() => {
-    if (!activeTabId) return;
+    // No active tab — if there are zero tabs left, clear project state
+    if (!activeTabId) {
+      if (tabs.length === 0) {
+        const currentProjectPath = useProjectStore.getState().projectPath;
+        if (currentProjectPath) {
+          useProjectStore.getState().clearProject();
+          useGitStore.getState().reset();
+        }
+      }
+      return;
+    }
+
     const tab = tabs.find(t => t.id === activeTabId);
     if (!tab) return;
 
