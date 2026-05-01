@@ -19,18 +19,25 @@ A native desktop environment for the [Pi Coding Agent](https://www.npmjs.com/pac
 
 ## Features
 
-- **Agent Chat** — streaming responses, tool call visibility, thinking blocks, steer/follow-up, image attachments, slash commands
+- **Agent Chat** — streaming responses, tool call visibility, thinking blocks, steer/follow-up, image attachments, slash commands, and AI follow-up suggestion chips
+- **File Editor** — syntax-highlighted code editor with line numbers, in-file **find & replace** (string and regex), and dirty-state revert
 - **Sandboxed File Operations** — all edits staged for review before touching disk, with accept/reject per change and Yolo mode override
 - **Tabbed Sessions** — independent agent sessions with drag-and-drop, pinning, project grouping, and draft persistence
-- **Git Integration** — status, staging, commits, branches, blame, stash — all inline
+- **Git Integration** — status, staging, commits, branches, blame, stash, **interactive rebase UI**, **submodule management**, and AI-assisted conflict resolution — all inline
 - **Memory System** — two-tier persistent memory (global + project) with auto-extraction and agent tools for reading/writing
 - **Subagents** — spawn parallel workers, orchestrate multi-step work, with live monitoring in the Agents panel
 - **Task Board** — kanban/table views with epics, dependencies, priorities, and full agent tool access
 - **Prompt Library** — reusable templates with variables and slash-command triggers
-- **Companion Access** — access Pilot from iOS/iPad/browser via HTTPS + WebSocket with PIN/QR pairing
+- **Web Tabs** — browse documentation, preview local HTML, or monitor dashboards inside the app
+- **Artifacts & Live Preview** — render HTML/CSS/JS artifacts the agent produces in a dedicated preview pane
+- **Web Search** — agent can search the web via Brave Search API and cite sources inline
+- **MCP Servers** — connect external tools via Model Context Protocol (stdio, SSE, Streamable HTTP)
+- **Desktop** — Docker-based virtual display the agent can control — browser testing, GUI automation, and visual verification with 18 tools (mouse, keyboard, screenshot, clipboard, browser)
+- **Custom Themes** — create, edit, and import color themes (dark, light, or fully custom)
+- **Scratch Pad** — quick persistent notepad for drafting messages or saving snippets
 - **Command Palette** — fuzzy-searchable `⌘K` overlay for every action
 - **Terminal** — embedded PTY terminal with tabs
-- **Desktop** — Docker-based virtual display the agent can control — browser testing, GUI automation, and visual verification with 18 tools (mouse, keyboard, screenshot, clipboard, browser)
+- **Companion Access** — access Pilot from iOS/iPad/browser via HTTPS + WebSocket with PIN/QR pairing
 - **Extensions & Skills** — install and manage Pi SDK extensions and skills
 
 See [docs/](docs/INDEX.md) for full documentation.
@@ -43,7 +50,7 @@ See [docs/](docs/INDEX.md) for full documentation.
 
 - **Node.js** 22+ (dev tooling; Electron bundles its own runtime)
 - **Git** on PATH
-- API key or OAuth credentials for at least one AI provider (Anthropic, OpenAI, or Google)
+- API key or OAuth credentials for at least one AI provider (Anthropic, OpenAI, Google, **or Ollama** for local models)
 - **Linux only:** `build-essential`, `libx11-dev`, `libxkbfile-dev`
 
 ### Install & Run
@@ -87,9 +94,9 @@ npm run preview
 
 | Platform | Location                                                 |
 | -------- | -------------------------------------------------------- |
-| macOS    | `~/.config/.pilot/`                                      |
-| Windows  | `%APPDATA%\.pilot\`                                      |
-| Linux    | `$XDG_CONFIG_HOME/.pilot/` (default `~/.config/.pilot/`) |
+| macOS    | `~/.config/pilot/`                                       |
+| Windows  | `%APPDATA%\pilot\`                                       |
+| Linux    | `$XDG_CONFIG_HOME/pilot/` (default `~/.config/pilot/`)    |
 
 
 Key files: `auth.json` (credentials), `app-settings.json` (preferences), `MEMORY.md` (global memory), `sessions/` (conversation history), `extensions/`, `skills/`, `prompts/`.
@@ -99,26 +106,6 @@ Key files: `auth.json` (credentials), `app-settings.json` (preferences), `MEMORY
 Key files: `settings.json` (jail, yolo mode), `commands.json` (dev commands), `MEMORY.md` (project memory), `tasks/tasks.jsonl` (task board), `prompts/` (project templates).
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full details.
-
----
-
-## Keyboard Shortcuts
-
-
-| Action                 | macOS         | Windows / Linux               |
-| ---------------------- | ------------- | ----------------------------- |
-| Command Palette        | `⌘K`          | `Ctrl+K`                      |
-| New Tab / Conversation | `⌘T` / `⌘N`   | `Ctrl+T` / `Ctrl+N`           |
-| Close Tab              | `⌘W`          | `Ctrl+W`                      |
-| Next / Previous Tab    | `⌘⇧]` / `⌘⇧[` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| Toggle Sidebar         | `⌘B`          | `Ctrl+B`                      |
-| Toggle Terminal        | `⌘``          | `Ctrl+``                      |
-| Prompt Library         | `⌘/`          | `Ctrl+/`                      |
-| Toggle Yolo Mode       | `⌘⇧Y`         | `Ctrl+Shift+Y`                |
-| Settings               | `⌘,`          | `Ctrl+,`                      |
-
-
-All shortcuts are rebindable in Settings → Keybindings.
 
 ---
 
