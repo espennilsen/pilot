@@ -271,7 +271,15 @@ function createPluginAPI(pluginId: string): PluginAPI {
       },
     },
     workspace: {
-      projectPath: null, // Updated via notifications from PluginBridge
+      projectPath: null as string | null,
+      onDidChangeProject: (callback: (newPath: string | null) => void) => {
+        workspaceChangeCallbacks.set(callback, callback);
+        return {
+          dispose: () => {
+            workspaceChangeCallbacks.delete(callback);
+          }
+        };
+      },
     },
   };
 }
@@ -279,6 +287,7 @@ function createPluginAPI(pluginId: string): PluginAPI {
 // ─── Event Handler Registry ──────────────────────────────────────────
 
 const eventHandlers = new Map<string, Map<string, Map<Function, Function>>>(); // event -> pluginId -> handler map
+const workspaceChangeCallbacks = new Map<Function, Function>(); // callbacks for workspace.onDidChangeProject
 
 // ─── Message Processing ──────────────────────────────────────────────
 
@@ -385,6 +394,14 @@ async function handleIncomingRequest(request: RpcRequest): Promise<void> {
         // Update projectPath in all active plugin APIs
         for (const plugin of activePlugins.values()) {
           plugin.api.workspace.projectPath = projectPath;
+        }
+        // Notify all workspace change callbacks
+        for (const callback of workspaceChangeCallbacks.values()) {
+          try {
+            callback(projectPath);
+          } catch (err) {
+            console.error('[ExtensionHost] workspace.onDidChangeProject callback error:', err);
+          }
         }
         // No response needed (notification)
         break;
