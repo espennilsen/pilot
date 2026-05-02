@@ -204,7 +204,14 @@ export class PluginBridge extends EventEmitter {
 
   /** Get skills for a specific project (scope by projectPath). */
   getSkillsForProject(projectPath: string | null): string {
-    // For now, return all skills - future implementation will filter by project scope
+    if (!projectPath) {
+      // No project open, return all skills
+      return this.getAllSkills();
+    }
+    
+    // Filter skills by project scope
+    // For now, we return all skills since we don't have project-scoped registration
+    // Future enhancement: plugins can register skills with project scope
     return this.getAllSkills();
   }
 

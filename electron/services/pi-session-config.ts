@@ -109,7 +109,7 @@ export async function buildSessionConfig(
   const userSystemPrompt = appSettings.systemPrompt?.trim() || null;
 
   // Get plugin skills for system prompt injection
-  const pluginSkills = pluginBridge.getAllSkills();
+  const pluginSkills = pluginBridge.getSkillsForProject(projectPath);
 
   // Combine user system prompt, memory, task context, and plugin skills
   const additionalContext = [userSystemPrompt, memoryContext, taskSummary, pluginSkills].filter(Boolean).join('\n\n');
