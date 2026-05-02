@@ -6,21 +6,27 @@ import type { InstalledPlugin } from '../../shared/types';
  * PluginDevMode — watches a plugin directory for changes and triggers
  * hot-reload by deactivating and reactivating the plugin in the Extension Host.
  */
+import type { InstalledPlugin } from '../../shared/types';
+
 export class PluginDevMode {
   private watchers = new Map<string, FSWatcher>();
   private reloadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private pluginPaths = new Map<string, string>();
+  private pluginManifests = new Map<string, InstalledPlugin>();
 
   /**
    * Start watching a plugin directory.
    * On file changes, deactivate then reactivate after a 300ms debounce.
    */
-  startWatching(pluginId: string, pluginPath: string): void {
+  startWatching(pluginId: string, pluginPath: string, manifest?: InstalledPlugin): void {
     if (this.watchers.has(pluginId)) {
       this.stopWatching(pluginId);
     }
 
     this.pluginPaths.set(pluginId, pluginPath);
+    if (manifest) {
+      this.pluginManifests.set(pluginId, manifest);
+    }
 
     const watcher = watch(pluginPath, {
       ignored: ['**/node_modules/**', '**/.git/**'],
@@ -61,6 +67,7 @@ export class PluginDevMode {
     }
 
     this.pluginPaths.delete(pluginId);
+    this.pluginManifests.delete(pluginId);
   }
 
   stopAll(): void {
@@ -79,18 +86,18 @@ export class PluginDevMode {
 
       try {
         // Unregister (deactivate) the plugin
-        pluginBridge.unregisterPlugin(pluginId);
+        await pluginBridge.unregisterPlugin(pluginId);
 
         // Small delay to ensure cleanup completes
         await new Promise(r => setTimeout(r, 200));
 
-        // Re-register — PluginBridge will call plugin/activate
-        // We need to get the plugin info from the registry
-        const pluginPath = this.pluginPaths.get(pluginId);
-        if (pluginPath) {
-          // Trigger a re-install/load by notifying the installer
-          // For now, we'll just reactivate via PluginBridge
-          console.log(`[PluginDevMode] Plugin ${pluginId} reactivated`);
+        // Re-register the plugin using stored manifest
+        const manifest = this.pluginManifests.get(pluginId);
+        if (manifest) {
+          await pluginBridge.registerPlugin(manifest);
+          console.log(`[PluginDevMode] Plugin ${pluginId} hot-reloaded successfully`);
+        } else {
+          console.error(`[PluginDevMode] No manifest found for ${pluginId}, cannot reload`);
         }
       } catch (err) {
         console.error(`[PluginDevMode] Failed to reload ${pluginId}:`, err);
