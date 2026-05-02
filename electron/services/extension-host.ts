@@ -154,6 +154,10 @@ async function deactivatePlugin(pluginId: string): Promise<void> {
   }
 
   activePlugins.delete(pluginId);
+  
+  // Clean up contribution callbacks
+  viewCallbacks.delete(pluginId);
+  commandCallbacks.delete(pluginId);
 }
 
 // ─── Plugin API Factory ──────────────────────────────────────────────
@@ -162,13 +166,19 @@ function createPluginAPI(pluginId: string): PluginAPI {
   return {
     contributions: {
       registerTreeView(id, options) {
+        const viewId = id;
         sendRequest('contribution/registerView', {
           pluginId,
-          viewId: id,
+          viewId,
           title: options.title as string,
           icon: options.icon as string,
           location: options.location as 'sidebar' | 'panel',
         }).catch(() => {});
+        // Store callback for getChildren
+        if (!viewCallbacks.has(pluginId)) {
+          viewCallbacks.set(pluginId, new Map());
+        }
+        viewCallbacks.get(pluginId)!.set(viewId, options.getChildren as (elementId: string | null) => Promise<unknown[]>);
       },
       registerWebviewView(id, options) {
         // Phase 2 implementation
@@ -212,12 +222,18 @@ function createPluginAPI(pluginId: string): PluginAPI {
         }).catch(() => {});
       },
       registerCommand(id, options) {
+        const commandId = id;
         sendRequest('contribution/registerCommand', {
           pluginId,
-          id,
+          id: commandId,
           label: options.label as string,
           keybinding: options.keybinding as string,
         }).catch(() => {});
+        // Store callback for execute
+        if (!commandCallbacks.has(pluginId)) {
+          commandCallbacks.set(pluginId, new Map());
+        }
+        commandCallbacks.get(pluginId)!.set(commandId, options.execute as (args?: unknown[]) => Promise<unknown>);
       },
     },
     agent: {
@@ -288,6 +304,11 @@ function createPluginAPI(pluginId: string): PluginAPI {
 
 const eventHandlers = new Map<string, Map<string, Map<Function, Function>>>(); // event -> pluginId -> handler map
 const workspaceChangeCallbacks = new Map<Function, Function>(); // callbacks for workspace.onDidChangeProject
+
+// ─── Contribution Callback Registries ─────────────────────────────────
+
+const viewCallbacks = new Map<string, Map<string, (elementId: string | null) => Promise<unknown[]>>>(); // pluginId -> viewId -> callback
+const commandCallbacks = new Map<string, Map<string, (args?: unknown[]) => Promise<unknown>>>(); // pluginId -> commandId -> callback
 
 // ─── Message Processing ──────────────────────────────────────────────
 
@@ -378,14 +399,48 @@ async function handleIncomingRequest(request: RpcRequest): Promise<void> {
       }
 
       case 'view/getChildren': {
-        // Plugin's getChildren is called — we'd need the plugin to have stored it.
-        // For Phase 1, return empty.
-        sendResponse(id!, { result: [] });
+        const { pluginId, viewId, elementId } = params as {
+          pluginId: string;
+          viewId: string;
+          elementId: string | null;
+        };
+        // Look up and invoke the plugin's getChildren callback
+        const viewCallback = viewCallbacks.get(pluginId)?.get(viewId);
+        if (viewCallback) {
+          try {
+            const result = await viewCallback(elementId);
+            sendResponse(id!, { result });
+          } catch (err) {
+            console.error(`[ExtensionHost] view/getChildren error for ${pluginId}/${viewId}:`, err);
+            sendResponse(id!, { error: { code: -32000, message: err instanceof Error ? err.message : 'Unknown error' } });
+          }
+        } else {
+          console.warn(`[ExtensionHost] No callback registered for view ${pluginId}/${viewId}`);
+          sendResponse(id!, { result: [] });
+        }
         break;
       }
 
       case 'command/execute': {
-        sendResponse(id!, { result: { ok: true } });
+        const { pluginId, commandId, args } = params as {
+          pluginId: string;
+          commandId: string;
+          args?: unknown[];
+        };
+        // Look up and invoke the plugin's execute callback
+        const commandCallback = commandCallbacks.get(pluginId)?.get(commandId);
+        if (commandCallback) {
+          try {
+            const result = await commandCallback(args);
+            sendResponse(id!, { result });
+          } catch (err) {
+            console.error(`[ExtensionHost] command/execute error for ${pluginId}/${commandId}:`, err);
+            sendResponse(id!, { error: { code: -32000, message: err instanceof Error ? err.message : 'Unknown error' } });
+          }
+        } else {
+          console.warn(`[ExtensionHost] No callback registered for command ${pluginId}/${commandId}`);
+          sendResponse(id!, { result: { ok: false, error: 'Command not found' } });
+        }
         break;
       }
 
