@@ -90,10 +90,28 @@ export function scaffoldPlugin(
     mkdirSync(join(pluginDir, 'src'), { recursive: true });
 
     const desc = description || `${name} plugin for Pilot`;
-
-    const packageJson = PACKAGE_JSON_TEMPLATE
-      .replace(/{{NAME}}/g, safeName)
-      .replace(/{{DESCRIPTION}}/g, desc);
+    const packageJson = JSON.stringify(
+      {
+        name: safeName,
+        version: '1.0.0',
+        description: desc,
+        main: './dist/plugin.js',
+        pilot: {
+          plugins: ['./dist/plugin.js'],
+          permissions: ['ui:sidebar'],
+        },
+        devDependencies: {
+          '@pilot/plugin-sdk': '^0.1.0',
+          typescript: '^5.0.0',
+        },
+        scripts: {
+          build: 'tsc',
+          dev: 'tsc --watch',
+        },
+      },
+      null,
+      2,
+    );
 
     const tsconfig = TSCONFIG_TEMPLATE;
 

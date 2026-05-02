@@ -50,7 +50,8 @@ See [docs/](docs/INDEX.md) for full documentation.
 
 - **Node.js** 22+ (dev tooling; Electron bundles its own runtime)
 - **Git** on PATH
-- API key or OAuth credentials for at least one AI provider (Anthropic, OpenAI, Google, **or Ollama** for local models)
+- API key or OAuth credentials for at least one AI provider (Anthropic, OpenAI, Google)
+- **Ollama** (local models) — optional, typically keyless; only needed for local model usage
 - **Linux only:** `build-essential`, `libx11-dev`, `libxkbfile-dev`
 
 ### Install & Run

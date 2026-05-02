@@ -57,6 +57,9 @@ function App() {
 
   // Start plugin event listeners
   useEffect(() => {
+    // Hydrate plugin state first
+    usePluginStore.getState().loadPlugins();
+    // Then start listening for updates
     const stop = usePluginStore.getState().startListening();
     return stop;
   }, []);

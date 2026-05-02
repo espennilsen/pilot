@@ -206,7 +206,9 @@ export default function ChatView() {
     setFindMatchCount(matches.length);
 
     if (matches.length > 0) {
-      const idx = 0;
+      // Preserve previous index or clamp to valid range
+      const prevIndex = findCurrentIndex >= 0 ? findCurrentIndex : 0;
+      const idx = Math.max(0, Math.min(prevIndex, matches.length - 1));
       setFindCurrentIndex(idx);
       applyChatHighlights(matches, idx);
       requestAnimationFrame(() => scrollToMatchInContainer(matches[idx], container));

@@ -352,7 +352,10 @@ export default function FileEditor() {
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         textareaRef.current.setSelectionRange(selectionStart, selectionEnd);
-        textareaRef.current.focus();
+        // Only focus textarea if it was already focused (preserve focus in replace input)
+        if (document.activeElement === textareaRef.current) {
+          textareaRef.current.focus();
+        }
       }
     });
   }, []);

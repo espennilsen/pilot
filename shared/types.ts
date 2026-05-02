@@ -2,6 +2,9 @@
 // These types are used by both main and renderer processes
 // All types must be serializable over IPC (Structured Clone)
 
+/** JSON-serializable value type for IPC payloads — ensures Structured Clone compliance */
+export type JsonValue = string | number | boolean | null | undefined | JsonValue[] | { [key: string]: JsonValue };
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 // Session metadata (Pilot layer on top of SDK sessions)
@@ -906,14 +909,227 @@ export interface PluginInstallResult {
 
 // ─── Plugin Contributions (sent from Extension Host → renderer via PluginBridge) ──
 
+/** Valid icon name from lucide-react */
+export type IconName =
+  | 'Puzzle'
+  | 'Smile'
+  | 'Monitor'
+  | 'PanelRightOpen'
+  | 'PanelRightClose'
+  | 'Folder'
+  | 'File'
+  | 'GitBranch'
+  | 'Settings'
+  | 'Terminal'
+  | 'Search'
+  | 'Plus'
+  | 'X'
+  | 'Check'
+  | 'AlertCircle'
+  | 'Info'
+  | 'Trash'
+  | 'Edit'
+  | 'Save'
+  | 'RefreshCw'
+  | 'ArrowUp'
+  | 'ArrowDown'
+  | 'ChevronRight'
+  | 'ChevronDown'
+  | 'MoreVertical'
+  | 'ExternalLink'
+  | 'Copy'
+  | 'Code'
+  | 'MessageSquare'
+  | 'User'
+  | 'LogOut'
+  | 'LogIn'
+  | 'Bell'
+  | 'Star'
+  | 'Clock'
+  | 'Calendar'
+  | 'Home'
+  | 'Briefcase'
+  | 'Database'
+  | 'Cloud'
+  | 'Download'
+  | 'Upload'
+  | 'GitMerge'
+  | 'GitPullRequest'
+  | 'GitCommit'
+  | 'Shield'
+  | 'Key'
+  | 'Lock'
+  | 'Unlock'
+  | 'Eye'
+  | 'EyeOff'
+  | 'Play'
+  | 'Pause'
+  | 'StopCircle'
+  | 'Square'
+  | 'Circle'
+  | 'Triangle'
+  | 'Hexagon'
+  | 'Box'
+  | 'Package'
+  | 'Layers'
+  | 'Layout'
+  | 'Grid'
+  | 'List'
+  | 'Menu'
+  | 'XOctagon'
+  | 'CheckCircle'
+  | 'AlertTriangle'
+  | 'AlertOctagon'
+  | 'HelpCircle'
+  | 'TrendingUp'
+  | 'TrendingDown'
+  | 'Activity'
+  | 'Zap'
+  | 'Coffee'
+  | 'Sun'
+  | 'Moon'
+  | 'CloudRain'
+  | 'Wind'
+  | 'Snowflake'
+  | 'Flame'
+  | 'Droplet'
+  | 'Music'
+  | 'Image'
+  | 'Video'
+  | 'Film'
+  | 'Camera'
+  | 'Mic'
+  | 'Headphones'
+  | 'Speaker'
+  | 'Phone'
+  | 'Mail'
+  | 'Send'
+  | 'Inbox'
+  | 'Archive'
+  | 'Bookmark'
+  | 'Tag'
+  | 'Hash'
+  | 'AtSign'
+  | 'Link'
+  | 'Unlink'
+  | 'FileText'
+  | 'FileCode'
+  | 'FileJson'
+  | 'FileSpreadsheet'
+  | 'FolderOpen'
+  | 'FolderPlus'
+  | 'FolderMinus'
+  | 'Gitlab'
+  | 'Github'
+  | 'Gitfork'
+  | 'Rocket'
+  | 'Wrench'
+  | 'Hammer'
+  | 'Screwdriver'
+  | 'Tool'
+  | 'Cpu'
+  | 'Server'
+  | 'Network'
+  | 'Wifi'
+  | 'Bluetooth'
+  | 'Usb'
+  | 'HardDrive'
+  | 'Disc'
+  | 'Printer'
+  | 'Scan'
+  | 'QrCode'
+  | 'Barcode'
+  | 'CreditCard'
+  | 'DollarSign'
+  | 'Euro'
+  | 'Bitcoin'
+  | 'ShoppingCart'
+  | 'ShoppingBag'
+  | 'Tag'
+  | 'Percent'
+  | 'TrendingUp'
+  | 'TrendingDown'
+  | 'PieChart'
+  | 'BarChart'
+  | 'LineChart'
+  | 'ScatterChart'
+  | 'Map'
+  | 'MapPin'
+  | 'Navigation'
+  | 'Compass'
+  | 'Globe'
+  | 'Flag'
+  | 'Award'
+  | 'Trophy'
+  | 'Medal'
+  | 'Crown'
+  | 'Gem'
+  | 'Gift'
+  | 'Heart'
+  | 'ThumbsUp'
+  | 'ThumbsDown'
+  | 'Hand'
+  | 'Fingerprint'
+  | 'Brain'
+  | 'Eye'
+  | 'Ear'
+  | 'Mouth'
+  | 'Bone'
+  | 'Footprints'
+  | 'Arm'
+  | 'HandMetal'
+  | 'Badge'
+  | 'Belt'
+  | 'Glasses'
+  | 'Hat'
+  | 'Shirt'
+  | 'Shoe'
+  | 'Watch'
+  | 'Anchor'
+  | 'Boat'
+  | 'Car'
+  | 'Bus'
+  | 'Train'
+  | 'Plane'
+  | 'Bike'
+  | 'Truck'
+  | 'Ship'
+  | 'Tractor'
+  | 'Ban'
+  | 'Allow'
+  | 'CircleAlert'
+  | 'CircleCheck'
+  | 'CircleHelp'
+  | 'CircleX'
+  | 'SquareAlert'
+  | 'SquareCheck'
+  | 'SquareHelp'
+  | 'SquareX'
+  | 'TriangleAlert'
+  | 'TriangleCheck'
+  | 'TriangleHelp'
+  | 'TriangleX'
+  | 'OctagonAlert'
+  | 'OctagonCheck'
+  | 'OctagonHelp'
+  | 'OctagonX'
+  | 'PentagonAlert'
+  | 'PentagonCheck'
+  | 'PentagonHelp'
+  | 'PentagonX'
+  | 'HexagonAlert'
+  | 'HexagonCheck'
+  | 'HexagonHelp'
+  | 'HexagonX';
+
 /** A tree view item for sidebar/panel contributions. */
 export interface PluginTreeItem {
   id: string;
   label: string;
   description?: string;
-  icon?: string;
+  icon?: IconName;
   collapsible?: boolean;
-  command?: { id: string; args?: unknown[] };
+  command?: { id: string; args?: JsonValue[] };
 }
 
 /** Registered tree view contributed by a plugin. */
@@ -921,7 +1137,7 @@ export interface PluginTreeView {
   pluginId: string;
   viewId: string;
   title: string;
-  icon?: string;
+  icon?: IconName;
   location: 'sidebar' | 'panel';
 }
 
@@ -983,7 +1199,7 @@ export interface PluginMessageRenderer {
 export interface PluginEventPayload {
   type: 'plugin-activated' | 'plugin-deactivated' | 'plugin-error' | 'contribution-updated';
   pluginId: string;
-  data?: unknown;
+  data?: JsonValue;
 }
 
 /** Registered interest in an agent event. */
@@ -997,8 +1213,8 @@ export interface SerialisedAgentEvent {
   name: string;
   toolName?: string;
   toolCallId?: string;
-  input?: Record<string, unknown>;
-  result?: unknown;
-  message?: unknown;
+  input?: Record<string, JsonValue>;
+  result?: JsonValue;
+  message?: JsonValue;
   prompt?: string;
 }
