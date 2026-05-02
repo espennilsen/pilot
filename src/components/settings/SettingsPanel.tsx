@@ -1,4 +1,5 @@
 import { useUIStore } from '../../stores/ui-store';
+import { usePluginStore } from '../../stores/plugin-store';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   X, Settings, FolderCog, Puzzle, BookOpen, Terminal, Keyboard,
@@ -19,6 +20,7 @@ import { DeveloperSettings } from './sections/DeveloperSettings';
 import { SystemPromptSettings } from './sections/SystemPromptSettings';
 import { McpSettings } from './sections/McpSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
+import PluginSettingsView from '../plugins/PluginSettingsView';
 
 const TABS = [
   { id: 'general' as const, label: 'General', icon: Settings },
@@ -38,6 +40,16 @@ const TABS = [
 
 export default function SettingsPanel() {
   const { settingsOpen, settingsTab, closeSettings, setSettingsTab } = useUIStore();
+  const { installedPlugins } = usePluginStore();
+  const pluginTabs = installedPlugins
+    .filter(p => p.manifest.permissions.includes('ui:settings'))
+    .map(p => ({
+      id: `plugin:${p.id}`,
+      label: p.name,
+      icon: Puzzle,
+    }));
+
+  const allTabs = [...TABS, ...pluginTabs];
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -125,7 +137,7 @@ export default function SettingsPanel() {
           <div className="px-4 py-3 mb-1">
             <h2 className="text-sm font-semibold text-text-primary">Settings</h2>
           </div>
-          {TABS.map((tab) => {
+          {allTabs.map((tab) => {
             const Icon = tab.icon;
             const active = settingsTab === tab.id;
             return (
@@ -178,6 +190,9 @@ export default function SettingsPanel() {
             {settingsTab === 'skills' && <SkillsSettings />}
             {settingsTab === 'mcp' && <McpSettings />}
             {settingsTab === 'developer' && <DeveloperSettings />}
+            {settingsTab && settingsTab.startsWith('plugin:') && (
+              <PluginSettingsView pluginId={settingsTab.slice(7)} />
+            )}
           </div>
         </div>
 
