@@ -19,6 +19,7 @@ import { useProjectStore } from './stores/project-store';
 import { useSessionStore } from './stores/session-store';
 import { useAppSettingsStore } from './stores/app-settings-store';
 import { useDevCommandStore } from './stores/dev-command-store';
+import { usePluginStore } from './stores/plugin-store';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcut';
 import { useDefaultCommands } from './hooks/useDefaultCommands';
 import { useSandboxEvents } from './hooks/useSandboxEvents';
@@ -52,6 +53,12 @@ function App() {
   // Load app settings (developer mode, keybinds, etc.) from disk on startup
   useEffect(() => {
     useAppSettingsStore.getState().load();
+  }, []);
+
+  // Start plugin event listeners
+  useEffect(() => {
+    const stop = usePluginStore.getState().startListening();
+    return stop;
   }, []);
 
   // Guard against concurrent in-flight session opens
