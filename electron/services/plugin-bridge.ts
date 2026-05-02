@@ -83,14 +83,26 @@ export class PluginBridge extends EventEmitter {
   // ─── Lifecycle ─────────────────────────────────────────────────────
 
   /** Start the Extension Host child process. */
-  start(): void {
+  start(debug?: boolean): void {
     const hostScript = join(__dirname, 'extension-host.js');
     // Compile extension-host.ts → extension-host.js happens at build time (electron-vite)
     // The .js file lives next to the compiled services
 
+    const env: Record<string, string> = {
+      ...process.env,
+      PILOT_PLUGIN_MODE: '1',
+    };
+
+    if (debug) {
+      env.PILOT_PLUGIN_DEBUG = '1';
+    }
+
+    const execArgv = debug ? ['--inspect=9229'] : [];
+
     this.childProcess = fork(hostScript, [], {
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-      env: { ...process.env, PILOT_PLUGIN_MODE: '1' },
+      env,
+      execArgv,
     });
 
     this.childProcess.stdout?.on('data', (data: Buffer) => {

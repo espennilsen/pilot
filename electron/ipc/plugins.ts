@@ -3,6 +3,8 @@ import { IPC } from '../../shared/ipc';
 import type { PluginBridge } from '../services/plugin-bridge';
 import type { PluginInstaller } from '../services/plugin-installer';
 import type { InstalledPlugin, PluginInstallResult } from '../../shared/types';
+import { scaffoldPlugin } from '../services/plugin-scaffolder';
+import { pluginDevMode } from '../services/plugin-dev-mode';
 
 export function registerPluginsIpc(
   pluginBridge: PluginBridge,
@@ -92,6 +94,30 @@ export function registerPluginsIpc(
       // This will be implemented with the full approval flow
       // For now, just acknowledge
       return { ok: true };
+    }
+  );
+
+  // Scaffold a new plugin
+  ipcMain.handle(
+    IPC.PLUGIN_INIT,
+    async (_event, name: string, targetDir: string, description?: string) => {
+      return scaffoldPlugin(name, targetDir, description);
+    }
+  );
+
+  // Start plugin dev mode (hot-reload)
+  ipcMain.handle(
+    IPC.PLUGIN_DEV_START,
+    async (_event, pluginId: string, pluginPath: string) => {
+      pluginDevMode.startWatching(pluginId, pluginPath);
+    }
+  );
+
+  // Stop plugin dev mode
+  ipcMain.handle(
+    IPC.PLUGIN_DEV_STOP,
+    async (_event, pluginId: string) => {
+      pluginDevMode.stopWatching(pluginId);
     }
   );
 }

@@ -7,6 +7,20 @@
 
 import { createJiti } from 'jiti';
 
+// Check for debug mode
+const debugMode = process.env.PILOT_PLUGIN_DEBUG === '1';
+
+if (debugMode) {
+  console.log('[ExtensionHost] Debug mode enabled — attach inspector to this process');
+  try {
+    const inspector = require('node:inspector');
+    inspector.open(9229, '0.0.0.0', true);
+    console.log('[ExtensionHost] Inspector listening on port 9229');
+  } catch (err) {
+    console.error('[ExtensionHost] Failed to start inspector:', err);
+  }
+}
+
 // ─── JSON-RPC Types ──────────────────────────────────────────────────
 
 interface RpcRequest {

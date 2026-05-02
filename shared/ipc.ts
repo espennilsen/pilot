@@ -323,4 +323,7 @@ export const IPC = {
   PLUGIN_AGENT_EVENT_REQUEST: 'plugin:agent-event-request',  // PluginBridge → Extension Host, response expected
   PLUGIN_CONTRIBUTION_UPDATED: 'plugin:contribution-updated', // main → renderer push
   PLUGIN_APPROVE_AGENT_CAPABILITY: 'plugin:approve-agent-capability',
+  PLUGIN_INIT: 'plugin:init',
+  PLUGIN_DEV_START: 'plugin:dev-start',
+  PLUGIN_DEV_STOP: 'plugin:dev-stop',
 } as const;

@@ -36,6 +36,7 @@ import { registerOllamaIpc } from '../ipc/ollama';
 import { McpManager } from '../services/mcp-manager';
 import { pluginBridge, PluginBridge } from '../services/plugin-bridge';
 import { PluginInstaller } from '../services/plugin-installer';
+import { pluginDevMode } from '../services/plugin-dev-mode';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
 import { CompanionAuth } from '../services/companion-auth';
@@ -510,8 +511,11 @@ app.whenReady().then(async () => {
   pluginInstaller = new PluginInstaller();
   registerPluginsIpc(pluginBridge, pluginInstaller);
 
+  // Check for --plugin-debug flag
+  const debugPlugins = process.argv.includes('--plugin-debug');
+
   // Start the Extension Host
-  pluginBridge.start();
+  pluginBridge.start(debugPlugins);
 
   // Activate installed plugins that are enabled
   const installedPlugins = pluginInstaller.listPlugins();
@@ -670,5 +674,6 @@ app.on('will-quit', () => {
   companionRemote?.dispose();
   companionBridge.shutdown();
   pluginBridge.stop();
+  pluginDevMode.stopAll();
   shutdownLogger();
 });
