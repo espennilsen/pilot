@@ -324,6 +324,9 @@ app.whenReady().then(async () => {
   sessionManager.mcpManager = mcpManager;
   terminalService = mainWindow ? new TerminalService(mainWindow) : null;
 
+  // Wire plugin system to session manager
+  pluginBridge.setSessionManager(sessionManager);
+
   // Initialize Ollama service (registers models in the ModelRegistry if enabled)
   ollamaService = new OllamaService();
   ollamaService.init(sessionManager.getModelRegistry());

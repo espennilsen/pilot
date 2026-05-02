@@ -84,4 +84,14 @@ export function registerPluginsIpc(
       return pluginBridge.executeCommand(commandId, args);
     }
   );
+
+  // Approve/deny agent capability request
+  ipcMain.handle(
+    IPC.PLUGIN_APPROVE_AGENT_CAPABILITY,
+    async (_event, approvalId: string, approved: boolean) => {
+      // This will be implemented with the full approval flow
+      // For now, just acknowledge
+      return { ok: true };
+    }
+  );
 }

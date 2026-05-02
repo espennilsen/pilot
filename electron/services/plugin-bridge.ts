@@ -71,6 +71,14 @@ export class PluginBridge extends EventEmitter {
   private nextRequestId = 1;
   private buffer = '';
   private installedPlugins: InstalledPlugin[] = [];
+  private sessionManager: any = null;
+  private pluginSkills = new Map<string, Array<{ skillId: string; content: string }>>();
+  private pendingApprovals = new Map<string, {
+    pluginId: string;
+    pluginName: string;
+    requestedCapabilities: Array<{ type: 'tool' | 'skill'; name: string; description?: string }>;
+    resolve: (approved: boolean) => void;
+  }>();
 
   // ─── Lifecycle ─────────────────────────────────────────────────────
 
@@ -158,6 +166,39 @@ export class PluginBridge extends EventEmitter {
 
   setInstalledPlugins(plugins: InstalledPlugin[]): void {
     this.installedPlugins = plugins;
+  }
+
+  /** Set the PilotSessionManager reference (called during wiring). */
+  setSessionManager(sm: any): void {
+    this.sessionManager = sm;
+  }
+
+  /** Get all plugin skills as a concatenated string for prompt injection. */
+  getAllSkills(): string {
+    const parts: string[] = [];
+    for (const skills of this.pluginSkills.values()) {
+      for (const skill of skills) {
+        parts.push(skill.content);
+      }
+    }
+    return parts.join('\n\n');
+  }
+
+  /** Register a skill from a plugin. */
+  registerSkill(pluginId: string, skillId: string, content: string): void {
+    if (!this.pluginSkills.has(pluginId)) {
+      this.pluginSkills.set(pluginId, []);
+    }
+    this.pluginSkills.get(pluginId)!.push({ skillId, content });
+  }
+
+  /** Remove a skill. */
+  removeSkill(pluginId: string, skillId: string): void {
+    const skills = this.pluginSkills.get(pluginId);
+    if (skills) {
+      const idx = skills.findIndex(s => s.skillId === skillId);
+      if (idx >= 0) skills.splice(idx, 1);
+    }
   }
 
   // ─── Permission Check ──────────────────────────────────────────────
@@ -516,12 +557,28 @@ export class PluginBridge extends EventEmitter {
       }
 
       case 'agent/registerTool': {
-        const p = params as { pluginId: string; toolName: string };
+        const p = params as { pluginId: string; toolName: string; toolDefinition: any; projectPath: string };
         if (!this.checkPermission(p.pluginId, 'agent:tools')) {
-          this.sendResponse(id!, { error: { code: -32001, message: 'Permission denied: agent:tools required' } });
+          this.sendResponse(id!, {
+            error: { code: -32001, message: 'Permission denied: agent:tools required' }
+          });
           return;
         }
-        // Tool registration is handled in Phase 3
+        // Tool registration requires user approval - handled in Phase 3 approval flow
+        // For now, acknowledge with flag that approval is needed
+        this.sendResponse(id!, { result: { ok: true, requiresApproval: true } });
+        break;
+      }
+
+      case 'agent/registerSkill': {
+        const p = params as { pluginId: string; skillId: string; content: string };
+        if (!this.checkPermission(p.pluginId, 'agent:skills')) {
+          this.sendResponse(id!, {
+            error: { code: -32001, message: 'Permission denied: agent:skills required' }
+          });
+          return;
+        }
+        this.registerSkill(p.pluginId, p.skillId, p.content);
         this.sendResponse(id!, { result: { ok: true } });
         break;
       }
