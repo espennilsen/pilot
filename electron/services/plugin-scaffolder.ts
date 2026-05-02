@@ -82,7 +82,7 @@ export function scaffoldPlugin(
   description?: string,
 ): { success: boolean; path?: string; error?: string } {
   const safeName = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-  const pluginDir = resolve(targetDir, safeName);
+  const pluginDir = normalizePath(resolve(targetDir, safeName));
 
   if (existsSync(pluginDir)) {
     return { success: false, error: `Directory already exists: ${pluginDir}` };
