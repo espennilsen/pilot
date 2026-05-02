@@ -59,6 +59,11 @@ export default function FindReplacePanel({
   const [showReplace, setShowReplace] = useState(replaceMode);
   const findInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync showReplace with replaceMode prop
+  useEffect(() => {
+    setShowReplace(replaceMode);
+  }, [replaceMode]);
+
   const matches = useMemo(
     () => findMatches(content, query, caseSensitive, regexMode),
     [content, query, caseSensitive, regexMode]
