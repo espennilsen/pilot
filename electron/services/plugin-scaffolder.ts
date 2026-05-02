@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { os } from 'node:process';
 import { join, resolve } from 'path';
+import { normalizePath } from '../utils/paths';
 
 const PACKAGE_JSON_TEMPLATE = `{
   "name": "{{NAME}}",
@@ -113,11 +115,12 @@ export function scaffoldPlugin(
       2,
     );
 
-    const tsconfig = TSCONFIG_TEMPLATE;
+    const tsconfig = TSCONFIG_TEMPLATE.replace(/\n/g, os.EOL);
 
     const pluginSrc = PLUGIN_SRC_TEMPLATE
       .replace(/{{NAME}}/g, name)
-      .replace(/{{SAFE_NAME}}/g, safeName);
+      .replace(/{{SAFE_NAME}}/g, safeName)
+      .replace(/\n/g, os.EOL);
 
     writeFileSync(join(pluginDir, 'package.json'), packageJson);
     writeFileSync(join(pluginDir, 'tsconfig.json'), tsconfig);
