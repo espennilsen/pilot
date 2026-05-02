@@ -28,7 +28,14 @@ export function registerPluginsIpc(
         const plugins = pluginInstaller.listPlugins();
         const installed = plugins.find(p => p.id === result.id);
         if (installed) {
-          pluginBridge.registerPlugin(installed);
+          try {
+            await pluginBridge.registerPlugin(installed);
+          } catch (err) {
+            return {
+              success: false,
+              error: err instanceof Error ? err.message : 'Failed to activate plugin',
+            };
+          }
         }
       }
 
@@ -51,10 +58,15 @@ export function registerPluginsIpc(
       const plugins = pluginInstaller.listPlugins();
       const plugin = plugins.find(p => p.id === pluginId);
       if (plugin) {
-        if (plugin.enabled) {
-          pluginBridge.registerPlugin(plugin);
-        } else {
-          pluginBridge.unregisterPlugin(pluginId);
+        try {
+          if (plugin.enabled) {
+            await pluginBridge.registerPlugin(plugin);
+          } else {
+            await pluginBridge.unregisterPlugin(pluginId);
+          }
+        } catch (err) {
+          console.error('[PLUGIN_TOGGLE] Failed:', err);
+          return false;
         }
       }
     }
@@ -91,8 +103,11 @@ export function registerPluginsIpc(
   ipcMain.handle(
     IPC.PLUGIN_APPROVE_AGENT_CAPABILITY,
     async (_event, approvalId: string, approved: boolean) => {
-      // This will be implemented with the full approval flow
-      // For now, just acknowledge
+      const pending = pluginBridge.getPendingApproval(approvalId);
+      if (!pending) {
+        return { ok: false, error: 'Invalid approval ID' };
+      }
+      pluginBridge.resolveApproval(approvalId, approved);
       return { ok: true };
     }
   );

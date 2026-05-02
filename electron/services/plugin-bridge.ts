@@ -71,6 +71,7 @@ export class PluginBridge extends EventEmitter {
   private nextRequestId = 1;
   private buffer = '';
   private installedPlugins: InstalledPlugin[] = [];
+  private isStopping = false;
   private sessionManager: any = null;
   private pluginSkills = new Map<string, Array<{ skillId: string; content: string }>>();
   private pendingApprovals = new Map<string, {
@@ -84,6 +85,7 @@ export class PluginBridge extends EventEmitter {
 
   /** Start the Extension Host child process. */
   start(debug?: boolean): void {
+    this.isStopping = false;
     const hostScript = join(__dirname, 'extension-host.js');
     // Compile extension-host.ts → extension-host.js happens at build time (electron-vite)
     // The .js file lives next to the compiled services
@@ -115,9 +117,9 @@ export class PluginBridge extends EventEmitter {
 
     this.childProcess.on('exit', (code) => {
       console.warn(`[PluginBridge] Extension Host exited with code ${code}`);
-      // Auto-restart after a short delay
+      // Auto-restart after a short delay (only if not intentionally stopping)
       setTimeout(() => {
-        if (this.plugins.size > 0) {
+        if (!this.isStopping && this.plugins.size > 0) {
           console.log('[PluginBridge] Restarting Extension Host...');
           this.start();
           this.reloadAllPlugins();
@@ -130,6 +132,7 @@ export class PluginBridge extends EventEmitter {
 
   /** Gracefully stop the Extension Host. */
   stop(): void {
+    this.isStopping = true;
     if (this.childProcess) {
       this.childProcess.kill();
       this.childProcess = null;
@@ -194,6 +197,12 @@ export class PluginBridge extends EventEmitter {
       }
     }
     return parts.join('\n\n');
+  }
+
+  /** Get skills for a specific project (scope by projectPath). */
+  getSkillsForProject(projectPath: string | null): string {
+    // For now, return all skills - future implementation will filter by project scope
+    return this.getAllSkills();
   }
 
   /** Register a skill from a plugin. */
@@ -479,8 +488,10 @@ export class PluginBridge extends EventEmitter {
     switch (method) {
       case 'contribution/registerView': {
         const p = params as PluginTreeView & { pluginId: string };
-        if (!this.checkPermission(p.pluginId, 'ui:sidebar') && !this.checkPermission(p.pluginId, 'ui:panel')) {
-          this.sendResponse(id!, { error: { code: -32001, message: 'Permission denied: ui:sidebar or ui:panel required' } });
+        // Check permission based on view location
+        const requiredPerm = p.location === 'sidebar' ? 'ui:sidebar' : 'ui:panel';
+        if (!this.checkPermission(p.pluginId, requiredPerm)) {
+          this.sendResponse(id!, { error: { code: -32001, message: `Permission denied: ${requiredPerm} required` } });
           return;
         }
         this.addTreeView({

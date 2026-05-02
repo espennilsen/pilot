@@ -228,27 +228,31 @@ function createPluginAPI(pluginId: string): PluginAPI {
         // Phase 3 implementation
       },
       async registerSkill(content, options) {
-        // Phase 3 implementation
+        const skillId = options?.id as string || `skill-${Date.now()}`;
+        await sendRequest('agent/registerSkill', { pluginId, skillId, content });
       },
       async removeSkill(id) {
-        // Phase 3 implementation
+        await sendRequest('agent/removeSkill', { pluginId, id });
       },
       on(event, handler) {
         sendRequest('agent/subscribeEvent', {
           pluginId,
           event,
         }).catch(() => {});
-        // Store the handler locally. When an agent event arrives, route it to the handler.
-        // The routing is done in handleIncomingRequest below.
+        // Store the handler locally, keyed by pluginId and event
         if (!eventHandlers.has(event)) {
           eventHandlers.set(event, new Map());
         }
-        eventHandlers.get(event)!.set(handler, handler);
+        const pluginHandlers = eventHandlers.get(event)!;
+        if (!pluginHandlers.has(pluginId)) {
+          pluginHandlers.set(pluginId, new Map());
+        }
+        pluginHandlers.get(pluginId)!.set(handler, handler);
       },
       off(event, handler) {
-        const handlers = eventHandlers.get(event);
-        if (handlers) {
-          handlers.delete(handler);
+        const pluginHandlers = eventHandlers.get(event)?.get(pluginId);
+        if (pluginHandlers) {
+          pluginHandlers.delete(handler);
         }
       },
     },
@@ -274,7 +278,7 @@ function createPluginAPI(pluginId: string): PluginAPI {
 
 // ─── Event Handler Registry ──────────────────────────────────────────
 
-const eventHandlers = new Map<string, Map<Function, Function>>();
+const eventHandlers = new Map<string, Map<string, Map<Function, Function>>>(); // event -> pluginId -> handler map
 
 // ─── Message Processing ──────────────────────────────────────────────
 
@@ -348,14 +352,14 @@ async function handleIncomingRequest(request: RpcRequest): Promise<void> {
           event: { name: string; [key: string]: unknown };
         };
         const { name, ...eventData } = event;
-        const handlers = eventHandlers.get(name);
-        if (handlers && handlers.size > 0) {
+        // Route event only to handlers registered by this specific plugin
+        const pluginHandlers = eventHandlers.get(name)?.get(pluginId);
+        if (pluginHandlers && pluginHandlers.size > 0) {
           const results = [];
-          for (const handler of handlers.values()) {
+          for (const handler of pluginHandlers.values()) {
             const result = await handler(eventData);
             results.push(result);
           }
-          // Merge results: return the first non-undefined result, or the last
           const merged = results.find(r => r !== undefined) ?? results[results.length - 1];
           sendResponse(id!, { result: merged ?? { handled: false } });
         } else {
