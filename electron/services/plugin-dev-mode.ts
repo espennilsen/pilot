@@ -23,7 +23,7 @@ export class PluginDevMode {
     this.pluginPaths.set(pluginId, pluginPath);
 
     const watcher = watch(pluginPath, {
-      ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/*.js'],
+      ignored: ['**/node_modules/**', '**/.git/**'],
       ignoreInitial: true,
       persistent: true,
     });

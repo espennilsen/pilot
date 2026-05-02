@@ -173,9 +173,12 @@ export class PluginBridge extends EventEmitter {
   }
 
   /** Unregister a plugin and tell the Extension Host to deactivate. */
-  unregisterPlugin(pluginId: string): void {
+  async unregisterPlugin(pluginId: string): Promise<void> {
+    // Remove plugin skills first
+    this.pluginSkills.delete(pluginId);
+    
     this.plugins.delete(pluginId);
-    this.sendRequest('plugin/deactivate', { pluginId }).catch(() => {});
+    await this.sendRequest('plugin/deactivate', { pluginId }).catch(() => {});
     this.broadcastPluginEvent('plugin-deactivated', pluginId);
   }
 
@@ -658,6 +661,9 @@ export class PluginBridge extends EventEmitter {
   // ─── Internal Helpers ──────────────────────────────────────────────
 
   private reloadAllPlugins(): void {
+    // Clear all plugin skills before reloading to prevent duplicates
+    this.pluginSkills.clear();
+    
     const plugins = Array.from(this.plugins.keys());
     this.plugins.clear();
     for (const pluginId of plugins) {
