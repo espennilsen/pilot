@@ -233,8 +233,11 @@ export class PilotSessionManager {
 
     // Listen for the first streaming event to confirm the model responded
     const onFirstEvent = () => { receivedFirstEvent = true; };
-    session.on('text', onFirstEvent);
-    session.on('thinking', onFirstEvent);
+    const unsubText = session.subscribe((event: AgentSessionEvent) => {
+      if (event.type === 'text' || event.type === 'thinking') {
+        onFirstEvent();
+      }
+    });
 
     // Timeout ID for cleanup
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -255,6 +258,8 @@ export class PilotSessionManager {
 
       // Clear timeout if prompt won the race
       if (timeoutId !== null) clearTimeout(timeoutId);
+      // Clean up event subscription
+      unsubText();
 
       if (result === 'timeout') {
         const timeoutSec = actualTimeoutMs / 1000;
@@ -294,8 +299,7 @@ export class PilotSessionManager {
       log.error(`Prompt failed on tab ${tabId}: ${err}`);
       throw err;
     } finally {
-      session.off('text', onFirstEvent);
-      session.off('thinking', onFirstEvent);
+      // Cleanup handled inline after timeout or in catch
     }
   }
 
