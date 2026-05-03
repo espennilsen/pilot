@@ -606,13 +606,23 @@ async forwardEvent(name: string, payload: unknown): Promise<EventResult> {
 
 ## 6. Security Model
 
-### 6.1 Plugin Sandboxing
+### 6.1 Plugin Isolation
 
-- Plugins run in a forked Node.js child process with no direct filesystem access
-- All system calls go through the JSON-RPC bridge → main process → gated by permissions
-- The Extension Host has no `require('electron')` access — it's a plain Node.js process
-- Plugins cannot access `window`, `document`, or any renderer APIs
-- Webview views run in `<iframe sandbox>` with no Node.js integration
+**Important:** Plugins run in a forked Node.js child process (`child_process.fork()`), which is **not a sandbox** in the traditional sense. The forked process has full access to Node.js built-in modules (`fs`, `child_process`, `net`, etc.) and inherits `process.env` from the parent.
+
+Security is enforced at the **application level**, not the runtime level:
+
+- **Bridge-based permission checks:** All plugin capabilities flow through the JSON-RPC bridge → main process → gated by declared permissions
+- **No Electron access:** The Extension Host is a plain Node.js process with no access to Electron APIs
+- **No renderer access:** Plugins cannot access `window`, `document`, or any browser/renderer APIs
+- **Project jail:** File operations initiated through bridge APIs are validated against the project root (see `sandboxed-tools.ts`)
+- **Webview isolation:** Webview views run in `<iframe sandbox>` with no Node.js integration
+
+**Trade-off:** This model trusts plugin authors not to bypass the bridge. For stronger isolation, future enhancements could:
+- Use Node.js 21+ `--permissions` flag (experimental)
+- Run plugins in isolated VM contexts
+- Use OS-level sandboxing (e.g., Firecracker, gVisor)
+- Require signed plugins with verified publishers
 
 ### 6.2 Permission Enforcement
 
