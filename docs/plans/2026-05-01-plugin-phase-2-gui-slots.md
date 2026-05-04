@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Add Plugin Views to Sidebar
+## Task 1: Add Plugin Views to Sidebar
 
 **Files:**
 - Modify: `src/components/sidebar/Sidebar.tsx`

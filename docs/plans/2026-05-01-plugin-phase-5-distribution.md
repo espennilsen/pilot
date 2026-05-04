@@ -54,7 +54,7 @@ Create `resources/plugin-catalog.json`:
   "lastUpdated": "2026-05-01T12:00:00Z",
   "plugins": [
     {
-      "id": "github-dashboard",
+      "id": "@pilot-plugins/github-dashboard",
       "name": "GitHub Dashboard",
       "description": "View PR status, CI runs, and repo activity directly in your Pilot sidebar. One-click open PRs and review changes.",
       "version": "1.0.0",
@@ -67,7 +67,7 @@ Create `resources/plugin-catalog.json`:
       "minPilotVersion": "1.0.0"
     },
     {
-      "id": "a2a",
+      "id": "@pilot-plugins/a2a",
       "name": "A2A Support",
       "description": "Connect to remote A2A agents. Discover, chat with, and delegate tasks to other AI agents across your network.",
       "version": "0.5.0",
@@ -140,7 +140,8 @@ import { PILOT_APP_DIR } from './pilot-paths';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export interface CatalogPlugin {
+export // CatalogPlugin type moved to shared/types.ts for cross-process usage
+interface CatalogPlugin {
   id: string;
   name: string;
   description: string;

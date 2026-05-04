@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Add Generic Tool Wrapper to SandboxedTools
+## Task 1: Add Generic Tool Wrapper to SandboxedTools
 
 **Files:**
 - Modify: `electron/services/sandboxed-tools.ts`
