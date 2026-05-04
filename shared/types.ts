@@ -1218,3 +1218,31 @@ export interface SerialisedAgentEvent {
   message?: JsonValue;
   prompt?: string;
 }
+
+// ─── Plugin Catalog (Phase 5 Distribution) ──────────────────────────
+
+/** A plugin entry in the plugin catalog/browser. */
+export interface CatalogPlugin {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  homepage?: string;
+  repository?: string;
+  /** Install string — "npm:package" or "git:repo" */
+  install: string;
+  tags: string[];
+  permissions: string[];
+  minPilotVersion: string;
+  rating?: number;
+  downloads?: number;
+  icon?: string;
+}
+
+/** Plugin catalog response from remote or bundled catalog. */
+export interface PluginCatalog {
+  version: number;
+  lastUpdated: string;
+  plugins: CatalogPlugin[];
+}
