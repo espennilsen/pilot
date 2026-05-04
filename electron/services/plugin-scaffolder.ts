@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { os } from 'node:process';
+import os from 'node:os';
 import { join, resolve } from 'path';
 import { normalizePath } from '../utils/paths';
 
