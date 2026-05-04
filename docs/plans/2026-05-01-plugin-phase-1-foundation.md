@@ -1502,12 +1502,19 @@ export class PluginInstaller {
         rmSync(pluginDir, { recursive: true, force: true });
       }
 
-      // Symlink or copy the local directory
-      // For development, we symlink so changes are immediate
-      await execFileAsync('ln', ['-s', localPath, pluginDir], { timeout: 5_000 }).catch(async () => {
-        // If symlink fails (Windows), copy instead
-        await execFileAsync('cp', ['-r', localPath, pluginDir], { timeout: 10_000 });
-      });
+      // Cross-platform installation using fs.promises (no POSIX shell dependencies)
+      // For development on POSIX, symlink so changes are immediate
+      if (process.platform !== 'win32') {
+        try {
+          await fs.promises.symlink(localPath, pluginDir, 'dir');
+        } catch (err) {
+          // Fallback to copy if symlink fails
+          await fs.promises.cp(localPath, pluginDir, { recursive: true });
+        }
+      } else {
+        // Windows: use junction or copy
+        await fs.promises.cp(localPath, pluginDir, { recursive: true });
+      }
 
       return this.registerInstalledPlugin(pluginDir, localPath, 'local');
     } catch (err) {
