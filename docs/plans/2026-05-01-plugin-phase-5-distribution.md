@@ -329,7 +329,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { usePluginStore } from '../../stores/plugin-store';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
-import type { CatalogPlugin } from '../../../../electron/services/plugin-catalog';
+import type { CatalogPlugin } from '../../../shared/types'; // Moved to shared types
 import { Search, Download, Check, Star, ExternalLink } from 'lucide-react';
 
 export default function PluginBrowser() {
