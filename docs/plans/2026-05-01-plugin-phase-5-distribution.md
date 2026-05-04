@@ -140,8 +140,8 @@ import { PILOT_APP_DIR } from './pilot-paths';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export // CatalogPlugin type moved to shared/types.ts for cross-process usage
-interface CatalogPlugin {
+export // CatalogPlugin and PluginCatalog types are defined in shared/types.ts
+// See import above
   id: string;
   name: string;
   description: string;
@@ -329,7 +329,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { usePluginStore } from '../../stores/plugin-store';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
-import type { CatalogPlugin } from '../../../shared/types'; // Moved to shared types
+import type { CatalogPlugin, PluginCatalog } from '../../../shared/types'; // Defined in shared/types.ts
 import { Search, Download, Check, Star, ExternalLink } from 'lucide-react';
 
 export default function PluginBrowser() {
