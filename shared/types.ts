@@ -1246,3 +1246,12 @@ export interface PluginCatalog {
   lastUpdated: string;
   plugins: CatalogPlugin[];
 }
+
+// ─── Plugin Scaffolding ───────────────────────────────────────────
+
+/** Result of plugin scaffolding operation. */
+export interface ScaffoldResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}

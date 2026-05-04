@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import type { ScaffoldResult } from '../../shared/types';
 import os from 'node:os';
 import { join, resolve } from 'path';
 import { normalizePath } from '../utils/paths';
@@ -80,7 +81,7 @@ export function scaffoldPlugin(
   name: string,
   targetDir: string,
   description?: string,
-): { success: boolean; path?: string; error?: string } {
+): ScaffoldResult {
   const safeName = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
   const pluginDir = normalizePath(resolve(targetDir, safeName));
 
