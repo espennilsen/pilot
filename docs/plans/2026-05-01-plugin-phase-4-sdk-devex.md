@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Create the @pilot/plugin-sdk npm Package
+## Task 1: Create the @pilot/plugin-sdk npm Package
 
 **Files:**
 - Create: `packages/plugin-sdk/package.json`
