@@ -197,7 +197,7 @@ export class PluginCatalogService {
 
     // Try loading bundled catalog (always available)
     try {
-      const bundledPath = join(app.getAppPath(), 'resources', 'plugin-catalog.json');
+      const bundledPath = join(process.resourcesPath, 'plugin-catalog.json');
       if (existsSync(bundledPath)) {
         this.catalog = JSON.parse(readFileSync(bundledPath, 'utf-8'));
       }
