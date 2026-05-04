@@ -729,7 +729,7 @@ npm run build
 
 ## Plugin Structure
 
-```
+```text
 my-awesome-plugin/
 ├── package.json       # Plugin manifest + dependencies
 ├── tsconfig.json      # TypeScript config
