@@ -88,7 +88,7 @@ export class PluginInstaller {
 
     try {
       // npm install into the plugins directory
-      await execFileAsync('npm', ['install', '--prefix', PILOT_PLUGINS_DIR, '--omit=dev', '--no-save', packageSpec], {
+      await execFileAsync('npm', ['install', '--prefix', PILOT_PLUGINS_DIR, '--omit=dev', '--no-save', '--ignore-scripts', packageSpec], {
         timeout: 120_000,
         env: { ...process.env },
       });
@@ -130,7 +130,7 @@ export class PluginInstaller {
 
       // Run npm install in the cloned repo if it has dependencies
       if (existsSync(join(pluginDir, 'package.json'))) {
-        await execFileAsync('npm', ['install', '--omit=dev'], {
+        await execFileAsync('npm', ['install', '--omit=dev', '--ignore-scripts'], {
           cwd: pluginDir,
           timeout: 60_000,
         });
