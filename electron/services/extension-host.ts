@@ -98,7 +98,7 @@ function sendRequest(method: string, params?: Record<string, unknown>): Promise<
     };
 
     pendingRequests.set(id, { resolve, reject });
-    process.stdout.write(JSON.stringify(request) + '\n');
+    process.send(JSON.stringify(request));
 
     setTimeout(() => {
       if (pendingRequests.has(id)) {
@@ -483,13 +483,13 @@ function sendResponse(id: string | number | undefined, response: Omit<RpcRespons
     id,
     ...response,
   };
-  process.stdout.write(JSON.stringify(rpcResponse) + '\n');
+  process.send(JSON.stringify(rpcResponse));
 }
 
 // ─── Startup ─────────────────────────────────────────────────────────
 
 // Signal that the Extension Host is ready
-process.stdout.write(JSON.stringify({
+process.send(JSON.stringify({
   jsonrpc: '2.0',
   method: 'host/ready',
 }) + '\n');

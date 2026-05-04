@@ -107,12 +107,20 @@ export class PluginBridge extends EventEmitter {
       execArgv,
     });
 
+    // Use fork IPC channel for JSON-RPC messages (not stdout)
+    // This prevents console.log from plugins breaking the RPC protocol
+    this.childProcess.on('message', (msg: string) => {
+      this.handleData(msg.toString('utf-8'));
+    });
+
+    // Stdout/stderr are for logs only - plugins can console.log freely
     this.childProcess.stdout?.on('data', (data: Buffer) => {
-      this.handleData(data.toString('utf-8'));
+      // Pass through stdout as-is for plugin console.log output
+      process.stdout.write(data);
     });
 
     this.childProcess.stderr?.on('data', (data: Buffer) => {
-      console.error(`[PluginBridge] Extension Host stderr: ${data.toString('utf-8')}`);
+      console.error(`[PluginBridge] Extension Host: ${data.toString('utf-8')}`);
     });
 
     this.childProcess.on('exit', (code) => {
