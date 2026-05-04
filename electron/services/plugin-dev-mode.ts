@@ -6,7 +6,6 @@ import type { InstalledPlugin } from '../../shared/types';
  * PluginDevMode — watches a plugin directory for changes and triggers
  * hot-reload by deactivating and reactivating the plugin in the Extension Host.
  */
-import type { InstalledPlugin } from '../../shared/types';
 
 export class PluginDevMode {
   private watchers = new Map<string, FSWatcher>();
