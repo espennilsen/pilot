@@ -33,7 +33,7 @@ function findTextMatches(container: HTMLElement, query: string, caseSensitive: b
   if (!query) return [];
   const flags = caseSensitive ? 'g' : 'gi';
   const regex = new RegExp(escapeRegex(query), flags);
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
   const matches: TextMatch[] = [];
   let node: Node | null;
   while ((node = walker.nextNode())) {
