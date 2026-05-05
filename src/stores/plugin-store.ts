@@ -106,7 +106,7 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
     });
   },
 
-  getViewChildren: async (viewId: string, elementId: string | null) => {
+  getViewChildren: async (viewId: string, elementId: string | null): Promise<unknown[]> => {
     return await invoke(IPC.PLUGIN_VIEW_GET_CHILDREN, viewId, elementId) as unknown[];
   },
 

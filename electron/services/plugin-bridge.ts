@@ -72,7 +72,7 @@ export class PluginBridge extends EventEmitter {
   private buffer = '';
   private installedPlugins: InstalledPlugin[] = [];
   private isStopping = false;
-  private sessionManager: import('./pi-session-manager').PilotSessionManager | null = null;
+  private sessionManager: any = null; // TODO: Type properly with PilotSessionManager
   private pluginSkills = new Map<string, Array<{ skillId: string; content: string }>>();
   private pendingApprovals = new Map<string, {
     pluginId: string;

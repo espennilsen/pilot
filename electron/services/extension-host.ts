@@ -298,10 +298,13 @@ function createPluginAPI(pluginId: string): PluginAPI {
     workspace: {
       projectPath: null as string | null,
       onDidChangeProject: (callback: (newPath: string | null) => void) => {
-        workspaceChangeCallbacks.set(callback, callback);
+        workspaceChangeCallbacks.get(pluginId)?.add(callback);
+        if (!workspaceChangeCallbacks.has(pluginId)) {
+          workspaceChangeCallbacks.set(pluginId, new Set());
+        }
         return {
           dispose: () => {
-            workspaceChangeCallbacks.delete(callback);
+            workspaceChangeCallbacks.get(pluginId)?.delete(callback);
           }
         };
       },
@@ -312,7 +315,7 @@ function createPluginAPI(pluginId: string): PluginAPI {
 // ─── Event Handler Registry ──────────────────────────────────────────
 
 const eventHandlers = new Map<string, Map<string, Map<Function, Function>>>(); // event -> pluginId -> handler map
-const workspaceChangeCallbacks = new Map<Function, Function>(); // callbacks for workspace.onDidChangeProject
+const workspaceChangeCallbacks = new Map<string, Set<(newPath: string | null) => void>>(); // pluginId -> callbacks
 
 // ─── Contribution Callback Registries ─────────────────────────────────
 
@@ -460,7 +463,8 @@ async function handleIncomingRequest(request: RpcRequest): Promise<void> {
           plugin.api.workspace.projectPath = projectPath;
         }
         // Notify all workspace change callbacks
-        for (const callback of workspaceChangeCallbacks.values()) {
+        for (const [pid, callbacks] of workspaceChangeCallbacks.entries()) {
+        for (const callback of callbacks) {
           try {
             callback(projectPath);
           } catch (err) {

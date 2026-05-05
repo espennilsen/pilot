@@ -113,7 +113,7 @@ export default function ContextPanel() {
               className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
               onClick={() => handleTabClick(view.viewId)}
             >
-              <Icon name={view.icon || 'Puzzle'} className="w-4 h-4" />
+              <Icon name={(view.icon || 'Puzzle') as IconName} className="w-4 h-4" />
             </button>
           </Tooltip>
         ))}
