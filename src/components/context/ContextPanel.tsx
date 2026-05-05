@@ -8,6 +8,7 @@ import { useTabStore } from '../../stores/tab-store';
 import { useSubagentStore } from '../../stores/subagent-store';
 import { usePluginStore } from '../../stores/plugin-store';
 import { Icon } from '../shared/Icon';
+import type { IconName } from '../../shared/types';
 import FileTree from './FileTree';
 import { StagedDiffQueue } from '../sandbox/StagedDiffQueue';
 import GitPanel from '../git/GitPanel';

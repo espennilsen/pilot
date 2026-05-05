@@ -51,14 +51,14 @@ interface ActivePlugin {
 
 interface PluginAPI {
   contributions: {
-    registerTreeView: (id: string, options: Record<string, unknown>) => void;
+    registerTreeView: (id: string, options: { title?: string; icon?: string; location?: 'sidebar' | 'panel'; getChildren?: (elementId: string | null) => Promise<unknown[]> }) => void;
     registerWebviewView: (id: string, options: Record<string, unknown>) => void;
-    createStatusBarItem: (id: string, options: Record<string, unknown>) => void;
+    createStatusBarItem: (id: string, options: { text?: string; tooltip?: string; alignment?: 'left' | 'right'; priority?: number; command?: Record<string, unknown> }) => void;
     registerContextMenu: (options: Record<string, unknown>) => void;
-    registerTabType: (id: string, options: Record<string, unknown>) => void;
-    registerMessageRenderer: (id: string, options: Record<string, unknown>) => void;
-    registerSettingsSection: (id: string, options: Record<string, unknown>) => void;
-    registerCommand: (id: string, options: Record<string, unknown>) => void;
+    registerTabType: (id: string, options: { label?: string; icon?: string }) => void;
+    registerMessageRenderer: (id: string, options: { matchToolName?: string; matchCustomType?: string }) => void;
+    registerSettingsSection: (id: string, options: { title?: string; icon?: string }) => void;
+    registerCommand: (id: string, options: { label?: string; keybinding?: string; execute?: (args?: unknown[]) => Promise<unknown> }) => void;
   };
   agent: {
     registerTool: (definition: Record<string, unknown>) => Promise<void>;
@@ -181,7 +181,11 @@ function createPluginAPI(pluginId: string): PluginAPI {
         viewCallbacks.get(pluginId)!.set(viewId, options.getChildren as (elementId: string | null) => Promise<unknown[]>);
       },
       registerWebviewView(id, options) {
-        // Phase 2 implementation
+        sendRequest('contribution/registerWebviewView', {
+          pluginId,
+          viewId: id,
+          title: options.title as string,
+        }).catch(() => {});
       },
       createStatusBarItem(id, options) {
         sendRequest('contribution/registerStatusBar', {
@@ -195,7 +199,12 @@ function createPluginAPI(pluginId: string): PluginAPI {
         }).catch(() => {});
       },
       registerContextMenu(options) {
-        // Phase 2 implementation
+        sendRequest('contribution/registerContextMenu', {
+          pluginId,
+          when: options.when as string,
+          group: options.group as string,
+          items: options.items,
+        }).catch(() => {});
       },
       registerTabType(id, options) {
         sendRequest('contribution/registerTabType', {

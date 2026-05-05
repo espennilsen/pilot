@@ -139,7 +139,7 @@ export class PluginInstaller {
 
       // Run npm install in the cloned repo if it has dependencies
       if (existsSync(join(pluginDir, 'package.json'))) {
-        await execFileAsync('npm', ['install', '--omit=dev', '--ignore-scripts'], {
+        await execFileAsync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit'], {
           cwd: pluginDir,
           timeout: 60_000,
         });

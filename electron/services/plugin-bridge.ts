@@ -72,7 +72,7 @@ export class PluginBridge extends EventEmitter {
   private buffer = '';
   private installedPlugins: InstalledPlugin[] = [];
   private isStopping = false;
-  private sessionManager: any = null;
+  private sessionManager: import('./pi-session-manager').PilotSessionManager | null = null;
   private pluginSkills = new Map<string, Array<{ skillId: string; content: string }>>();
   private pendingApprovals = new Map<string, {
     pluginId: string;
@@ -80,6 +80,20 @@ export class PluginBridge extends EventEmitter {
     requestedCapabilities: Array<{ type: 'tool' | 'skill'; name: string; description?: string }>;
     resolve: (approved: boolean) => void;
   }>();
+
+  /** Get a pending approval by ID. */
+  getPendingApproval(approvalId: string) {
+    return this.pendingApprovals.get(approvalId);
+  }
+
+  /** Resolve (approve/deny) a pending approval. */
+  resolveApproval(approvalId: string, approved: boolean): void {
+    const pending = this.pendingApprovals.get(approvalId);
+    if (pending) {
+      pending.resolve(approved);
+      this.pendingApprovals.delete(approvalId);
+    }
+  }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────
 
