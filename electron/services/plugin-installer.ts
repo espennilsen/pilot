@@ -75,8 +75,17 @@ export class PluginInstaller {
       return this.installFromNpm(source.slice(4));
     } else if (source.startsWith('git:')) {
       return this.installFromGit(source.slice(4));
-    } else if (source.startsWith('./') || source.startsWith('/') || source.startsWith('~')) {
-      return this.installFromLocal(resolve(source));
+    } else {
+      // Try local path (expand ~ and check if exists)
+      const expandedSource = expandHome(source);
+      const normalizedSource = normalizePath(expandedSource);
+      try {
+        if (existsSync(normalizedSource)) {
+          return this.installFromLocal(normalizedSource);
+        }
+      } catch {
+        // Fall through to npm
+      }
     } else {
       // Default: treat as npm package
       return this.installFromNpm(source);
