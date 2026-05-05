@@ -124,7 +124,11 @@ export function registerPluginsIpc(
   ipcMain.handle(
     IPC.PLUGIN_DEV_START,
     async (_event, pluginId: string, pluginPath: string) => {
-      pluginDevMode.startWatching(pluginId, pluginPath);
+      const plugins = pluginInstaller.listPlugins();
+      const plugin = plugins.find(p => p.id === pluginId);
+      if (plugin) {
+        pluginDevMode.startWatching(pluginId, pluginPath, plugin);
+      }
     }
   );
 

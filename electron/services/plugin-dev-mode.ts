@@ -17,7 +17,7 @@ export class PluginDevMode {
    * Start watching a plugin directory.
    * On file changes, deactivate then reactivate after a 300ms debounce.
    */
-  startWatching(pluginId: string, pluginPath: string, manifest?: InstalledPlugin): void {
+  startWatching(pluginId: string, pluginPath: string, manifest: InstalledPlugin): void {
     if (this.watchers.has(pluginId)) {
       this.stopWatching(pluginId);
     }
