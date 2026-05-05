@@ -3,7 +3,7 @@
 // All types must be serializable over IPC (Structured Clone)
 
 /** JSON-serializable value type for IPC payloads — ensures Structured Clone compliance */
-export type JsonValue = string | number | boolean | null | undefined | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
