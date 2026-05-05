@@ -6,6 +6,7 @@ import {
   createEventBus,
   type AgentSession,
   type AgentSessionEvent,
+  type SerialisedAgentEvent,
 } from '@mariozechner/pi-coding-agent';
 import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import { extractLastAssistantText } from '../utils/message-utils';
