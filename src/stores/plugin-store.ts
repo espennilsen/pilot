@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke, on } from '../lib/ipc-client';
+import type { ScaffoldResult } from '../../shared/types';
 import { IPC } from '../../shared/ipc';
 import type {
   InstalledPlugin,

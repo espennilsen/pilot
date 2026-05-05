@@ -82,6 +82,8 @@ export class PluginDevMode {
     this.reloadTimeouts.set(pluginId, setTimeout(async () => {
       this.reloadTimeouts.delete(pluginId);
       console.log(`[PluginDevMode] Hot-reloading plugin ${pluginId}...`);
+      
+      // Verify manifest exists before attempting reload
 
       try {
         // Unregister (deactivate) the plugin

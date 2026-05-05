@@ -47,6 +47,9 @@ interface ProjectStore {
 /**
  * Project store — manages project directory, file tree, file preview/editing, and .gitignore prompts.
  */
+export { useProjectStore };
+export type { ProjectStore } from './project-store';
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projectPath: null,
   fileTree: [],
