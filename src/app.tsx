@@ -58,7 +58,9 @@ function App() {
   // Start plugin event listeners
   useEffect(() => {
     // Hydrate plugin state first
-    usePluginStore.getState().loadPlugins();
+    void usePluginStore.getState().loadPlugins().catch((error) => {
+      console.error("Failed to load plugins on startup:", error);
+    });
     // Then start listening for updates
     const stop = usePluginStore.getState().startListening();
     return stop;
