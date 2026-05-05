@@ -234,7 +234,7 @@ export class PilotSessionManager {
 
     // Listen for the first streaming event to confirm the model responded
     const onFirstEvent = () => { receivedFirstEvent = true; };
-    const unsubText = session.subscribe((event: AgentSessionEvent) => {
+    const unsubText = session.subscribe((event: AgentSessionEvent): void => {
       if (event.type === 'text' || event.type === 'thinking') {
         onFirstEvent();
       }

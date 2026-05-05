@@ -10,6 +10,7 @@ import { join, resolve, basename } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { PILOT_PLUGINS_DIR, PILOT_PLUGIN_REGISTRY_FILE } from './pilot-paths';
+import { expandHome, normalizePath } from '../utils/paths';
 import type { InstalledPlugin, PluginManifest, PluginInstallResult } from '../../shared/types';
 
 const execFileAsync = promisify(execFile);
@@ -76,9 +77,8 @@ export class PluginInstaller {
     } else if (source.startsWith('git:')) {
       return this.installFromGit(source.slice(4));
     } else {
-      // Try local path (expand ~ and check if exists)
-      const expandedSource = expandHome(source);
-      const normalizedSource = normalizePath(expandedSource);
+      // Try local path or default to npm
+      const normalizedSource = normalizePath(expandHome(source));
       try {
         if (existsSync(normalizedSource)) {
           return this.installFromLocal(normalizedSource);
@@ -86,7 +86,6 @@ export class PluginInstaller {
       } catch {
         // Fall through to npm
       }
-    } else {
       // Default: treat as npm package
       return this.installFromNpm(source);
     }
