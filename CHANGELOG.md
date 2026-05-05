@@ -2,7 +2,10 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
-## 2026-04-16
+## 2026-04-21
+
+### Fixed
+- **TypeError: session.on is not a function** — the Ollama timeout-handling code was calling `.on()` / `.off()` on `AgentSession`, which only exposes `.subscribe()`. This caused a crash on every new chat. Replaced with proper `session.subscribe()` + unsubscribe cleanup in `finally`.
 
 ### Changed
 - **Top bar shows projects instead of chats** — the tab bar is now a project bar, showing one compact pill per project (folder icon, name, status dot) instead of individual chat tabs. This maximises the number of visible projects at once. Chat navigation moved entirely to the sidebar Sessions pane, which now shows active chats above historical sessions with a clear section split. Keyboard shortcuts updated: `Cmd+1-9` and `Ctrl+Tab` cycle projects instead of individual tabs.

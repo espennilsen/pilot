@@ -261,11 +261,11 @@ export function TabBar() {
         </button>
       )}
 
-      <Tooltip content={`New tab (${shortcutLabel('T')})`} position="bottom">
+      <Tooltip content="Open Project" position="bottom">
         <button
-          onClick={() => { if (!addTab()) openProjectDialog(); }}
+          onClick={() => openProjectDialog()}
           className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors"
-          aria-label="New tab"
+          aria-label="Open Project"
         >
           <Icon name="Plus" size={16} className="text-text-secondary" />
         </button>
