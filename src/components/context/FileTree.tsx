@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
+import { useCallback, useRef, useState, useMemo, useEffect, KeyboardEvent } from 'react';
+import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection, useFileTreeSearch } from '@pierre/trees/react';
 import { preparePresortedFileTreeInput } from '@pierre/trees';
 import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
+import { useGitStore } from '../../stores/git-store';
 import { useDetectedEditors, type DetectedEditor } from '../../hooks/useDetectedEditors';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
@@ -16,6 +17,7 @@ export default function FileTree() {
   const { fileTree, isLoadingTree, projectPath, loadFileTree, setExpandedPaths, setSelectedPath } = useProjectStore();
   const { addFileTab } = useTabStore();
   const { contextPanelTab } = useUIStore();
+  const { status } = useGitStore();
   const editors = useDetectedEditors();
 
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -49,17 +51,125 @@ export default function FileTree() {
     return flattenPaths(fileTree);
   }, [fileTree, projectPath]);
 
-  // Prepare optimized input for @pierre/trees
+  // Prepare optimized input for large tree handling
   const preparedInput = useMemo(() => {
     return preparePresortedFileTreeInput(paths);
   }, [paths]);
 
+  // Build git status entries for the tree
+  const gitStatusEntries = useMemo(() => {
+    if (!projectPath || !status) return [];
+    
+    const entries: Array<{ path: string; status: 'M' | 'A' | 'D' | 'U' | 'R' }> = [];
+    
+    // Modified files
+    if (status.modified) {
+      for (const file of status.modified) {
+        const relativePath = file.startsWith(projectPath + '/') 
+          ? file.slice(projectPath.length + 1) 
+          : file;
+        entries.push({ path: relativePath, status: 'M' });
+      }
+    }
+    
+    // Added files
+    if (status.added) {
+      for (const file of status.added) {
+        const relativePath = file.startsWith(projectPath + '/') 
+          ? file.slice(projectPath.length + 1) 
+          : file;
+        entries.push({ path: relativePath, status: 'A' });
+      }
+    }
+    
+    // Deleted files
+    if (status.deleted) {
+      for (const file of status.deleted) {
+        const relativePath = file.startsWith(projectPath + '/') 
+          ? file.slice(projectPath.length + 1) 
+          : file;
+        entries.push({ path: relativePath, status: 'D' });
+      }
+    }
+    
+    // Untracked files
+    if (status.untracked) {
+      for (const file of status.untracked) {
+        const relativePath = file.startsWith(projectPath + '/') 
+          ? file.slice(projectPath.length + 1) 
+          : file;
+        entries.push({ path: relativePath, status: 'U' });
+      }
+    }
+    
+    return entries;
+  }, [status, projectPath]);
+
   const { model } = useFileTree({
     preparedInput,
     initialExpansion: 'closed',
-    search: true,
+    search: false,  // Hidden by default, toggle with Cmd/Ctrl+F
     flattenEmptyDirectories: false,
-    initialVisibleRowCount: 15,
+    
+    // === OPTIMIZE FOR LARGE TREES ===
+    // Virtual scrolling with overscan for smooth performance
+    initialVisibleRowCount: Math.min(30, paths.length),
+    overscan: 15,  // Render 15 extra rows above/below viewport
+    stickyFolders: true,  // Keep parent folders visible while scrolling
+    
+    // === DRAG AND DROP ===
+    dragAndDrop: {
+      enabled: true,
+      canDrag: (draggedPaths) => {
+        // Allow dragging all files/folders
+        return draggedPaths.length > 0;
+      },
+      canDrop: (dropContext) => {
+        // Prevent dropping into itself
+        const { draggedPaths, targetPath } = dropContext;
+        return !draggedPaths.includes(targetPath);
+      },
+      onDropComplete: (dropResult) => {
+        // Handle successful drop
+        console.log('Drop completed:', dropResult);
+      },
+      onDropError: (error, dropContext) => {
+        window.alert(`Move failed: ${error}`);
+      },
+      openOnDropDelay: 300,  // Delay before expanding folder on drop
+    },
+    
+    // === INLINE RENAMING ===
+    renaming: {
+      enabled: true,
+      canRename: (item) => {
+        // Allow renaming all items
+        return true;
+      },
+      onError: (error) => {
+        window.alert(`Rename failed: ${error}`);
+      },
+      onRename: async (event) => {
+        // Handle rename through IPC
+        const oldFullPath = toFullPath(event.oldPath);
+        const dir = oldFullPath.substring(0, oldFullPath.lastIndexOf('/'));
+        const newFullPath = `${dir}/${event.newName}`;
+        
+        if (newFullPath === oldFullPath) return;
+        
+        const result = await invoke(IPC.PROJECT_RENAME_PATH, oldFullPath, newFullPath) as { ok?: boolean; error?: string };
+        if (result.ok) {
+          loadFileTree();
+        } else {
+          throw new Error(result.error || 'Rename failed');
+        }
+      },
+    },
+    
+    // === GIT STATUS ===
+    gitStatus: gitStatusEntries,
+    
+    // === ICONS ===
     icons: {
       set: 'complete',
       colored: true,
@@ -116,6 +226,8 @@ export default function FileTree() {
         </svg>
       `,
     },
+    
+    // === CUSTOM STYLING ===
     unsafeCSS: `
       :host {
         --trees-bg-override: transparent;
@@ -154,6 +266,18 @@ export default function FileTree() {
       }
       [part="search-input"]:focus { border-color: var(--accent) !important; outline: none !important; }
       [part="search"] { padding: 8px !important; border-bottom: 1px solid var(--border) !important; }
+      /* Git status badges */
+      [part="git-status"] {
+        font-size: 10px;
+        font-weight: bold;
+        padding: 1px 4px;
+        border-radius: 3px;
+        margin-left: 4px;
+      }
+      [data-git-status="M"] { color: #f0a020; }
+      [data-git-status="A"] { color: #2ea043; }
+      [data-git-status="D"] { color: #d73a49; }
+      [data-git-status="U"] { color: #6a737d; }
     `,
   });
 
@@ -190,6 +314,56 @@ export default function FileTree() {
       if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
     };
   }, [model, setExpandedPaths, setSelectedPath]);
+
+  // ── Keyboard shortcuts ───────────────────────────────────
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modKey = isMac ? e.metaKey : e.ctrlKey;
+    
+    // Cmd/Ctrl+F to toggle search
+    if (modKey && e.key === 'f') {
+      e.preventDefault();
+      model.openSearch();
+      return;
+    }
+    
+    // F2 to rename selected file
+    if (e.key === 'F2') {
+      e.preventDefault();
+      const focusedPath = model.getFocusedPath();
+      if (focusedPath) {
+        model.startRenaming(focusedPath);
+      }
+    }
+    
+    // Delete to delete selected file (with Cmd/Ctrl)
+    if (e.key === 'Delete' && modKey) {
+      e.preventDefault();
+      const selectedPaths = model.getSelectedPaths();
+      if (selectedPaths.length > 0) {
+        const path = selectedPaths[0];
+        const fullPath = toFullPath(path);
+        const node = findNodeByPath(fileTree, fullPath);
+        if (node) {
+          handleDelete(path, node.name, node.type);
+        }
+      }
+    }
+    
+    // Enter to open file
+    if (e.key === 'Enter' && !model.getFocusedPath()?.endsWith('/')) {
+      e.preventDefault();
+      const focusedPath = model.getFocusedPath();
+      if (focusedPath) {
+        const fullPath = toFullPath(focusedPath);
+        const node = findNodeByPath(fileTree, fullPath);
+        if (node && node.type === 'file') {
+          addFileTab(fullPath, projectPath);
+        }
+      }
+    }
+  }, [model, fileTree, projectPath, toFullPath, handleDelete, addFileTab]);
 
   // ── Action callbacks ───────────────────────────────────
 
@@ -235,23 +409,6 @@ export default function FileTree() {
     }
   }, [toFullPath, loadFileTree]);
 
-  const handleRename = useCallback(async (oldRelativePath: string, newName: string) => {
-    const oldFullPath = toFullPath(oldRelativePath);
-    const dir = oldFullPath.substring(0, oldFullPath.lastIndexOf('/'));
-    const newFullPath = `${dir}/${newName}`;
-    
-    if (newFullPath === oldFullPath) return true;
-
-    const result = await invoke(IPC.PROJECT_RENAME_PATH, oldFullPath, newFullPath) as { ok?: boolean; error?: string };
-    if (result.ok) {
-      loadFileTree();
-      return true;
-    } else {
-      window.alert(`Rename failed: ${result.error}`);
-      return false;
-    }
-  }, [toFullPath, loadFileTree]);
-
   const handleCreate = useCallback(async (parentRelativePath: string, name: string, kind: 'file' | 'folder') => {
     const fullParentPath = toFullPath(parentRelativePath);
     const fullPath = `${fullParentPath}/${name}`;
@@ -272,6 +429,37 @@ export default function FileTree() {
     }
   }, [addFileTab, toFullPath, projectPath]);
 
+  const handleDragDrop = useCallback(async (draggedPaths: readonly string[], targetPath: string, dropType: 'into' | 'before' | 'after') => {
+    if (!projectPath) return;
+    
+    for (const draggedPath of draggedPaths) {
+      const fullDraggedPath = toFullPath(draggedPath);
+      const fullTargetPath = toFullPath(targetPath);
+      
+      // Determine new path based on drop type
+      let newPath: string;
+      if (dropType === 'into') {
+        const fileName = draggedPath.split('/').pop();
+        newPath = `${fullTargetPath}/${fileName}`;
+      } else {
+        // For before/after, get parent directory
+        const parentDir = fullDraggedPath.substring(0, fullDraggedPath.lastIndexOf('/'));
+        const fileName = draggedPath.split('/').pop();
+        newPath = `${parentDir}/${fileName}`;
+      }
+      
+      if (newPath !== fullDraggedPath) {
+        const result = await invoke(IPC.PROJECT_RENAME_PATH, fullDraggedPath, newPath) as { ok?: boolean; error?: string };
+        if (!result.ok) {
+          window.alert(`Move failed: ${result.error}`);
+          return;
+        }
+      }
+    }
+    
+    loadFileTree();
+  }, [projectPath, toFullPath, loadFileTree]);
+
   const buildContextMenu = useCallback((item: any, context: any) => {
     const fullPath = toFullPath(item.path);
     const node = findNodeByPath(fileTree, fullPath);
@@ -283,7 +471,7 @@ export default function FileTree() {
       onCopyPath: () => handleCopyPath(item.path),
       onCopyRelativePath: () => handleCopyRelativePath(item.path),
       onCopyName: () => handleCopyName(node.name),
-      onRename: () => { model.startRename(item.path); },
+      onRename: () => { model.startRenaming(item.path); },
       onDelete: () => handleDelete(item.path, node.name, node.type),
       onNewFile: () => setInlineInput({ parentPath: item.path, kind: 'file' }),
       onNewFolder: () => setInlineInput({ parentPath: item.path, kind: 'folder' }),
@@ -338,7 +526,7 @@ export default function FileTree() {
     });
     
     return menuEl;
-  }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
+  }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab, model]);
 
   // ── Render ─────────────────────────────────────────────
 
@@ -359,7 +547,13 @@ export default function FileTree() {
   }
 
   return (
-    <div ref={treeRef} className="h-full" style={{ minHeight: 0, position: 'relative' }}>
+    <div 
+      ref={treeRef} 
+      className="h-full" 
+      style={{ minHeight: 0, position: 'relative' }}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       <PierreFileTree
         model={model}
         style={{ height: '100%' }}
@@ -372,6 +566,9 @@ export default function FileTree() {
         }}
         onItemActivate={(item) => {
           handleDoubleClick(item.path, item.kind as 'file' | 'directory');
+        }}
+        onDrop={(draggedPaths, targetPath, dropType) => {
+          handleDragDrop(draggedPaths, targetPath, dropType);
         }}
       />
 
