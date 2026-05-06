@@ -19,6 +19,7 @@ import { useProjectStore } from './stores/project-store';
 import { useSessionStore } from './stores/session-store';
 import { useAppSettingsStore } from './stores/app-settings-store';
 import { useDevCommandStore } from './stores/dev-command-store';
+import { usePluginStore } from './stores/plugin-store';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcut';
 import { useDefaultCommands } from './hooks/useDefaultCommands';
 import { useSandboxEvents } from './hooks/useSandboxEvents';
@@ -34,6 +35,7 @@ import { useDesktopEvents } from './hooks/useDesktopEvents';
 import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
+import { useGitStore } from './stores/git-store';
 import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
 
@@ -53,6 +55,17 @@ function App() {
     useAppSettingsStore.getState().load();
   }, []);
 
+  // Start plugin event listeners
+  useEffect(() => {
+    // Hydrate plugin state first
+    void usePluginStore.getState().loadPlugins().catch((error) => {
+      console.error("Failed to load plugins on startup:", error);
+    });
+    // Then start listening for updates
+    const stop = usePluginStore.getState().startListening();
+    return stop;
+  }, []);
+
   // Guard against concurrent in-flight session opens
   const inFlightRef = useRef<Set<string>>(new Set());
 
@@ -60,7 +73,18 @@ function App() {
   // On startup, useWorkspacePersistence opens all sessions first and registers them
   // in the wired sessions store. This effect only handles subsequent tab switches.
   useEffect(() => {
-    if (!activeTabId) return;
+    // No active tab — if there are zero tabs left, clear project state
+    if (!activeTabId) {
+      if (tabs.length === 0) {
+        const currentProjectPath = useProjectStore.getState().projectPath;
+        if (currentProjectPath) {
+          useProjectStore.getState().clearProject();
+          useGitStore.getState().reset();
+        }
+      }
+      return;
+    }
+
     const tab = tabs.find(t => t.id === activeTabId);
     if (!tab) return;
 

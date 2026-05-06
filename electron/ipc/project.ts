@@ -97,9 +97,10 @@ export function registerProjectIpc() {
     }
   }
 
-  ipcMain.handle(IPC.PROJECT_SET_DIRECTORY, async (_event, path: string) => {
-    currentProjectPath = path;
-    startWatching(path);
+  ipcMain.handle(IPC.PROJECT_SET_DIRECTORY, async (_event, path: string | null) => {
+    currentProjectPath = path || null;
+    stopWatching();
+    if (path) startWatching(path);
   });
 
   ipcMain.handle(IPC.PROJECT_FILE_TREE, async () => {

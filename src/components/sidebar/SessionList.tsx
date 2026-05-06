@@ -56,6 +56,7 @@ export function SessionList() {
     isLoading,
     showArchived,
     loadSessions,
+    clearSessions,
     setSearchQuery,
     setShowArchived,
     getFilteredSessions,
@@ -75,9 +76,9 @@ export function SessionList() {
     if (projectPath) {
       loadSessions([projectPath]);
     } else {
-      loadSessions([]);
+      clearSessions();
     }
-  }, [loadSessions, projectPath]);
+  }, [loadSessions, clearSessions, projectPath]);
 
   // Active chat tabs for the current project
   const activeChats = useMemo(() =>

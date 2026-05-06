@@ -296,11 +296,34 @@ export const IPC = {
   WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
   WEB_TAB_LOAD_FAILED: 'web-tab:load-failed', // main → renderer
 
+  // WebView in-page find
+  WEBVIEW_FIND_IN_PAGE: 'webview:find-in-page',
+  WEBVIEW_STOP_FIND_IN_PAGE: 'webview:stop-find-in-page',
+  WEBVIEW_FOUND_IN_PAGE: 'webview:found-in-page', // main → renderer
+
   // Ollama
   OLLAMA_STATUS: 'ollama:status',                 // main → renderer push
   OLLAMA_GET_STATUS: 'ollama:get-status',
   OLLAMA_CHECK_CONNECTION: 'ollama:check-connection',
   OLLAMA_SAVE_SETTINGS: 'ollama:save-settings',
   OLLAMA_VALIDATE_MODEL: 'ollama:validate-model',
-  OLLAMA_REFRESH_MODELS: 'ollama:refresh-models'
+  OLLAMA_REFRESH_MODELS: 'ollama:refresh-models',
+
+  // Plugins
+  PLUGIN_LIST: 'plugin:list',
+  PLUGIN_INSTALL: 'plugin:install',
+  PLUGIN_REMOVE: 'plugin:remove',
+  PLUGIN_TOGGLE: 'plugin:toggle',
+  PLUGIN_GET_CONTRIBUTIONS: 'plugin:get-contributions',
+  PLUGIN_VIEW_GET_CHILDREN: 'plugin:view-get-children',
+  PLUGIN_COMMAND_EXECUTE: 'plugin:command-execute',
+  PLUGIN_SETTINGS_GET_HTML: 'plugin:settings-get-html',
+  PLUGIN_SETTINGS_SAVE: 'plugin:settings-save',
+  PLUGIN_EVENT: 'plugin:event',                       // main → renderer push
+  PLUGIN_AGENT_EVENT_REQUEST: 'plugin:agent-event-request',  // PluginBridge → Extension Host, response expected
+  PLUGIN_CONTRIBUTION_UPDATED: 'plugin:contribution-updated', // main → renderer push
+  PLUGIN_APPROVE_AGENT_CAPABILITY: 'plugin:approve-agent-capability',
+  PLUGIN_INIT: 'plugin:init',
+  PLUGIN_DEV_START: 'plugin:dev-start',
+  PLUGIN_DEV_STOP: 'plugin:dev-stop',
 } as const;

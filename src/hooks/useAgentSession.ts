@@ -205,6 +205,8 @@ export function useAgentSession() {
         if (sub.type === 'text_delta') {
           appendToLastAssistant(tabId, sub.delta);
         } else if (sub.type === 'thinking_delta') {
+          // Ensure streaming indicator is shown when thinking starts
+          setStreaming(tabId, true);
           appendThinking(tabId, sub.delta);
         }
         break;

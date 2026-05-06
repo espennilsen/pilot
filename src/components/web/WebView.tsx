@@ -1,13 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTabStore } from '../../stores/tab-store';
-import { on } from '../../lib/ipc-client';
+import { on, invoke } from '../../lib/ipc-client';
 import { IPC } from '../../../shared/ipc';
 import { Icon } from '../shared/Icon';
+import FindBar from '../shared/FindBar';
 
 export function WebView() {
   const activeTab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
   const [refreshKey, setRefreshKey] = useState(0);
   const [errorUrl, setErrorUrl] = useState<string | null>(null);
+
+  // In-page find state
+  const [findVisible, setFindVisible] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findCaseSensitive, setFindCaseSensitive] = useState(false);
+  const [findMatchCount, setFindMatchCount] = useState(0);
+  const [findCurrentIndex, setFindCurrentIndex] = useState(0);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const url = activeTab?.type === 'web' ? activeTab.filePath : null;
 
@@ -21,6 +30,81 @@ export function WebView() {
     return on(IPC.WEB_TAB_LOAD_FAILED, (payload: { url: string }) => {
       setErrorUrl(payload.url);
     });
+  }, []);
+
+  // Listen for found-in-page results from main process
+  useEffect(() => {
+    return on(IPC.WEBVIEW_FOUND_IN_PAGE, (result: { activeMatchOrdinal: number; matches: number }) => {
+      setFindMatchCount(result.matches);
+      if (result.activeMatchOrdinal > 0) {
+        setFindCurrentIndex(result.activeMatchOrdinal - 1);
+      }
+    });
+  }, []);
+
+  // Debounced search via main-process findInPage
+  const handleQueryChange = useCallback((query: string) => {
+    setFindQuery(query);
+    setFindMatchCount(-1);
+    setFindCurrentIndex(0);
+
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    if (!query) {
+      invoke(IPC.WEBVIEW_STOP_FIND_IN_PAGE, 'clearSelection').catch(() => {});
+      setFindMatchCount(0);
+      return;
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      invoke(IPC.WEBVIEW_FIND_IN_PAGE, query, {
+        forward: true,
+        findNext: false,
+        matchCase: findCaseSensitive,
+      }).catch(() => {});
+    }, 150);
+  }, [findCaseSensitive]);
+
+  const handlePrev = useCallback(() => {
+    if (!findQuery) return;
+    invoke(IPC.WEBVIEW_FIND_IN_PAGE, findQuery, {
+      forward: false,
+      findNext: true,
+      matchCase: findCaseSensitive,
+    }).catch(() => {});
+  }, [findQuery, findCaseSensitive]);
+
+  const handleNext = useCallback(() => {
+    if (!findQuery) return;
+    invoke(IPC.WEBVIEW_FIND_IN_PAGE, findQuery, {
+      forward: true,
+      findNext: true,
+      matchCase: findCaseSensitive,
+    }).catch(() => {});
+  }, [findQuery, findCaseSensitive]);
+
+  const handleClose = useCallback(() => {
+    setFindVisible(false);
+    setFindQuery('');
+    setFindMatchCount(0);
+    setFindCurrentIndex(0);
+    invoke(IPC.WEBVIEW_STOP_FIND_IN_PAGE, 'clearSelection').catch(() => {});
+  }, []);
+
+  // Close find and stop search when URL changes
+  useEffect(() => {
+    if (findVisible) {
+      handleClose();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      invoke(IPC.WEBVIEW_STOP_FIND_IN_PAGE, 'clearSelection').catch(() => {});
+    };
   }, []);
 
   if (!activeTab || activeTab.type !== 'web' || !url) {
@@ -44,7 +128,7 @@ export function WebView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
       {/* Navigation toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-bg-surface">
         <div className="flex-1 min-w-0 px-2 py-1 text-xs font-mono text-text-secondary bg-bg-base rounded border border-border truncate">
@@ -60,6 +144,13 @@ export function WebView() {
           </button>
         )}
         <button
+          onClick={() => setFindVisible(v => !v)}
+          className={`p-1 rounded hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors ${findVisible ? 'text-accent bg-accent/10' : ''}`}
+          title="Find in page"
+        >
+          <Icon name="Search" size={14} />
+        </button>
+        <button
           onClick={() => { setErrorUrl(null); setRefreshKey(k => k + 1); }}
           className="p-1 rounded hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
           title="Refresh"
@@ -74,6 +165,21 @@ export function WebView() {
           <Icon name="ExternalLink" size={14} />
         </button>
       </div>
+
+      {/* Find bar overlay */}
+      <FindBar
+        query={findQuery}
+        onQueryChange={handleQueryChange}
+        caseSensitive={findCaseSensitive}
+        onCaseSensitiveChange={setFindCaseSensitive}
+        matchCount={findMatchCount}
+        currentIndex={findCurrentIndex}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        onClose={handleClose}
+        visible={findVisible}
+      />
+
       {/* Content */}
       {showError ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-text-secondary">

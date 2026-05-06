@@ -6,6 +6,7 @@ import {
   createEventBus,
   type AgentSession,
   type AgentSessionEvent,
+  type SerialisedAgentEvent,
 } from '@mariozechner/pi-coding-agent';
 import type { TextContent, ThinkingContent } from '@mariozechner/pi-ai';
 import { extractLastAssistantText } from '../utils/message-utils';
@@ -38,6 +39,7 @@ import type { McpManager } from './mcp-manager';
 import { createDesktopTools } from './desktop-tools';
 import { injectTools, ejectTools, hasTools } from './session-tool-injector';
 import { loadProjectSettings } from './project-settings';
+import { pluginBridge } from './plugin-bridge';
 
 export class PilotSessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -48,6 +50,15 @@ export class PilotSessionManager {
   private authStorage: AuthStorage;
   private modelRegistry: ModelRegistry;
   private eventBus = createEventBus();
+
+  /** Forward agent lifecycle events to PluginBridge */
+  private async forwardAgentEventToPlugins(eventName: string, eventData: Record<string, unknown>): Promise<void> {
+    if (pluginBridge.hasSubscribersFor(eventName)) {
+      pluginBridge.forwardAgentEvent({ name: eventName, ...eventData }).catch(err => {
+        console.error(`Plugin agent event forward failed (${eventName}):`, err);
+      });
+    }
+  }
   public stagedDiffs = new StagedDiffManager();
   public memoryManager = new MemoryManager();
   public taskManager = new TaskManager();
@@ -161,6 +172,19 @@ export class PilotSessionManager {
         console.warn(`[SessionManager] Failed to forward event '${event.type}' to renderer:`, err);
       }
 
+      // Forward agent lifecycle events to PluginBridge
+      const eventMapping: Record<string, string> = {
+        'agent_start': 'agent_start',
+        'agent_end': 'agent_end',
+        'turn_start': 'turn_start',
+        'turn_end': 'turn_end',
+        'message_end': 'message_end',
+      };
+      const mappedName = eventMapping[event.type];
+      if (mappedName && pluginBridge.hasSubscribersFor(mappedName)) {
+        this.forwardAgentEventToPlugins(mappedName, { message: event }).catch(() => {});
+      }
+
       if (event.type === 'agent_end' || event.type === 'turn_end') {
         const messages = session.state.messages;
         const responseText = extractLastAssistantText(messages);
@@ -179,6 +203,9 @@ export class PilotSessionManager {
     this.unsubscribers.set(tabId, unsub);
     this.tabProjectPaths.set(tabId, projectPath);
     this.tabSandboxOptions.set(tabId, sandboxOptions);
+
+    // Forward session lifecycle events to PluginBridge
+    this.forwardAgentEventToPlugins('session_start', { prompt: `Session started for tab ${tabId}` }).catch(() => {});
   }
 
   async prompt(tabId: string, text: string): Promise<void> {
@@ -205,8 +232,6 @@ export class PilotSessionManager {
     const isOllama = modelInfo?.provider === 'ollama';
 
     // Track first response via existing subscription (session has no .on()/.off() methods)
-    let receivedFirstEvent = false;
-    let firstEventUnsub: (() => void) | null = null;
 
     // Timeout ID for cleanup
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -234,6 +259,8 @@ export class PilotSessionManager {
 
       // Clear timeout if prompt won the race
       if (timeoutId !== null) clearTimeout(timeoutId);
+      // Clean up event subscription
+      unsubText();
 
       if (result === 'timeout') {
         const timeoutSec = actualTimeoutMs / 1000;
@@ -411,6 +438,9 @@ export class PilotSessionManager {
     this.tabProjectPaths.delete(tabId);
     this.lastUserMessages.delete(tabId);
     this.tabSandboxOptions.delete(tabId);
+
+    // Forward session shutdown event to PluginBridge
+    this.forwardAgentEventToPlugins('session_shutdown', { prompt: `Session shutting down for tab ${tabId}` }).catch(() => {});
 
     // Stop Docker desktop when no more tabs reference this project
     if (projectPath && this.desktopService) {
