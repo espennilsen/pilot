@@ -172,7 +172,7 @@ function buildApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function createWindow() {
+async function createWindow() {
   // Read persisted theme to set correct initial window chrome (avoid flash)
   const settings = loadAppSettings();
   let windowBg: string;
@@ -250,14 +250,8 @@ function createWindow() {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
   });
-    const workspace = await service.load();
-    if (workspace?.windowBounds && !workspace.windowMaximized) {
-      mainWindow?.setBounds(workspace.windowBounds);
-    }
-    if (workspace?.windowMaximized) {
-      mainWindow?.maximize();
-    }
-  })();
+
+  // Save window bounds on resize/position changes
 
   // Save window bounds on resize/position changes
   let saveWindowBoundsTimeout: NodeJS.Timeout | null = null;
