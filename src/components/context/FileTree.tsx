@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import { preparePresortedFileTreeInput } from '@pierre/trees';
+import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -20,7 +21,6 @@ export default function FileTree() {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const saveStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef(false);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -29,15 +29,12 @@ export default function FileTree() {
   } | null>(null);
 
   // Convert FileNode[] to flat path array for @pierre/trees
-  // Note: Only include files - directories are inferred from path structure
-  // Strip project root to show relative paths
   const paths = useMemo(() => {
     if (!fileTree || fileTree.length === 0 || !projectPath) return [];
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
         if (node.type === 'file') {
-          // Strip project root to get relative path
           const relativePath = node.path.startsWith(projectPath + '/')
             ? node.path.slice(projectPath.length + 1)
             : node.path;
@@ -62,204 +59,63 @@ export default function FileTree() {
     initialExpansion: 'closed',
     search: true,
     flattenEmptyDirectories: false,
-    // Give the tree a sensible initial row budget as fallback
     initialVisibleRowCount: 15,
     icons: {
-      // Use built-in icon set with colors
       set: 'complete',
       colored: true,
-      // Custom icon remapping by extension with colors
       byFileExtension: {
-        // TypeScript/JavaScript
-        ts: 'typescript',
-        tsx: 'typescript',
-        mts: 'typescript',
-        cts: 'typescript',
-        js: 'javascript',
-        jsx: 'javascript',
-        mjs: 'javascript',
-        cjs: 'javascript',
-        // JSON/YAML
-        json: 'json',
-        jsonc: 'json',
-        yaml: 'yaml',
-        yml: 'yaml',
-        // Markdown
-        md: 'markdown',
-        mdx: 'markdown',
-        // Stylesheets
-        css: 'css',
-        scss: 'scss',
-        sass: 'scss',
-        less: 'less',
-        // Python
-        py: 'python',
-        pyw: 'python',
-        ipynb: 'python',
-        // Rust
-        rs: 'rust',
-        toml: 'rust',
-        // Git
-        gitignore: 'git',
-        gitattributes: 'git',
-        gitmodules: 'git',
-        // Docker
-        dockerfile: 'docker',
-        dockerignore: 'docker',
-        // HTML
-        html: 'html',
-        htm: 'html',
-        xhtml: 'html',
-        // Images
-        png: 'image',
-        jpg: 'image',
-        jpeg: 'image',
-        gif: 'image',
-        svg: 'image',
-        webp: 'image',
-        ico: 'image',
-        bmp: 'image',
-        // Other common types
-        sh: 'shell',
-        bash: 'shell',
-        zsh: 'shell',
-        fish: 'shell',
-        go: 'go',
-        java: 'java',
-        class: 'java',
-        kt: 'kotlin',
-        kts: 'kotlin',
-        swift: 'swift',
-        rb: 'ruby',
-        erb: 'ruby',
-        php: 'php',
-        sql: 'database',
-        db: 'database',
-        sqlite: 'database',
-        xml: 'xml',
-        rss: 'xml',
-        env: 'config',
-        local: 'config',
-        lock: 'lock',
-        pdf: 'pdf',
-        txt: 'text',
-        log: 'text',
+        ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript',
+        js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
+        json: 'json', jsonc: 'json', yaml: 'yaml', yml: 'yaml',
+        md: 'markdown', mdx: 'markdown',
+        css: 'css', scss: 'scss', sass: 'scss', less: 'less',
+        py: 'python', pyw: 'python', ipynb: 'python',
+        rs: 'rust', toml: 'rust',
+        gitignore: 'git', gitattributes: 'git', gitmodules: 'git',
+        dockerfile: 'docker', dockerignore: 'docker',
+        html: 'html', htm: 'html', xhtml: 'html',
+        png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image', webp: 'image', ico: 'image', bmp: 'image',
+        sh: 'shell', bash: 'shell', zsh: 'shell', fish: 'shell',
+        go: 'go', java: 'java', class: 'java',
+        kt: 'kotlin', kts: 'kotlin', swift: 'swift',
+        rb: 'ruby', erb: 'ruby', php: 'php',
+        sql: 'database', db: 'database', sqlite: 'database',
+        xml: 'xml', rss: 'xml',
+        env: 'config', local: 'config', lock: 'lock',
+        pdf: 'pdf', txt: 'text', log: 'text',
       },
-      // Custom sprite sheet with colored icons
       spriteSheet: `
         <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-          <symbol id="typescript" viewBox="0 0 24 24">
-            <path fill="#3178C6" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">TS</text>
-          </symbol>
-          <symbol id="javascript" viewBox="0 0 24 24">
-            <path fill="#F7DF1E" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="black">JS</text>
-          </symbol>
-          <symbol id="json" viewBox="0 0 24 24">
-            <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="8" y="17" font-size="10" font-weight="bold" fill="white">{}</text>
-          </symbol>
-          <symbol id="yaml" viewBox="0 0 24 24">
-            <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">YML</text>
-          </symbol>
-          <symbol id="markdown" viewBox="0 0 24 24">
-            <path fill="#519aba" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">MD</text>
-          </symbol>
-          <symbol id="css" viewBox="0 0 24 24">
-            <path fill="#563d7c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">CSS</text>
-          </symbol>
-          <symbol id="scss" viewBox="0 0 24 24">
-            <path fill="#c6538c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">SCSS</text>
-          </symbol>
-          <symbol id="less" viewBox="0 0 24 24">
-            <path fill="#1d365d" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">LESS</text>
-          </symbol>
-          <symbol id="python" viewBox="0 0 24 24">
-            <path fill="#3776ab" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PY</text>
-          </symbol>
-          <symbol id="rust" viewBox="0 0 24 24">
-            <path fill="#dea584" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="black">RS</text>
-          </symbol>
-          <symbol id="git" viewBox="0 0 24 24">
-            <path fill="#f05032" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">GIT</text>
-          </symbol>
-          <symbol id="docker" viewBox="0 0 24 24">
-            <path fill="#2496ed" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="10" fill="white">🐳</text>
-          </symbol>
-          <symbol id="html" viewBox="0 0 24 24">
-            <path fill="#e34f26" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">HTML</text>
-          </symbol>
-          <symbol id="image" viewBox="0 0 24 24">
-            <path fill="#a8a8a8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <circle cx="12" cy="12" r="3" fill="white"/>
-          </symbol>
-          <symbol id="shell" viewBox="0 0 24 24">
-            <path fill="#4eaa25" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="9" y="17" font-size="10" font-weight="bold" fill="white">$</text>
-          </symbol>
-          <symbol id="go" viewBox="0 0 24 24">
-            <path fill="#00ADD8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">GO</text>
-          </symbol>
-          <symbol id="java" viewBox="0 0 24 24">
-            <path fill="#5382a1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">JAVA</text>
-          </symbol>
-          <symbol id="kotlin" viewBox="0 0 24 24">
-            <path fill="#7F52FF" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="17" font-size="7" font-weight="bold" fill="white">KT</text>
-          </symbol>
-          <symbol id="swift" viewBox="0 0 24 24">
-            <path fill="#F05138" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">SWIFT</text>
-          </symbol>
-          <symbol id="ruby" viewBox="0 0 24 24">
-            <path fill="#CC342D" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">RB</text>
-          </symbol>
-          <symbol id="php" viewBox="0 0 24 24">
-            <path fill="#777BB4" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PHP</text>
-          </symbol>
-          <symbol id="database" viewBox="0 0 24 24">
-            <path fill="#4479A1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">SQL</text>
-          </symbol>
-          <symbol id="xml" viewBox="0 0 24 24">
-            <path fill="#F16529" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">&lt;</text>
-          </symbol>
-          <symbol id="config" viewBox="0 0 24 24">
-            <path fill="#6D8088" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <circle cx="12" cy="12" r="4" fill="white"/>
-          </symbol>
-          <symbol id="lock" viewBox="0 0 24 24">
-            <path fill="#E6B422" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <path d="M12 8a2 2 0 0 0-2 2v1a2 2 0 0 0 4 0v-1a2 2 0 0 0-2-2z" fill="white"/>
-          </symbol>
-          <symbol id="pdf" viewBox="0 0 24 24">
-            <path fill="#F04531" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PDF</text>
-          </symbol>
-          <symbol id="text" viewBox="0 0 24 24">
-            <path fill="#A8B5C0" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.5"/>
-          </symbol>
+          <symbol id="typescript" viewBox="0 0 24 24"><path fill="#3178C6" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="white">TS</text></symbol>
+          <symbol id="javascript" viewBox="0 0 24 24"><path fill="#F7DF1E" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="black">JS</text></symbol>
+          <symbol id="json" viewBox="0 0 24 24"><path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="8" y="17" font-size="10" font-weight="bold" fill="white">{}</text></symbol>
+          <symbol id="yaml" viewBox="0 0 24 24"><path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">YML</text></symbol>
+          <symbol id="markdown" viewBox="0 0 24 24"><path fill="#519aba" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">MD</text></symbol>
+          <symbol id="css" viewBox="0 0 24 24"><path fill="#563d7c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="white">CSS</text></symbol>
+          <symbol id="scss" viewBox="0 0 24 24"><path fill="#c6538c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">SCSS</text></symbol>
+          <symbol id="less" viewBox="0 0 24 24"><path fill="#1d365d" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">LESS</text></symbol>
+          <symbol id="python" viewBox="0 0 24 24"><path fill="#3776ab" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">PY</text></symbol>
+          <symbol id="rust" viewBox="0 0 24 24"><path fill="#dea584" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="black">RS</text></symbol>
+          <symbol id="git" viewBox="0 0 24 24"><path fill="#f05032" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="white">GIT</text></symbol>
+          <symbol id="docker" viewBox="0 0 24 24"><path fill="#2496ed" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="10" fill="white">🐳</text></symbol>
+          <symbol id="html" viewBox="0 0 24 24"><path fill="#e34f26" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="5" y="17" font-size="8" font-weight="bold" fill="white">HTML</text></symbol>
+          <symbol id="image" viewBox="0 0 24 24"><path fill="#a8a8a8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><circle cx="12" cy="12" r="3" fill="white"/></symbol>
+          <symbol id="shell" viewBox="0 0 24 24"><path fill="#4eaa25" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="9" y="17" font-size="10" font-weight="bold" fill="white">$</text></symbol>
+          <symbol id="go" viewBox="0 0 24 24"><path fill="#00ADD8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="white">GO</text></symbol>
+          <symbol id="java" viewBox="0 0 24 24"><path fill="#5382a1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">JAVA</text></symbol>
+          <symbol id="kotlin" viewBox="0 0 24 24"><path fill="#7F52FF" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="5" y="17" font-size="7" font-weight="bold" fill="white">KT</text></symbol>
+          <symbol id="swift" viewBox="0 0 24 24"><path fill="#F05138" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="5" y="17" font-size="8" font-weight="bold" fill="white">SWIFT</text></symbol>
+          <symbol id="ruby" viewBox="0 0 24 24"><path fill="#CC342D" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">RB</text></symbol>
+          <symbol id="php" viewBox="0 0 24 24"><path fill="#777BB4" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">PHP</text></symbol>
+          <symbol id="database" viewBox="0 0 24 24"><path fill="#4479A1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="5" y="17" font-size="8" font-weight="bold" fill="white">SQL</text></symbol>
+          <symbol id="xml" viewBox="0 0 24 24"><path fill="#F16529" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="7" y="17" font-size="9" font-weight="bold" fill="white">&lt;</text></symbol>
+          <symbol id="config" viewBox="0 0 24 24"><path fill="#6D8088" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><circle cx="12" cy="12" r="4" fill="white"/></symbol>
+          <symbol id="lock" viewBox="0 0 24 24"><path fill="#E6B422" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M12 8a2 2 0 0 0-2 2v1a2 2 0 0 0 4 0v-1a2 2 0 0 0-2-2z" fill="white"/></symbol>
+          <symbol id="pdf" viewBox="0 0 24 24"><path fill="#F04531" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><text x="6" y="17" font-size="8" font-weight="bold" fill="white">PDF</text></symbol>
+          <symbol id="text" viewBox="0 0 24 24"><path fill="#A8B5C0" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.5"/></symbol>
         </svg>
       `,
     },
-    // Custom styling to match app theme
     unsafeCSS: `
       :host {
         --trees-bg-override: transparent;
@@ -274,50 +130,20 @@ export default function FileTree() {
         --trees-font-family: inherit;
         --trees-font-size: 14px;
       }
-      
-      /* Remove default outline */
-      [part="tree"] {
-        outline: none !important;
-      }
-      
-      /* Style rows */
+      [part="tree"] { outline: none !important; }
       button[data-type="item"] {
         padding-left: calc(var(--trees-indent) * var(--depth) + 8px) !important;
         padding-right: 8px !important;
         transition: background-color 0.15s ease;
       }
-      
-      button[data-type="item"]:hover {
-        background-color: var(--trees-hover-bg-override) !important;
-      }
-      
+      button[data-type="item"]:hover { background-color: var(--trees-hover-bg-override) !important; }
       button[data-type="item"][data-item-selected] {
         background-color: var(--trees-selected-bg-override) !important;
         color: var(--trees-selected-fg-override) !important;
       }
-      
-      /* Style chevron icons */
-      [part="chevron"] {
-        width: 12px;
-        height: 12px;
-        color: var(--text-secondary);
-      }
-      
-      /* Style file icons */
-      [part="icon"] {
-        width: var(--trees-icon-size);
-        height: var(--trees-icon-size);
-      }
-      
-      /* Style text */
-      [part="label"] {
-        font-size: var(--trees-font-size);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      
-      /* Search input styling */
+      [part="chevron"] { width: 12px; height: 12px; color: var(--text-secondary); }
+      [part="icon"] { width: var(--trees-icon-size); height: var(--trees-icon-size); }
+      [part="label"] { font-size: var(--trees-font-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       [part="search-input"] {
         background-color: var(--bg-elevated) !important;
         border: 1px solid var(--border) !important;
@@ -326,24 +152,15 @@ export default function FileTree() {
         padding: 6px 10px !important;
         font-size: 13px !important;
       }
-      
-      [part="search-input"]:focus {
-        border-color: var(--accent) !important;
-        outline: none !important;
-      }
-      
-      /* Search container */
-      [part="search"] {
-        padding: 8px !important;
-        border-bottom: 1px solid var(--border) !important;
-      }
+      [part="search-input"]:focus { border-color: var(--accent) !important; outline: none !important; }
+      [part="search"] { padding: 8px !important; border-bottom: 1px solid var(--border) !important; }
     `,
   });
 
-  // ── Persist tree state (expansion, selection) ───────────────────────────────────
+  // ── Persist tree state ───────────────────────────────────
 
   useEffect(() => {
-    if (!model || !isMountedRef.current) return;
+    if (!model) return;
 
     const saveState = () => {
       if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
@@ -373,35 +190,6 @@ export default function FileTree() {
       if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
     };
   }, [model, setExpandedPaths, setSelectedPath]);
-
-  // ── Mount tree only when Files tab becomes active ───────────────────────────────────
-
-  useEffect(() => {
-    const container = treeRef.current;
-    if (!model || !container) return;
-
-    // Only mount when the Files tab is active
-    if (contextPanelTab === 'files') {
-      // Wait for layout to settle
-      const rafId = requestAnimationFrame(() => {
-        if (container.offsetParent !== null) {
-          isMountedRef.current = true;
-          // Force tree to recalculate viewport
-          const focusedPath = model.getFocusedPath();
-          if (focusedPath) {
-            model.focusPath(focusedPath);
-          }
-        }
-      });
-
-      return () => {
-        cancelAnimationFrame(rafId);
-      };
-    } else {
-      // Mark as unmounted when tab changes
-      isMountedRef.current = false;
-    }
-  }, [model, contextPanelTab]);
 
   // ── Action callbacks ───────────────────────────────────
 
@@ -495,14 +283,10 @@ export default function FileTree() {
       onCopyPath: () => handleCopyPath(item.path),
       onCopyRelativePath: () => handleCopyRelativePath(item.path),
       onCopyName: () => handleCopyName(node.name),
-      onRename: () => {
-        model.startRename(item.path);
-      },
+      onRename: () => { model.startRename(item.path); },
       onDelete: () => handleDelete(item.path, node.name, node.type),
-      onNewFile: () =>
-        setInlineInput({ parentPath: item.path, kind: 'file' }),
-      onNewFolder: () =>
-        setInlineInput({ parentPath: item.path, kind: 'folder' }),
+      onNewFile: () => setInlineInput({ parentPath: item.path, kind: 'file' }),
+      onNewFolder: () => setInlineInput({ parentPath: item.path, kind: 'folder' }),
       onOpenInEditor: (editor) => handleOpenInEditor(editor, item.path),
       onOpenAsTab: () => {
         if (node.type === 'file') {
@@ -536,7 +320,6 @@ export default function FileTree() {
       iconContainer.style.height = '14px';
       
       if (entry.icon) {
-        const iconClone = (entry.icon as React.ReactElement).type as any;
         iconContainer.textContent = entry.label.split(' ')[0];
       }
       
