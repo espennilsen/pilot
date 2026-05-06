@@ -94,11 +94,11 @@ export class PluginDevMode {
 
         // Re-register the plugin using stored manifest
         const manifest = this.pluginManifests.get(pluginId);
-        if (manifest) {
+        if (manifest && manifest.enabled) {
           await pluginBridge.registerPlugin(manifest);
-          console.log(`[PluginDevMode] Plugin ${pluginId} hot-reloaded successfully`);
+          console.log(`[PluginDevMode] Plugin ${pluginId} hot-reloaded`);
         } else {
-          console.error(`[PluginDevMode] No manifest found for ${pluginId}, cannot reload`);
+          console.warn(`[PluginDevMode] Skipping reload for ${pluginId}: no manifest or disabled`);
         }
       } catch (err) {
         console.error(`[PluginDevMode] Failed to reload ${pluginId}:`, err);

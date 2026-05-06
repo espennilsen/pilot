@@ -52,7 +52,7 @@ export class PilotSessionManager {
   private eventBus = createEventBus();
 
   /** Forward agent lifecycle events to PluginBridge */
-  private async forwardAgentEventToPlugins(eventName: string, eventData: any): Promise<void> {
+  private async forwardAgentEventToPlugins(eventName: string, eventData: Record<string, unknown>): Promise<void> {
     if (pluginBridge.hasSubscribersFor(eventName)) {
       pluginBridge.forwardAgentEvent({ name: eventName, ...eventData }).catch(err => {
         console.error(`Plugin agent event forward failed (${eventName}):`, err);

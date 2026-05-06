@@ -11,7 +11,6 @@
 
 import { fork, type ChildProcess } from 'child_process';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { broadcastToRenderer } from '../utils/broadcast';
 import { IPC } from '../../shared/ipc';
@@ -72,7 +71,7 @@ export class PluginBridge extends EventEmitter {
   private buffer = '';
   private installedPlugins: InstalledPlugin[] = [];
   private isStopping = false;
-  private sessionManager: any = null; // TODO: Type properly with PilotSessionManager
+  private sessionManager: unknown = null;
   private pluginSkills = new Map<string, Array<{ skillId: string; content: string }>>();
   private pendingApprovals = new Map<string, {
     pluginId: string;
