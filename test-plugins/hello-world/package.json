@@ -1,0 +1,10 @@
+{
+  "name": "hello-world-plugin",
+  "version": "1.0.0",
+  "description": "A minimal test plugin",
+  "pilot": {
+    "plugins": ["./plugin.js"],
+    "permissions": ["ui:sidebar", "ui:panel", "ui:status-bar", "ui:settings"]
+  },
+  "dependencies": {}
+}

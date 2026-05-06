@@ -2,6 +2,35 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-04-21
+
+### Fixed
+- **TypeError: session.on is not a function** — the Ollama timeout-handling code was calling `.on()` / `.off()` on `AgentSession`, which only exposes `.subscribe()`. This caused a crash on every new chat. Replaced with proper `session.subscribe()` + unsubscribe cleanup in `finally`.
+
+### Changed
+- **Top bar shows projects instead of chats** — the tab bar is now a project bar, showing one compact pill per project (folder icon, name, status dot) instead of individual chat tabs. This maximises the number of visible projects at once. Chat navigation moved entirely to the sidebar Sessions pane, which now shows active chats above historical sessions with a clear section split. Keyboard shortcuts updated: `Cmd+1-9` and `Ctrl+Tab` cycle projects instead of individual tabs.
+
+### Fixed
+- **Zustand selector infinite loop** — replaced unstable object/array-returning selectors with primitive-value subscriptions (`tabs.length`, sorted key strings, booleans) to prevent `useSyncExternalStore` from detecting spurious state changes and re-rendering in an infinite loop.
+
+## 2026-03-15
+
+### Added
+- **Custom themes** — full theme editor with color pickers, live preview, built-in presets, and import/export as JSON files. Themes persist across restarts via localStorage early-apply to prevent flash. (#23)
+- **Session export** — export conversations to Markdown or JSON files, or copy to clipboard. Includes optional thinking blocks (fenced in code blocks for safe HTML) and timestamps. (#18)
+- **Message actions** — copy, regenerate, and edit & resend on individual chat messages. Regenerate forks the session at the preceding user message. Edit preserves image attachments through the round-trip. (#19)
+
+### Fixed
+- **Theme editor delete** — deleting the active custom theme now resets mode to dark instead of leaving the user stuck in an unresolvable custom mode
+- **Theme path traversal** — hardened slug validation and path resolution in theme get/save/delete/export to prevent directory traversal
+- **Theme slug collisions** — prevent overwriting built-in themes; atomic rename for slug changes
+- **Export menu stale error** — error state clears when reopening the menu so previous failures don't flash
+- **Export double-click** — added in-flight guard to prevent spawning duplicate save dialogs or clipboard writes
+- **Regenerate with edit overlay** — editing index is cleared before fork so the overlay doesn't attach to a stale message
+- **Edit drops images** — image attachment prefix is preserved when editing and resending a message with attachments
+- **Citations performance** — memoized `extractCitations` to avoid re-running regex on every streaming tick
+- **Appearance settings error handling** — import, export, and delete theme handlers now surface errors via a dismissible banner instead of silently failing
+
 ## 2026-03-13
 
 ### Fixed

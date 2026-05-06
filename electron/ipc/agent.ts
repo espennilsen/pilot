@@ -12,6 +12,10 @@ export function setPromptLibraryRef(lib: PromptLibrary): void {
   promptLibraryRef = lib;
 }
 
+import { getLogger } from '../services/logger';
+
+const log = getLogger('agent-ipc');
+
 export function registerAgentIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.AGENT_CREATE_SESSION, async (_event, tabId: string, projectPath: string) => {
     await sessionManager.createSession(tabId, projectPath);
@@ -210,7 +214,12 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
       companionBridge.forwardEvent(IPC.AGENT_EVENT, userMessageEvent);
     }
 
-    await sessionManager.prompt(tabId, text);
+    try {
+      await sessionManager.prompt(tabId, text);
+    } catch (err) {
+      log.error(`AGENT_PROMPT failed: tab=${tabId}, error=${err}`);
+      throw err;
+    }
   });
 
   ipcMain.handle(IPC.AGENT_STEER, async (_event, tabId: string, text: string) => {
@@ -290,6 +299,21 @@ export function registerAgentIpc(sessionManager: PilotSessionManager) {
     return {
       history: sessionManager.getSessionHistory(tabId),
       sessionPath: sessionManager.getSessionPath(tabId) || null,
+    };
+  });
+
+  // Get user messages with entry IDs for fork/regenerate
+  ipcMain.handle(IPC.SESSION_GET_FORK_POINTS, async (_event, tabId: string) => {
+    return sessionManager.getForkPoints(tabId);
+  });
+
+  // Fork session at a specific entry (for regenerate/edit-and-resend)
+  ipcMain.handle(IPC.SESSION_FORK, async (_event, tabId: string, entryId: string) => {
+    const result = await sessionManager.fork(tabId, entryId);
+    return {
+      selectedText: result.selectedText,
+      cancelled: result.cancelled,
+      history: sessionManager.getSessionHistory(tabId),
     };
   });
 

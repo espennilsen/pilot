@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, shell } from 'electron';
 import { IPC } from '../../shared/ipc';
 import type { PilotSessionManager } from '../services/pi-session-manager';
 import { companionBridge } from '../services/companion-ipc-bridge';
+import { loadAppSettings } from '../services/app-settings';
 
 export interface ProviderAuthInfo {
   provider: string;
@@ -24,13 +25,29 @@ export function registerAuthIpc(sessionManager: PilotSessionManager) {
   ipcMain.handle(IPC.AUTH_GET_STATUS, async () => {
     const auth = sessionManager.getAuthStorage();
     // Check common providers
-    const knownProviders = ['anthropic', 'openai', 'google'];
+    const knownProviders = ['anthropic', 'openai', 'google', 'ollama'];
     const statuses: ProviderAuthInfo[] = [];
 
     for (const provider of knownProviders) {
       const hasAuth = auth.hasAuth(provider);
       const credential = auth.get(provider);
       let authType: ProviderAuthInfo['authType'] = 'none';
+
+      // Ollama: special handling — auth comes from its own settings, not auth.json
+      if (provider === 'ollama') {
+        const ollamaSettings = loadAppSettings().ollama;
+        const ollamaEnabled = ollamaSettings?.enabled ?? false;
+        if (ollamaEnabled) {
+          statuses.push({
+            provider: 'ollama',
+            hasAuth: true,
+            authType: ollamaSettings?.apiKey ? 'api_key' : 'none',
+          });
+        } else {
+          statuses.push({ provider: 'ollama', hasAuth: false, authType: 'none' });
+        }
+        continue;
+      }
 
       if (credential) {
         authType = credential.type === 'oauth' ? 'oauth' : 'api_key';

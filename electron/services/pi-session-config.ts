@@ -29,6 +29,7 @@ import { createWebSearchTool } from './web-search-tool';
 import type { DesktopService } from './desktop-service';
 import type { StagedDiff } from '../../shared/types';
 import type { McpManager } from './mcp-manager';
+import { pluginBridge } from './plugin-bridge';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -107,8 +108,11 @@ export async function buildSessionConfig(
   const appSettings = loadAppSettings();
   const userSystemPrompt = appSettings.systemPrompt?.trim() || null;
 
-  // Combine user system prompt, memory, and task context
-  const additionalContext = [userSystemPrompt, memoryContext, taskSummary].filter(Boolean).join('\n\n');
+  // Get plugin skills for system prompt injection
+  const pluginSkills = pluginBridge.getSkillsForProject(projectPath);
+
+  // Combine user system prompt, memory, task context, and plugin skills
+  const additionalContext = [userSystemPrompt, memoryContext, taskSummary, pluginSkills].filter(Boolean).join('\n\n');
 
   // Build resource loader with extensions, skills, and system prompt
   const resourceLoader = new DefaultResourceLoader({

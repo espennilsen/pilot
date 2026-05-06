@@ -17,6 +17,7 @@ import {
   isWithinProject,
   findEscapingPaths,
 } from './sandbox-path-helpers';
+import { pluginBridge } from './plugin-bridge';
 
 export { findEscapingPaths } from './sandbox-path-helpers';
 
@@ -51,6 +52,80 @@ function agentToolToDefinition(agentTool: any): ToolDefinition {
     execute: async (toolCallId, params, signal, onUpdate, _ctx) => {
       // Call the AgentTool's execute, which doesn't need ctx
       return agentTool.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as ToolDefinition;
+}
+
+/**
+ * Wrap a tool definition with plugin before/after interception.
+ * The wrapper calls pluginBridge.forwardAgentEvent('tool_call') before
+ * execution and pluginBridge.forwardAgentEvent('tool_result') after.
+ *
+ * Short-circuits to a direct passthrough if no plugin is interested in
+ * this tool's events.
+ */
+function wrapToolWithPluginHooks(tool: ToolDefinition): ToolDefinition {
+  return {
+    name: tool.name,
+    label: tool.label,
+    description: tool.description,
+    parameters: tool.parameters,
+    promptSnippet: (tool as any).promptSnippet,
+    promptGuidelines: (tool as any).promptGuidelines,
+    execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+      // Only forward if plugins have subscribed to tool events
+      const hasToolCallSubs = pluginBridge.hasSubscribersFor('tool_call');
+      const hasToolResultSubs = pluginBridge.hasSubscribersFor('tool_result');
+
+      if (!hasToolCallSubs && !hasToolResultSubs) {
+        // Fast path: no plugins interested, execute directly
+        return tool.execute(toolCallId, params, signal, onUpdate, ctx);
+      }
+
+      // Before: forward to plugins, allow blocking
+      if (hasToolCallSubs) {
+        const beforeResult = await pluginBridge.forwardAgentEvent({
+          name: 'tool_call',
+          toolName: tool.name,
+          toolCallId,
+          input: params as Record<string, unknown>,
+        });
+
+        if (beforeResult.block) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${tool.name}" blocked by plugin: ${beforeResult.reason || 'No reason given'}`,
+            }],
+            details: { blocked: true, reason: beforeResult.reason },
+          };
+        }
+
+        // Apply input mutations from plugins
+        if (beforeResult.patchedInput) {
+          Object.assign(params, beforeResult.patchedInput);
+        }
+      }
+
+      // Execute the actual tool
+      const result = await tool.execute(toolCallId, params, signal, onUpdate, ctx);
+
+      // After: forward result to plugins, allow modification
+      if (hasToolResultSubs) {
+        const afterResult = await pluginBridge.forwardAgentEvent({
+          name: 'tool_result',
+          toolName: tool.name,
+          toolCallId,
+          input: params as Record<string, unknown>,
+          result,
+        });
+
+        if (afterResult.modifiedResult !== undefined) {
+          return afterResult.modifiedResult;
+        }
+      }
+
+      return result;
     },
   } as ToolDefinition;
 }
@@ -339,8 +414,12 @@ export function createSandboxedTools(
     sandboxedLs,
   ];
 
+  // Wrap all tools with plugin interception hooks
+  const wrappedTools = [sandboxedEdit, sandboxedWrite, sandboxedBash].map(wrapToolWithPluginHooks);
+  const wrappedReadOnlyTools = readOnlyToolDefs.map(wrapToolWithPluginHooks);
+
   return {
-    tools: [sandboxedEdit, sandboxedWrite, sandboxedBash],
-    readOnlyTools: readOnlyToolDefs,
+    tools: wrappedTools,
+    readOnlyTools: wrappedReadOnlyTools,
   };
 }

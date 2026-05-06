@@ -2,6 +2,9 @@
 // These types are used by both main and renderer processes
 // All types must be serializable over IPC (Structured Clone)
 
+/** JSON-serializable value type for IPC payloads — ensures Structured Clone compliance */
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 // Session metadata (Pilot layer on top of SDK sessions)
@@ -41,6 +44,24 @@ export interface CustomTheme {
   /** Syntax highlighting (highlight.js) token color overrides. Optional */
   syntax?: Record<string, string>;
 }
+
+// ─── Ollama ────────────────────────────────────────────────────────────
+
+/** A manually-added Ollama cloud model entry. */
+export type OllamaCloudModel = {
+  /** Model ID as Ollama knows it (e.g. 'GLM-5.1', stored as 'GLM-5.1:cloud') */
+  id: string;
+  /** Human-readable display name (e.g. 'GLM 5.1 Cloud') */
+  name?: string;
+  /** Context window in tokens. Default: 131072 */
+  contextWindow?: number;
+  /** Max output tokens. Default: 16384 */
+  maxTokens?: number;
+  /** Whether the model supports reasoning/thinking. Default: false */
+  reasoning?: boolean;
+  /** Whether the model supports image input. Default: false */
+  vision?: boolean;
+};
 
 export interface PilotAppSettings {
   /** Custom pi agent config directory. Default: ~/.config/pilot */
@@ -109,7 +130,23 @@ export interface PilotAppSettings {
     /** Brave Search API key. Get one free at https://api.search.brave.com/ */
     apiKey?: string;
   };
+
+  /** Ollama local LLM configuration */
+  ollama?: {
+    /** Enable Ollama integration. Default: false */
+    enabled: boolean;
+    /** Ollama API endpoint URL. Default: 'http://localhost:11434' */
+    endpoint: string;
+    /** Optional API key (for remote/proxied Ollama instances). Default: '' (no key) */
+    apiKey?: string;
+    /** Manually-added cloud models not returned by ollama.list() */
+    cloudModels?: OllamaCloudModel[];
+    /** Default model ID (local or cloud) for new sessions. E.g. 'llama3.1:8b' or 'GLM-5.1:cloud' */
+    defaultModel?: string;
+  };
 }
+
+
 
 // MCP (Model Context Protocol) types
 export type McpTransportType = 'stdio' | 'sse' | 'streamable-http';
@@ -812,4 +849,409 @@ export interface WebTabOpenPayload {
   url: string;
   title?: string;
   projectPath: string | null;
+}
+
+// ─── Plugin System ───────────────────────────────────────────────────────
+
+/** Permissions a plugin requests. Each maps to a capability gate in PluginBridge. */
+export type PluginPermission =
+  | 'ui:sidebar'
+  | 'ui:panel'
+  | 'ui:status-bar'
+  | 'ui:context-menu'
+  | 'ui:settings'
+  | 'ui:tabs'
+  | 'ui:chat-renderer'
+  | 'agent:tools'
+  | 'agent:skills'
+  | 'agent:events'
+  | `network:${string}`
+  | 'fs:read'
+  | 'fs:write'
+  | 'git:status'
+  | 'git:write'
+  | 'shell:exec';
+
+/** Manifest extracted from a plugin's package.json under the "pilot" key. */
+export interface PluginManifest {
+  /** Entry files relative to package root (e.g. ["./dist/plugin.js"]) */
+  plugins: string[];
+  /** Permissions the plugin needs */
+  permissions: PluginPermission[];
+  /** Minimum Pilot version (semver) */
+  minPilotVersion?: string;
+}
+
+/** A plugin installed on disk. */
+export interface InstalledPlugin {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  source: 'npm' | 'git' | 'local';
+  sourceUrl: string;
+  installedAt: number;
+  enabled: boolean;
+  manifest: PluginManifest;
+  path: string;        // absolute path on disk
+  hasErrors: boolean;
+  errorMessage?: string;
+}
+
+/** Result of a plugin install operation. */
+export interface PluginInstallResult {
+  success: boolean;
+  id?: string;
+  name?: string;
+  version?: string;
+  error?: string;
+}
+
+// ─── Plugin Contributions (sent from Extension Host → renderer via PluginBridge) ──
+
+/** Valid icon name from lucide-react */
+export type IconName =
+  | 'Puzzle'
+  | 'Smile'
+  | 'Monitor'
+  | 'PanelRightOpen'
+  | 'PanelRightClose'
+  | 'Folder'
+  | 'File'
+  | 'GitBranch'
+  | 'Settings'
+  | 'Terminal'
+  | 'Search'
+  | 'Plus'
+  | 'X'
+  | 'Check'
+  | 'AlertCircle'
+  | 'Info'
+  | 'Trash'
+  | 'Edit'
+  | 'Save'
+  | 'RefreshCw'
+  | 'ArrowUp'
+  | 'ArrowDown'
+  | 'ChevronRight'
+  | 'ChevronDown'
+  | 'MoreVertical'
+  | 'ExternalLink'
+  | 'Copy'
+  | 'Code'
+  | 'MessageSquare'
+  | 'User'
+  | 'LogOut'
+  | 'LogIn'
+  | 'Bell'
+  | 'Star'
+  | 'Clock'
+  | 'Calendar'
+  | 'Home'
+  | 'Briefcase'
+  | 'Database'
+  | 'Cloud'
+  | 'Download'
+  | 'Upload'
+  | 'GitMerge'
+  | 'GitPullRequest'
+  | 'GitCommit'
+  | 'Shield'
+  | 'Key'
+  | 'Lock'
+  | 'Unlock'
+  | 'Eye'
+  | 'EyeOff'
+  | 'Play'
+  | 'Pause'
+  | 'StopCircle'
+  | 'Square'
+  | 'Circle'
+  | 'Triangle'
+  | 'Hexagon'
+  | 'Box'
+  | 'Package'
+  | 'Layers'
+  | 'Layout'
+  | 'Grid'
+  | 'List'
+  | 'Menu'
+  | 'XOctagon'
+  | 'CheckCircle'
+  | 'AlertTriangle'
+  | 'AlertOctagon'
+  | 'HelpCircle'
+  | 'TrendingUp'
+  | 'TrendingDown'
+  | 'Activity'
+  | 'Zap'
+  | 'Coffee'
+  | 'Sun'
+  | 'Moon'
+  | 'CloudRain'
+  | 'Wind'
+  | 'Snowflake'
+  | 'Flame'
+  | 'Droplet'
+  | 'Music'
+  | 'Image'
+  | 'Video'
+  | 'Film'
+  | 'Camera'
+  | 'Mic'
+  | 'Headphones'
+  | 'Speaker'
+  | 'Phone'
+  | 'Mail'
+  | 'Send'
+  | 'Inbox'
+  | 'Archive'
+  | 'Bookmark'
+  | 'Tag'
+  | 'Hash'
+  | 'AtSign'
+  | 'Link'
+  | 'Unlink'
+  | 'FileText'
+  | 'FileCode'
+  | 'FileJson'
+  | 'FileSpreadsheet'
+  | 'FolderOpen'
+  | 'FolderPlus'
+  | 'FolderMinus'
+  | 'Gitlab'
+  | 'Github'
+  | 'Gitfork'
+  | 'Rocket'
+  | 'Wrench'
+  | 'Hammer'
+  | 'Screwdriver'
+  | 'Tool'
+  | 'Cpu'
+  | 'Server'
+  | 'Network'
+  | 'Wifi'
+  | 'Bluetooth'
+  | 'Usb'
+  | 'HardDrive'
+  | 'Disc'
+  | 'Printer'
+  | 'Scan'
+  | 'QrCode'
+  | 'Barcode'
+  | 'CreditCard'
+  | 'DollarSign'
+  | 'Euro'
+  | 'Bitcoin'
+  | 'ShoppingCart'
+  | 'ShoppingBag'
+  | 'Tag'
+  | 'Percent'
+  | 'TrendingUp'
+  | 'TrendingDown'
+  | 'PieChart'
+  | 'BarChart'
+  | 'LineChart'
+  | 'ScatterChart'
+  | 'Map'
+  | 'MapPin'
+  | 'Navigation'
+  | 'Compass'
+  | 'Globe'
+  | 'Flag'
+  | 'Award'
+  | 'Trophy'
+  | 'Medal'
+  | 'Crown'
+  | 'Gem'
+  | 'Gift'
+  | 'Heart'
+  | 'ThumbsUp'
+  | 'ThumbsDown'
+  | 'Hand'
+  | 'Fingerprint'
+  | 'Brain'
+  | 'Eye'
+  | 'Ear'
+  | 'Mouth'
+  | 'Bone'
+  | 'Footprints'
+  | 'Arm'
+  | 'HandMetal'
+  | 'Badge'
+  | 'Belt'
+  | 'Glasses'
+  | 'Hat'
+  | 'Shirt'
+  | 'Shoe'
+  | 'Watch'
+  | 'Anchor'
+  | 'Boat'
+  | 'Car'
+  | 'Bus'
+  | 'Train'
+  | 'Plane'
+  | 'Bike'
+  | 'Truck'
+  | 'Ship'
+  | 'Tractor'
+  | 'Ban'
+  | 'Allow'
+  | 'CircleAlert'
+  | 'CircleCheck'
+  | 'CircleHelp'
+  | 'CircleX'
+  | 'SquareAlert'
+  | 'SquareCheck'
+  | 'SquareHelp'
+  | 'SquareX'
+  | 'TriangleAlert'
+  | 'TriangleCheck'
+  | 'TriangleHelp'
+  | 'TriangleX'
+  | 'OctagonAlert'
+  | 'OctagonCheck'
+  | 'OctagonHelp'
+  | 'OctagonX'
+  | 'PentagonAlert'
+  | 'PentagonCheck'
+  | 'PentagonHelp'
+  | 'PentagonX'
+  | 'HexagonAlert'
+  | 'HexagonCheck'
+  | 'HexagonHelp'
+  | 'HexagonX';
+
+/** A tree view item for sidebar/panel contributions. */
+export interface PluginTreeItem {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: IconName;
+  collapsible?: boolean;
+  command?: { id: string; args?: JsonValue[] };
+}
+
+/** Registered tree view contributed by a plugin. */
+export interface PluginTreeView {
+  pluginId: string;
+  viewId: string;
+  title: string;
+  icon?: IconName;
+  location: 'sidebar' | 'panel';
+}
+
+/** Status bar item contributed by a plugin. */
+export interface PluginStatusBarItem {
+  pluginId: string;
+  itemId: string;
+  text: string;
+  tooltip?: string;
+  alignment: 'left' | 'right';
+  priority: number;
+  command?: { id: string; args?: unknown[] };
+}
+
+/** Context menu contribution. */
+export interface PluginContextMenuContribution {
+  pluginId: string;
+  when: string;
+  group: string;
+  items: Array<{
+    label: string;
+    command: { id: string; args?: unknown[] };
+  }>;
+}
+
+/** Registered command from a plugin. */
+export interface PluginCommand {
+  pluginId: string;
+  id: string;
+  label: string;
+  keybinding?: string;
+}
+
+/** Settings section contribution. */
+export interface PluginSettingsSection {
+  pluginId: string;
+  sectionId: string;
+  title: string;
+  icon?: string;
+}
+
+/** A tab type registered by a plugin. */
+export interface PluginTabType {
+  pluginId: string;
+  typeId: string;
+  label: string;
+  icon?: string;
+}
+
+/** Chat message renderer contribution. */
+export interface PluginMessageRenderer {
+  pluginId: string;
+  rendererId: string;
+  matchToolName?: string;
+  matchCustomType?: string;
+}
+
+/** Event forwarded from PluginBridge → renderer about plugin state changes. */
+export interface PluginEventPayload {
+  type: 'plugin-activated' | 'plugin-deactivated' | 'plugin-error' | 'contribution-updated';
+  pluginId: string;
+  data?: JsonValue;
+}
+
+/** Registered interest in an agent event. */
+export interface PluginAgentEventSubscription {
+  pluginId: string;
+  event: string;   // 'tool_call' | 'tool_result' | 'agent_start' | etc.
+}
+
+/** Serialised agent event forwarded to plugins. */
+export interface SerialisedAgentEvent {
+  name: string;
+  toolName?: string;
+  toolCallId?: string;
+  input?: Record<string, JsonValue>;
+  result?: JsonValue;
+  message?: JsonValue;
+  prompt?: string;
+}
+
+// ─── Plugin Catalog (Phase 5 Distribution) ──────────────────────────
+
+/** A plugin entry in the plugin catalog/browser. */
+export interface CatalogPlugin {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  homepage?: string;
+  repository?: string;
+  /** Install string — "npm:package" or "git:repo" */
+  install: string;
+  tags: string[];
+  permissions: string[];
+  minPilotVersion: string;
+  rating?: number;
+  downloads?: number;
+  icon?: string;
+}
+
+/** Plugin catalog response from remote or bundled catalog. */
+export interface PluginCatalog {
+  version: number;
+  lastUpdated: string;
+  plugins: CatalogPlugin[];
+}
+
+// ─── Plugin Scaffolding ───────────────────────────────────────────
+
+/** Result of plugin scaffolding operation. */
+export interface ScaffoldResult {
+  success: boolean;
+  path?: string;
+  error?: string;
 }
