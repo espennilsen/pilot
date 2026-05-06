@@ -50,7 +50,7 @@ export default function FileTree() {
 
   const { model } = useFileTree({
     paths,
-    initialExpansion: 'open',
+    initialExpansion: 'closed',
     search: true,
     flattenEmptyDirectories: false,
     icons: {
@@ -73,6 +73,85 @@ export default function FileTree() {
         less: { name: 'less', viewBox: '0 0 24 24' },
       },
     },
+    // Custom styling to match app theme
+    unsafeCSS: `
+      :host {
+        --trees-bg-override: transparent;
+        --trees-fg-override: var(--text-primary);
+        --trees-border-color-override: var(--border);
+        --trees-selected-bg-override: var(--accent/0.15);
+        --trees-selected-fg-override: var(--accent);
+        --trees-hover-bg-override: var(--bg-elevated);
+        --trees-row-height: 32px;
+        --trees-indent: 16px;
+        --trees-icon-size: 16px;
+        --trees-font-family: inherit;
+        --trees-font-size: 14px;
+      }
+      
+      /* Remove default outline */
+      [part="tree"] {
+        outline: none !important;
+      }
+      
+      /* Style rows */
+      button[data-type="item"] {
+        padding-left: calc(var(--trees-indent) * var(--depth) + 8px) !important;
+        padding-right: 8px !important;
+        transition: background-color 0.15s ease;
+      }
+      
+      button[data-type="item"]:hover {
+        background-color: var(--trees-hover-bg-override) !important;
+      }
+      
+      button[data-type="item"][data-item-selected] {
+        background-color: var(--trees-selected-bg-override) !important;
+        color: var(--trees-selected-fg-override) !important;
+      }
+      
+      /* Style chevron icons */
+      [part="chevron"] {
+        width: 12px;
+        height: 12px;
+        color: var(--text-secondary);
+      }
+      
+      /* Style file icons */
+      [part="icon"] {
+        width: var(--trees-icon-size);
+        height: var(--trees-icon-size);
+      }
+      
+      /* Style text */
+      [part="label"] {
+        font-size: var(--trees-font-size);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      /* Search input styling */
+      [part="search-input"] {
+        background-color: var(--bg-elevated) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+        color: var(--text-primary) !important;
+        padding: 6px 10px !important;
+        font-size: 13px !important;
+      }
+      
+      [part="search-input"]:focus {
+        border-color: var(--accent) !important;
+        outline: none !important;
+      }
+      
+      /* Search container */
+      [part="search"] {
+        padding: 8px !important;
+        border-bottom: 1px solid var(--border) !important;
+      }
+    `,
   });
 
   // ── Action callbacks ───────────────────────────────────
