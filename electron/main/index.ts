@@ -47,6 +47,7 @@ import { companionBridge, syncAllHandlers } from '../services/companion-ipc-brid
 import { ensureTLSCert } from '../services/companion-tls';
 import { PILOT_APP_DIR } from '../services/pilot-paths';
 import { loadAppSettings } from '../services/app-settings';
+import { WorkspaceStateService } from '../services/workspace-state';
 import { IPC } from '../../shared/ipc';
 
 let mainWindow: BrowserWindow | null = null;
@@ -65,6 +66,7 @@ let themeService: ThemeService | null = null;
 let ollamaService: OllamaService | null = null;
 let pluginInstaller: PluginInstaller | null = null;
 let developerModeEnabled = false;
+const service = new WorkspaceStateService();
 
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -239,6 +241,39 @@ function createWindow() {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
   });
+
+  // Restore window bounds from workspace state
+  (async () => {
+    const workspace = await service.load();
+    if (workspace?.windowBounds && !workspace.windowMaximized) {
+      mainWindow?.setBounds(workspace.windowBounds);
+    }
+    if (workspace?.windowMaximized) {
+      mainWindow?.maximize();
+    }
+  })();
+
+  // Save window bounds on resize/position changes
+  let saveWindowBoundsTimeout: NodeJS.Timeout | null = null;
+  const saveWindowBounds = () => {
+    if (saveWindowBoundsTimeout) clearTimeout(saveWindowBoundsTimeout);
+    saveWindowBoundsTimeout = setTimeout(async () => {
+      if (!mainWindow) return;
+      const bounds = mainWindow.getBounds();
+      const isMaximized = mainWindow.isMaximized();
+      const workspace = await service.load();
+      await service.save({
+        ...workspace!,
+        windowBounds: bounds,
+        windowMaximized: isMaximized,
+      });
+    }, 500);
+  };
+
+  mainWindow.on('resize', saveWindowBounds);
+  mainWindow.on('move', saveWindowBounds);
+  mainWindow.on('maximize', saveWindowBounds);
+  mainWindow.on('unmaximize', saveWindowBounds);
 
   // Send maximize state changes to renderer
   mainWindow.on('maximize', () => {
