@@ -233,7 +233,16 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
-  // Show window when ready to prevent flash
+  // Restore window bounds from workspace state BEFORE showing window
+  const workspace = await service.load();
+  if (workspace?.windowBounds && !workspace.windowMaximized) {
+    mainWindow.setBounds(workspace.windowBounds);
+  }
+  if (workspace?.windowMaximized) {
+    mainWindow.maximize();
+  }
+
+  // Show window when ready
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show();
     // Open DevTools in dev mode for debugging
@@ -241,9 +250,6 @@ function createWindow() {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
   });
-
-  // Restore window bounds from workspace state
-  (async () => {
     const workspace = await service.load();
     if (workspace?.windowBounds && !workspace.windowMaximized) {
       mainWindow?.setBounds(workspace.windowBounds);
