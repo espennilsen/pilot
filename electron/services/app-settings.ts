@@ -81,6 +81,8 @@ export function loadAppSettings(): PilotAppSettings {
     const parsed = JSON.parse(raw);
     cachedSettings = {
       piAgentDir: parsed.piAgentDir || DEFAULT_PI_AGENT_DIR,
+      theme: parsed.theme ?? undefined,
+      customThemeSlug: parsed.customThemeSlug ?? undefined,
       terminalApp: parsed.terminalApp ?? null,
       editorCli: parsed.editorCli ?? null,
       onboardingComplete: parsed.onboardingComplete ?? false,
@@ -93,6 +95,7 @@ export function loadAppSettings(): PilotAppSettings {
       desktopEnabled: parsed.desktopEnabled ?? false,
       systemPrompt: parsed.systemPrompt ?? undefined,
       logging: parsed.logging ?? DEFAULT_APP_SETTINGS.logging,
+      ollama: parsed.ollama ?? undefined,
     };
     return cachedSettings;
   } catch (err) {
@@ -124,10 +127,37 @@ export function saveAppSettings(settings: Partial<PilotAppSettings>): PilotAppSe
   if (typeof settings.companionProtocol === 'string') validated.companionProtocol = settings.companionProtocol;
   if (typeof settings.companionAutoStart === 'boolean') validated.companionAutoStart = settings.companionAutoStart;
   if (typeof settings.desktopEnabled === 'boolean') validated.desktopEnabled = settings.desktopEnabled;
+  if (typeof settings.theme === 'string' && ['dark', 'light', 'system', 'custom'].includes(settings.theme)) validated.theme = settings.theme;
+  if (settings.customThemeSlug === undefined) {
+    validated.customThemeSlug = undefined;
+  } else if (typeof settings.customThemeSlug === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(settings.customThemeSlug)) {
+    validated.customThemeSlug = settings.customThemeSlug;
+  }
   if (typeof settings.systemPrompt === 'string' || settings.systemPrompt === undefined) validated.systemPrompt = settings.systemPrompt;
   if (typeof settings.logging === 'object' && settings.logging !== null) validated.logging = settings.logging;
   if (typeof settings.keybindOverrides === 'object' && settings.keybindOverrides !== null) validated.keybindOverrides = settings.keybindOverrides;
   if (Array.isArray(settings.hiddenPaths)) validated.hiddenPaths = settings.hiddenPaths;
+  if (typeof settings.ollama === 'object' && settings.ollama !== null) {
+    const o = settings.ollama as any;
+    validated.ollama = {
+      enabled: typeof o.enabled === 'boolean' ? o.enabled : false,
+      endpoint: typeof o.endpoint === 'string' && /^https?:\/\//.test(o.endpoint) ? o.endpoint : 'http://localhost:11434',
+      apiKey: typeof o.apiKey === 'string' ? o.apiKey : '',
+      cloudModels: Array.isArray(o.cloudModels)
+        ? o.cloudModels
+            .filter((m: any) => m && typeof m.id === 'string')
+            .map((m: any) => ({
+              id: m.id,
+              name: typeof m.name === 'string' ? m.name : undefined,
+              contextWindow: typeof m.contextWindow === 'number' ? m.contextWindow : undefined,
+              maxTokens: typeof m.maxTokens === 'number' ? m.maxTokens : undefined,
+              reasoning: typeof m.reasoning === 'boolean' ? m.reasoning : undefined,
+              vision: typeof m.vision === 'boolean' ? m.vision : undefined,
+            }))
+        : [],
+      defaultModel: typeof o.defaultModel === 'string' ? o.defaultModel : undefined,
+    };
+  }
 
   const merged: PilotAppSettings = {
     ...current,

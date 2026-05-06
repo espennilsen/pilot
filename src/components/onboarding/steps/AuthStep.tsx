@@ -1,18 +1,30 @@
-import { useState } from 'react';
-import { useAuthStore, type ProviderAuthInfo } from '../../../stores/auth-store';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuthStore, type ProviderAuthInfo, type OllamaStatusInfo } from '../../../stores/auth-store';
+import { IPC } from '../../../../shared/ipc';
+import { invoke } from '../../../lib/ipc-client';
 import {
   Key, Globe, CheckCircle, AlertCircle, Loader2, ExternalLink,
+  Server, Wifi, WifiOff,
 } from 'lucide-react';
 
 // ─── Provider definitions ────────────────────────────────────────────────
 
 const PROVIDERS = [
   {
+    id: 'ollama',
+    name: 'Ollama',
+    description: 'Local models — no API key needed',
+    envVar: '',
+    supportsOAuth: false,
+    isOllama: true,
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic',
     description: 'Claude models (Sonnet, Opus, Haiku)',
     envVar: 'ANTHROPIC_API_KEY',
     supportsOAuth: true,
+    isOllama: false,
   },
   {
     id: 'openai',
@@ -20,6 +32,7 @@ const PROVIDERS = [
     description: 'GPT-4o, o1, o3 models',
     envVar: 'OPENAI_API_KEY',
     supportsOAuth: false,
+    isOllama: false,
   },
   {
     id: 'google',
@@ -27,6 +40,7 @@ const PROVIDERS = [
     description: 'Gemini models',
     envVar: 'GOOGLE_API_KEY',
     supportsOAuth: false,
+    isOllama: false,
   },
 ];
 
@@ -80,6 +94,132 @@ function OAuthPromptDialog({
           ✕
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Ollama Card ─────────────────────────────────────────────────────────
+
+function OllamaCard({
+  authInfo,
+  ollamaStatus,
+  onEnabled,
+}: {
+  authInfo?: ProviderAuthInfo;
+  ollamaStatus: OllamaStatusInfo | null;
+  onEnabled: () => void;
+}) {
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; version?: string; error?: string } | null>(null);
+  const isConnected = authInfo?.hasAuth ?? false;
+  const status = ollamaStatus;
+
+  // Auto-test connection when initially enabled
+  const handleTest = useCallback(async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await invoke(IPC.OLLAMA_CHECK_CONNECTION) as { ok: boolean; version?: string; error?: string };
+      setTestResult(result);
+    } catch (err: any) {
+      setTestResult({ ok: false, error: err?.message || 'Unknown error' });
+    }
+    setTesting(false);
+  }, []);
+
+  const handleEnable = async () => {
+    // Quick test then enable
+    setTesting(true);
+    try {
+      const result = await invoke(IPC.OLLAMA_CHECK_CONNECTION) as { ok: boolean; version?: string; error?: string };
+      setTestResult(result);
+      // Enable regardless — user may start Ollama later or only use cloud models
+      await invoke(IPC.OLLAMA_SAVE_SETTINGS, { enabled: true });
+      onEnabled();
+    } catch {
+      // Still enable — maybe Ollama isn't running yet but user will start it later
+      await invoke(IPC.OLLAMA_SAVE_SETTINGS, { enabled: true });
+      onEnabled();
+    }
+    setTesting(false);
+  };
+
+  // Auto-test connection when initially enabled
+  useEffect(() => {
+    if (isConnected && !testResult && !testing) {
+      handleTest();
+    }
+  }, [isConnected, testResult, testing, handleTest]);
+
+  return (
+    <div className={`border rounded-lg transition-colors ${
+      isConnected ? 'border-success/30 bg-success/5' : 'border-border bg-bg-surface'
+    }`}>
+      <div className="flex items-center gap-3 p-3">
+        <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
+          isConnected ? 'bg-success/20' : 'bg-bg-elevated'
+        }`}>
+          {isConnected ? (
+            status?.available ? (
+              <Wifi className="w-3.5 h-3.5 text-success" />
+            ) : (
+              <CheckCircle className="w-3.5 h-3.5 text-success" />
+            )
+          ) : (
+            <Server className="w-3.5 h-3.5 text-text-secondary" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-text-primary">Ollama</span>
+            {isConnected && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-medium">
+                {status?.available ? `${status.modelCount} models` : 'Enabled'}
+              </span>
+            )}
+            {status?.version && (
+              <span className="text-[10px] text-text-secondary">v{status.version}</span>
+            )}
+          </div>
+          <p className="text-xs text-text-secondary">
+            {isConnected
+              ? status?.available
+                ? `Running at ${status.endpoint}`
+                : status?.error || 'Not reachable'
+              : 'Local models — no API key needed'}
+          </p>
+        </div>
+        {!isConnected && (
+          <button
+            onClick={handleEnable}
+            disabled={testing}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-accent hover:bg-accent/90 rounded transition-colors disabled:opacity-50"
+          >
+            {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Server className="w-3 h-3" />}
+            Enable
+          </button>
+        )}
+        {isConnected && (
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-text-primary bg-bg-elevated border border-border hover:border-accent/50 rounded transition-colors"
+          >
+            {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+            Test
+          </button>
+        )}
+      </div>
+      {/* Test result feedback */}
+      {testResult && (
+        <div className={`mx-3 mb-3 px-2.5 py-1.5 rounded text-xs ${
+          testResult.ok ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+        }`}>
+          {testResult.ok
+            ? `Connected — Ollama v${testResult.version}`
+            : testResult.error || 'Connection failed'}
+        </div>
+      )}
     </div>
   );
 }
@@ -191,7 +331,11 @@ function ProviderCard({
 // ─── AuthStep Component ──────────────────────────────────────────────────
 
 export default function AuthStep() {
-  const { providers, setApiKey, loginOAuth, oauthInProgress, oauthMessage, oauthPrompt, submitOAuthPrompt, cancelOAuthPrompt, error, clearError } = useAuthStore();
+  const { providers, ollamaStatus, setApiKey, loginOAuth, oauthInProgress, oauthMessage, oauthPrompt, submitOAuthPrompt, cancelOAuthPrompt, error, clearError, loadStatus } = useAuthStore();
+
+  const refreshAll = async () => {
+    await loadStatus();
+  };
 
   return (
     <div className="space-y-4">
@@ -228,6 +372,18 @@ export default function AuthStep() {
       <div className="space-y-2">
         {PROVIDERS.map((provider) => {
           const authInfo = providers.find(p => p.provider === provider.id);
+
+          if (provider.isOllama) {
+            return (
+              <OllamaCard
+                key={provider.id}
+                authInfo={authInfo}
+                ollamaStatus={ollamaStatus}
+                onEnabled={refreshAll}
+              />
+            );
+          }
+
           return (
             <ProviderCard
               key={provider.id}
@@ -242,7 +398,7 @@ export default function AuthStep() {
       </div>
 
       <p className="text-[10px] text-text-secondary/40 text-center">
-        Keys are stored locally in ~/.config/pilot/auth.json
+        Cloud keys are stored locally in ~/.config/pilot/auth.json
       </p>
     </div>
   );

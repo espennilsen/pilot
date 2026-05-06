@@ -35,6 +35,10 @@ export const IPC = {
   SESSION_NEW: 'session:new',
   SESSION_SWITCH: 'session:switch',
   SESSION_FORK: 'session:fork',
+  SESSION_EXPORT: 'session:export',
+  SESSION_EXPORT_CLIPBOARD: 'session:export-clipboard',
+  SESSION_EXPORT_BY_PATH: 'session:export-by-path',
+  SESSION_EXPORT_CLIPBOARD_BY_PATH: 'session:export-clipboard-by-path',
   SESSION_GET_FORK_POINTS: 'session:get-fork-points',
   SESSION_SUGGESTIONS: 'session:suggestions', // main → renderer push
 
@@ -42,6 +46,16 @@ export const IPC = {
   APP_SETTINGS_GET: 'app-settings:get',
   APP_SETTINGS_UPDATE: 'app-settings:update',
   APP_THEME_CHANGED: 'app-settings:theme-changed',
+
+  // Custom Themes
+  THEME_LIST: 'theme:list',
+  THEME_GET: 'theme:get',
+  THEME_SAVE: 'theme:save',
+  THEME_DELETE: 'theme:delete',
+  THEME_IMPORT: 'theme:import',
+  THEME_EXPORT: 'theme:export',
+
+
   PI_SETTINGS_GET: 'pi-settings:get',
   PI_SETTINGS_UPDATE: 'pi-settings:update',
 
@@ -281,4 +295,35 @@ export const IPC = {
   // Web Tab (agent → renderer)
   WEB_TAB_OPEN: 'web-tab:open',              // main → renderer
   WEB_TAB_LOAD_FAILED: 'web-tab:load-failed', // main → renderer
+
+  // WebView in-page find
+  WEBVIEW_FIND_IN_PAGE: 'webview:find-in-page',
+  WEBVIEW_STOP_FIND_IN_PAGE: 'webview:stop-find-in-page',
+  WEBVIEW_FOUND_IN_PAGE: 'webview:found-in-page', // main → renderer
+
+  // Ollama
+  OLLAMA_STATUS: 'ollama:status',                 // main → renderer push
+  OLLAMA_GET_STATUS: 'ollama:get-status',
+  OLLAMA_CHECK_CONNECTION: 'ollama:check-connection',
+  OLLAMA_SAVE_SETTINGS: 'ollama:save-settings',
+  OLLAMA_VALIDATE_MODEL: 'ollama:validate-model',
+  OLLAMA_REFRESH_MODELS: 'ollama:refresh-models',
+
+  // Plugins
+  PLUGIN_LIST: 'plugin:list',
+  PLUGIN_INSTALL: 'plugin:install',
+  PLUGIN_REMOVE: 'plugin:remove',
+  PLUGIN_TOGGLE: 'plugin:toggle',
+  PLUGIN_GET_CONTRIBUTIONS: 'plugin:get-contributions',
+  PLUGIN_VIEW_GET_CHILDREN: 'plugin:view-get-children',
+  PLUGIN_COMMAND_EXECUTE: 'plugin:command-execute',
+  PLUGIN_SETTINGS_GET_HTML: 'plugin:settings-get-html',
+  PLUGIN_SETTINGS_SAVE: 'plugin:settings-save',
+  PLUGIN_EVENT: 'plugin:event',                       // main → renderer push
+  PLUGIN_AGENT_EVENT_REQUEST: 'plugin:agent-event-request',  // PluginBridge → Extension Host, response expected
+  PLUGIN_CONTRIBUTION_UPDATED: 'plugin:contribution-updated', // main → renderer push
+  PLUGIN_APPROVE_AGENT_CAPABILITY: 'plugin:approve-agent-capability',
+  PLUGIN_INIT: 'plugin:init',
+  PLUGIN_DEV_START: 'plugin:dev-start',
+  PLUGIN_DEV_STOP: 'plugin:dev-stop',
 } as const;

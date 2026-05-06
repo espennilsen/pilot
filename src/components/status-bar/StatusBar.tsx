@@ -7,6 +7,7 @@ import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useDevCommandStore } from '../../stores/dev-command-store';
 import { useMcpStore } from '../../stores/mcp-store';
 import { useUIStore } from '../../stores/ui-store';
+import { usePluginStore } from '../../stores/plugin-store';
 import { MemoryIndicator } from '../memory/MemoryIndicator';
 
 function formatTokenCount(n: number): string {
@@ -45,6 +46,9 @@ export default function StatusBar() {
   const mcpErrors = mcpStatuses.filter(s => s.status === 'error').length;
   const mcpTotal = mcpStatuses.length;
   const openSettings = useUIStore(s => s.openSettings);
+  const { activeStatusBarItems } = usePluginStore();
+  const pluginLeftItems = activeStatusBarItems.filter(i => i.alignment === 'left');
+  const pluginRightItems = activeStatusBarItems.filter(i => i.alignment === 'right');
 
   const autoAccepted = activeTabId ? getAutoAcceptedTools(activeTabId) : [];
   const hasRunningDevCommand = Object.values(devCommandStates).some(state => state.status === 'running');
@@ -99,6 +103,22 @@ export default function StatusBar() {
             <span>Dev</span>
           </div>
         )}
+
+        {/* Plugin status bar items (left) */}
+        {pluginLeftItems.map(item => (
+          <button
+            key={item.itemId}
+            className="flex items-center gap-1.5 hover:text-text-primary transition-colors text-xs"
+            title={item.tooltip || ''}
+            onClick={() => {
+              if (item.command) {
+                usePluginStore.getState().executeCommand(item.command.id, item.command.args || []);
+              }
+            }}
+          >
+            <span>{item.text}</span>
+          </button>
+        ))}
       </div>
 
       {/* Right side */}
@@ -160,6 +180,22 @@ export default function StatusBar() {
             <span className="font-mono">{formatCost(cost)}</span>
           </div>
         )}
+
+        {/* Plugin status bar items (right) */}
+        {pluginRightItems.map(item => (
+          <button
+            key={item.itemId}
+            className="flex items-center gap-1.5 hover:text-text-primary transition-colors text-xs"
+            title={item.tooltip || ''}
+            onClick={() => {
+              if (item.command) {
+                usePluginStore.getState().executeCommand(item.command.id, item.command.args || []);
+              }
+            }}
+          >
+            <span>{item.text}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

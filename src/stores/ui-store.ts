@@ -26,16 +26,16 @@ const saveScratchPadContent = (content: string) => {
 };
 
 /** Sidebar pane type (left sidebar). */
-export type SidebarPane = 'sessions' | 'memory' | 'tasks';
+export type SidebarPane = 'sessions' | 'memory' | 'tasks' | 'plugins';
 
 /** Context panel tab type (right sidebar). */
-export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents' | 'desktop';
+export type ContextPanelTab = 'files' | 'git' | 'changes' | 'tasks' | 'agents' | 'desktop' | string;
 
 /** Settings panel tab type. */
 export type SettingsTab =
-  | 'general' | 'auth' | 'project' | 'files'
+  | 'general' | 'appearance' | 'auth' | 'project' | 'files'
   | 'companion' | 'system-prompt' | 'prompts' | 'keybindings'
-  | 'extensions' | 'skills' | 'mcp' | 'developer';
+  | 'extensions' | 'skills' | 'mcp' | 'developer' | string;
 
 interface UIStore {
   sidebarVisible: boolean;

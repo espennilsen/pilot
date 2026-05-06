@@ -1,0 +1,52 @@
+{
+  "name": "Nord",
+  "slug": "nord",
+  "author": "Pilot",
+  "base": "dark",
+  "version": 1,
+  "builtIn": true,
+  "colors": {
+    "bg-base": "#2e3440",
+    "bg-surface": "#3b4252",
+    "bg-elevated": "#434c5e",
+    "text-primary": "#eceff4",
+    "text-secondary": "#d8dee9",
+    "accent": "#88c0d0",
+    "success": "#a3be8c",
+    "error": "#bf616a",
+    "warning": "#ebcb8b",
+    "border": "#4c566a"
+  },
+  "terminal": {
+    "background": "#2e3440",
+    "foreground": "#d8dee9",
+    "cursor": "#d8dee9",
+    "selectionBackground": "#434c5e",
+    "black": "#3b4252",
+    "red": "#bf616a",
+    "green": "#a3be8c",
+    "yellow": "#ebcb8b",
+    "blue": "#81a1c1",
+    "magenta": "#b48ead",
+    "cyan": "#88c0d0",
+    "white": "#e5e9f0",
+    "brightBlack": "#4c566a",
+    "brightRed": "#bf616a",
+    "brightGreen": "#a3be8c",
+    "brightYellow": "#ebcb8b",
+    "brightBlue": "#81a1c1",
+    "brightMagenta": "#b48ead",
+    "brightCyan": "#8fbcbb",
+    "brightWhite": "#eceff4"
+  },
+  "syntax": {
+    "comment": "#616e88",
+    "keyword": "#81a1c1",
+    "string": "#a3be8c",
+    "number": "#b48ead",
+    "function": "#88c0d0",
+    "variable": "#d8dee9",
+    "type": "#8fbcbb",
+    "operator": "#81a1c1"
+  }
+}

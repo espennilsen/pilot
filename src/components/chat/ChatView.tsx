@@ -13,13 +13,84 @@ import MessageInput from './MessageInput';
 import ChatHeader from './ChatHeader';
 import SuggestionChips from './SuggestionChips';
 import WelcomeScreen from '../onboarding/WelcomeScreen';
+import FindBar from '../shared/FindBar';
+
+const EMPTY_SUGGESTIONS: string[] = [];
+
+/** Escape a string for use in RegExp */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+interface TextMatch {
+  node: Text;
+  start: number;
+  end: number;
+}
+
+/** Walk all text nodes in a container and find regex matches. */
+function findTextMatches(container: HTMLElement, query: string, caseSensitive: boolean): TextMatch[] {
+  if (!query) return [];
+  const flags = caseSensitive ? 'g' : 'gi';
+  const regex = new RegExp(escapeRegex(query), flags);
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  const matches: TextMatch[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent || '';
+    let match: RegExpExecArray | null;
+    // Reset regex state for each text node
+    regex.lastIndex = 0;
+    while ((match = regex.exec(text)) !== null) {
+      matches.push({ node: node as Text, start: match.index, end: match.index + match[0].length });
+      if (match[0].length === 0) break;
+    }
+  }
+  return matches;
+}
+
+/** Clear CSS Custom Highlights from a named group. */
+function clearChatHighlights() {
+  try {
+    CSS.highlights?.delete('chat-find-match');
+    CSS.highlights?.delete('chat-find-match-active');
+  } catch { /* Expected: CSS highlights may not be available */ }
+}
+
+/** Apply CSS Custom Highlights for all matches and the active match. */
+function applyChatHighlights(matches: TextMatch[], activeIndex: number) {
+  if (!CSS.highlights || matches.length === 0) return;
+  const all = new Highlight();
+  const active = new Highlight();
+  for (let i = 0; i < matches.length; i++) {
+    const range = new Range();
+    range.setStart(matches[i].node, matches[i].start);
+    range.setEnd(matches[i].node, matches[i].end);
+    all.add(range);
+    if (i === activeIndex) active.add(range);
+  }
+  CSS.highlights.set('chat-find-match', all);
+  CSS.highlights.set('chat-find-match-active', active);
+}
+
+/** Scroll a container so a text match is visible in the viewport. */
+function scrollToMatchInContainer(match: TextMatch, container: HTMLElement) {
+  const range = new Range();
+  range.setStart(match.node, match.start);
+  range.setEnd(match.node, match.end);
+  const rect = range.getBoundingClientRect();
+  if (!rect || rect.top === 0) return;
+  const containerRect = container.getBoundingClientRect();
+  const targetTop = rect.top - containerRect.top + container.scrollTop - container.clientHeight / 3;
+  container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+}
 
 export default function ChatView() {
   const activeTabId = useTabStore(s => s.activeTabId);
   const messagesByTab = useChatStore(s => s.messagesByTab);
   const messages = useMemo(() => (activeTabId ? messagesByTab[activeTabId] ?? [] : []), [messagesByTab, activeTabId]);
   const isStreaming = useChatStore(s => activeTabId ? s.streamingByTab[activeTabId] : false);
-  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? [] : []);
+  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? EMPTY_SUGGESTIONS : EMPTY_SUGGESTIONS);
   const { sendMessage, steerAgent, followUpAgent, abortAgent, cycleModel, selectModel, cycleThinking } = useAgentSession();
   const { hasAnyAuth, loadStatus: loadAuthStatus } = useAuthStore();
   const { onboardingComplete, load: loadAppSettings } = useAppSettingsStore();
@@ -32,7 +103,7 @@ export default function ChatView() {
   }, [loadAuthStatus, loadAppSettings]);
 
   const showWelcome = !onboardingComplete;
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -71,6 +142,93 @@ export default function ChatView() {
   useEffect(() => {
     setEditingIndex(null);
   }, [activeTabId]);
+
+  // ── In-page find ──────────────────────────────────────────────────────
+
+  const [findVisible, setFindVisible] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findCaseSensitive, setFindCaseSensitive] = useState(false);
+  const [findMatchCount, setFindMatchCount] = useState(0);
+  const [findCurrentIndex, setFindCurrentIndex] = useState(0);
+  const findMatchesRef = useRef<TextMatch[]>([]);
+
+  // Inject CSS Custom Highlight styles once
+  useEffect(() => {
+    const id = 'chat-find-highlight-styles';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = `
+        ::highlight(chat-find-match) {
+          background-color: var(--color-accent, #4f46e5);
+          color: var(--color-bg-base, #1a1b1e);
+          border-radius: 2px;
+        }
+        ::highlight(chat-find-match-active) {
+          background-color: var(--color-warning, #f59e0b);
+          color: var(--color-bg-base, #1a1b1e);
+          border-radius: 2px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // Keyboard: Cmd/Ctrl+F opens find, Escape closes
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        setFindVisible(true);
+      }
+      if (e.key === 'Escape' && findVisible) {
+        e.preventDefault();
+        setFindVisible(false);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [findVisible]);
+
+  // Run search and apply highlights whenever query, case sensitivity, or messages change
+  useEffect(() => {
+    if (!findVisible || !findQuery || !scrollContainerRef.current) {
+      clearChatHighlights();
+      setFindMatchCount(0);
+      setFindCurrentIndex(-1);
+      findMatchesRef.current = [];
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    const matches = findTextMatches(container, findQuery, findCaseSensitive);
+    findMatchesRef.current = matches;
+    setFindMatchCount(matches.length);
+
+    if (matches.length > 0) {
+      // Preserve previous index or clamp to valid range
+      const prevIndex = findCurrentIndex >= 0 ? findCurrentIndex : 0;
+      const idx = Math.max(0, Math.min(prevIndex, matches.length - 1));
+      setFindCurrentIndex(idx);
+      applyChatHighlights(matches, idx);
+      requestAnimationFrame(() => scrollToMatchInContainer(matches[idx], container));
+    } else {
+      setFindCurrentIndex(-1);
+      clearChatHighlights();
+    }
+
+    return () => clearChatHighlights();
+  }, [findVisible, findQuery, findCaseSensitive, messages]);
+
+  // Navigate to a specific match index
+  const goToFindMatch = useCallback((index: number) => {
+    const matches = findMatchesRef.current;
+    if (matches.length === 0 || !scrollContainerRef.current) return;
+    const idx = ((index % matches.length) + matches.length) % matches.length;
+    setFindCurrentIndex(idx);
+    applyChatHighlights(matches, idx);
+    scrollToMatchInContainer(matches[idx], scrollContainerRef.current);
+  }, []);
 
   /**
    * Regenerate: fork the session at the user message that preceded this assistant message,
@@ -235,11 +393,24 @@ export default function ChatView() {
       <ChatHeader isStreaming={!!isStreaming} />
 
       {/* Messages Area */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4"
-      >
+      <div className="flex-1 relative overflow-hidden">
+        <FindBar
+          query={findQuery}
+          onQueryChange={setFindQuery}
+          caseSensitive={findCaseSensitive}
+          onCaseSensitiveChange={setFindCaseSensitive}
+          matchCount={findMatchCount}
+          currentIndex={findCurrentIndex}
+          onPrev={() => goToFindMatch(findCurrentIndex - 1)}
+          onNext={() => goToFindMatch(findCurrentIndex + 1)}
+          onClose={() => setFindVisible(false)}
+          visible={findVisible}
+        />
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto px-4 py-4"
+        >
         {showWelcome ? (
           <WelcomeScreen />
         ) : messages.length === 0 ? (
@@ -252,16 +423,16 @@ export default function ChatView() {
                 </>
               ) : (
                 <>
-                  <div className="w-12 h-12 mx-auto rounded-xl bg-bg-surface border-2 border-dashed border-border flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6 text-text-secondary" />
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-bg-surface border-2 border-dashed border-border flex items-center justify-center">
+                    <FolderOpen className="w-7 h-7 text-text-secondary" />
                   </div>
-                  <p className="text-text-secondary text-lg">No project open</p>
+                  <p className="text-text-secondary text-xl font-medium">No project open</p>
                   <p className="text-text-secondary/50 text-sm">Open a project to start chatting with the agent</p>
                   <button
                     onClick={openProjectDialog}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent/90 rounded-md transition-colors"
+                    className="inline-flex items-center gap-2.5 px-6 py-3 text-base font-medium text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors shadow-lg shadow-accent/20"
                   >
-                    <FolderOpen className="w-4 h-4" />
+                    <FolderOpen className="w-5 h-5" />
                     Open Project
                   </button>
                 </>
@@ -290,6 +461,7 @@ export default function ChatView() {
             <div ref={messagesEndRef} />
           </div>
         )}
+        </div>
       </div>
 
       {/* Message Input */}
@@ -301,7 +473,7 @@ export default function ChatView() {
         onSelectModel={selectModel}
         onCycleThinking={cycleThinking}
         isStreaming={!!isStreaming}
-        disabled={showWelcome}
+        disabled={showWelcome || !activeTabId || !projectPath}
       />
     </div>
   );

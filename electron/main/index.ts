@@ -27,8 +27,16 @@ import { registerSubagentIpc } from '../ipc/subagent';
 import { registerAttachmentIpc } from '../ipc/attachment';
 import { registerMcpIpc } from '../ipc/mcp';
 import { registerDesktopIpc } from '../ipc/desktop';
+import { registerThemeIpc } from '../ipc/theme';
+import { registerPluginsIpc } from '../ipc/plugins';
 import { DesktopService } from '../services/desktop-service';
+import { ThemeService } from '../services/theme-service';
+import { OllamaService } from '../services/ollama-service';
+import { registerOllamaIpc } from '../ipc/ollama';
 import { McpManager } from '../services/mcp-manager';
+import { pluginBridge, PluginBridge } from '../services/plugin-bridge';
+import { PluginInstaller } from '../services/plugin-installer';
+import { pluginDevMode } from '../services/plugin-dev-mode';
 import { PromptLibrary } from '../services/prompt-library';
 import { CommandRegistry } from '../services/command-registry';
 import { CompanionAuth } from '../services/companion-auth';
@@ -53,6 +61,9 @@ let companionDiscovery: CompanionDiscovery | null = null;
 let companionRemote: CompanionRemote | null = null;
 let mcpManager: McpManager | null = null;
 let desktopService: DesktopService | null = null;
+let themeService: ThemeService | null = null;
+let ollamaService: OllamaService | null = null;
+let pluginInstaller: PluginInstaller | null = null;
 let developerModeEnabled = false;
 
 const isMac = process.platform === 'darwin';
@@ -162,18 +173,35 @@ function buildApplicationMenu() {
 function createWindow() {
   // Read persisted theme to set correct initial window chrome (avoid flash)
   const settings = loadAppSettings();
-  const isLightTheme = settings.theme === 'light';
-  const windowBg = isLightTheme ? '#ffffff' : '#1a1b1e';
-  const windowFg = isLightTheme ? '#1a1b1e' : '#ffffff';
+  let windowBg: string;
+  let windowFg: string;
+  if (settings.theme === 'custom' && settings.customThemeSlug) {
+    // Try to read the custom theme for its bg-base color
+    try {
+      const ts = themeService!;
+      const ct = ts.get(settings.customThemeSlug);
+      windowBg = ct?.colors['bg-base'] ?? '#1a1b1e';
+      // Estimate foreground from base type
+      windowFg = ct?.base === 'light' ? '#1a1b1e' : '#ffffff';
+    } catch {
+      windowBg = '#1a1b1e';
+      windowFg = '#ffffff';
+    }
+  } else {
+    const isLightTheme = settings.theme === 'light';
+    windowBg = isLightTheme ? '#ffffff' : '#1a1b1e';
+    windowFg = isLightTheme ? '#1a1b1e' : '#ffffff';
+  }
 
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    frame: false,
+    ...(!isWin ? { frame: false } : {}),
     ...(isMac ? { titleBarStyle: 'hiddenInset' as const } : {}),
     ...(isWin ? {
+      titleBarStyle: 'hidden' as const,
       titleBarOverlay: {
         color: windowBg,
         symbolColor: windowFg,
@@ -230,6 +258,13 @@ function createWindow() {
     mainWindow?.webContents.send(IPC.WEB_TAB_LOAD_FAILED, { url: validatedURL, errorCode });
   });
 
+  // Forward found-in-page results from webContents to renderer for WebView find bar
+  mainWindow.webContents.on('found-in-page', (_event, result) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC.WEBVIEW_FOUND_IN_PAGE, result);
+    }
+  });
+
   // Build application menu
   buildApplicationMenu();
 }
@@ -251,7 +286,7 @@ app.whenReady().then(async () => {
   // Initialize logger first
   initLogger();
   const log = getLogger('main');
-  log.info('Pilot starting', { version: app.getVersion(), platform: process.platform });
+  log.info('Pilot starting', { version: app.getVersion(), platform: process.platform, dev: !!process.env.ELECTRON_RENDERER_URL });
 
   // Handle pilot-attachment:// URLs → read local files
   protocol.handle('pilot-attachment', (request) => {
@@ -276,6 +311,9 @@ app.whenReady().then(async () => {
 
     return net.fetch(`file://${resolved}`);
   });
+  // Initialize theme service before createWindow so it can read custom theme colors
+  themeService = new ThemeService();
+
   // Create window first (needed by terminal service)
   createWindow();
 
@@ -286,7 +324,14 @@ app.whenReady().then(async () => {
   mcpManager = new McpManager();
   sessionManager.mcpManager = mcpManager;
   terminalService = mainWindow ? new TerminalService(mainWindow) : null;
-  
+
+  // Wire plugin system to session manager
+  pluginBridge.setSessionManager(sessionManager);
+
+  // Initialize Ollama service (registers models in the ModelRegistry if enabled)
+  ollamaService = new OllamaService();
+  ollamaService.init(sessionManager.getModelRegistry());
+
   // Register IPC handlers
   registerAgentIpc(sessionManager);
   registerModelIpc(sessionManager);
@@ -307,7 +352,11 @@ app.whenReady().then(async () => {
   registerTasksIpc(sessionManager.taskManager);
   registerSubagentIpc(sessionManager.subagentManager);
   registerMcpIpc(mcpManager);
+  registerOllamaIpc(ollamaService!);
   registerAttachmentIpc();
+
+  // Custom themes (themeService already initialized before createWindow)
+  registerThemeIpc(themeService!);
 
   // Docker sandbox — always register IPC handlers so the renderer gets
   // graceful responses even when Docker is unavailable or init fails.
@@ -458,6 +507,29 @@ app.whenReady().then(async () => {
   registerPromptsIpc(promptLibrary);
   setPromptLibraryRef(promptLibrary);
 
+  // Initialize plugin system
+  pluginInstaller = new PluginInstaller();
+  registerPluginsIpc(pluginBridge, pluginInstaller);
+
+  // Check for --plugin-debug flag
+  const debugPlugins = process.argv.includes('--plugin-debug');
+
+  // Start the Extension Host
+  pluginBridge.start(debugPlugins);
+
+  // Activate installed plugins that are enabled
+  const installedPlugins = pluginInstaller.listPlugins();
+  pluginBridge.setInstalledPlugins(installedPlugins);
+  for (const plugin of installedPlugins) {
+    if (plugin.enabled) {
+      try {
+        pluginBridge.registerPlugin(plugin);
+      } catch (err) {
+        console.error(`Failed to activate plugin ${plugin.id}:`, err);
+      }
+    }
+  }
+
   // Window control IPC handlers
   ipcMain.handle('window:minimize', () => {
     mainWindow?.minimize();
@@ -506,6 +578,16 @@ app.whenReady().then(async () => {
   });
 
   // Sync all IPC handlers to the companion bridge registry.
+  ipcMain.handle(IPC.WEBVIEW_FIND_IN_PAGE, (_event, query: string, options: { forward?: boolean; findNext?: boolean; matchCase?: boolean } = {}) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.findInPage(query, options);
+  });
+
+  ipcMain.handle(IPC.WEBVIEW_STOP_FIND_IN_PAGE, (_event, action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection') => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.stopFindInPage(action);
+  });
+
   // This must happen AFTER all ipcMain.handle() registrations above.
   syncAllHandlers();
 
@@ -516,9 +598,18 @@ app.whenReady().then(async () => {
   });
 
   // Theme changed — update window chrome (background, titlebar overlay)
-  ipcMain.on(IPC.APP_THEME_CHANGED, (_event, resolved: string) => {
-    const bg = resolved === 'light' ? '#ffffff' : '#1a1b1e';
-    const fg = resolved === 'light' ? '#1a1b1e' : '#ffffff';
+  // Payload: { resolved: 'dark' | 'light', bgColor?: string, fgColor?: string }
+  ipcMain.on(IPC.APP_THEME_CHANGED, (_event, payload: string | { resolved: string; bgColor?: string; fgColor?: string }) => {
+    // Support both legacy string payload and new object payload
+    let bg: string;
+    let fg: string;
+    if (typeof payload === 'string') {
+      bg = payload === 'light' ? '#ffffff' : '#1a1b1e';
+      fg = payload === 'light' ? '#1a1b1e' : '#ffffff';
+    } else {
+      bg = payload.bgColor ?? (payload.resolved === 'light' ? '#ffffff' : '#1a1b1e');
+      fg = payload.fgColor ?? (payload.resolved === 'light' ? '#1a1b1e' : '#ffffff');
+    }
     if (mainWindow) {
       mainWindow.setBackgroundColor(bg);
       if (isWin) {
@@ -574,6 +665,7 @@ app.on('before-quit', async (e) => {
 app.on('will-quit', () => {
   sessionManager?.disposeAll();
   mcpManager?.disposeAll();
+  ollamaService?.dispose();
   devService?.dispose();
   terminalService?.disposeAll();
   promptLibrary?.dispose();
@@ -581,5 +673,7 @@ app.on('will-quit', () => {
   companionDiscovery?.stop();
   companionRemote?.dispose();
   companionBridge.shutdown();
+  pluginBridge.stop();
+  pluginDevMode.stopAll();
   shutdownLogger();
 });

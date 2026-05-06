@@ -6,6 +6,9 @@ import { useSandboxStore } from '../../stores/sandbox-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useSubagentStore } from '../../stores/subagent-store';
+import { usePluginStore } from '../../stores/plugin-store';
+import { Icon } from '../shared/Icon';
+import type { IconName } from '../../shared/types';
 import FileTree from './FileTree';
 import { StagedDiffQueue } from '../sandbox/StagedDiffQueue';
 import GitPanel from '../git/GitPanel';
@@ -17,6 +20,8 @@ export default function ContextPanel() {
   const { projectPath, openProjectDialog } = useProjectStore();
   const activeTabId = useTabStore((s) => s.activeTabId);
   const getPendingDiffs = useSandboxStore((s) => s.getPendingDiffs);
+  const { activeViews: pluginViews, getViewChildren } = usePluginStore();
+  const pluginPanelViews = pluginViews.filter(v => v.location === 'panel');
 
   const pendingCount = activeTabId ? getPendingDiffs(activeTabId).length : 0;
   const subagentsByTab = useSubagentStore((s) => s.subagentsByTab);
@@ -100,6 +105,18 @@ export default function ContextPanel() {
             </button>
           </Tooltip>
         )}
+
+        {/* Plugin panel views */}
+        {pluginPanelViews.map(view => (
+          <Tooltip key={view.viewId} content={view.title} position="left">
+            <button
+              className="p-2 rounded-md transition-colors hover:bg-bg-elevated text-text-secondary"
+              onClick={() => handleTabClick(view.viewId)}
+            >
+              <Icon name={(view.icon || 'Puzzle') as IconName} className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        ))}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -187,6 +204,21 @@ export default function ContextPanel() {
             Desktop
           </button>
         )}
+
+        {/* Plugin panel tabs */}
+        {pluginPanelViews.map(view => (
+          <button
+            key={view.viewId}
+            onClick={() => setContextPanelTab(view.viewId)}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-sm ${
+              effectiveTab === view.viewId
+                ? 'text-accent bg-bg-base border-b-2 border-accent'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-base/50'
+            }`}
+          >
+            {view.title}
+          </button>
+        ))}
       </div>
 
       {/* Content */}
@@ -214,6 +246,8 @@ export default function ContextPanel() {
           <AgentsPanel />
         ) : effectiveTab === 'desktop' ? (
           <DesktopPanel />
+        ) : pluginPanelViews.some(v => v.viewId === effectiveTab) ? (
+          <PluginPanelView viewId={effectiveTab} getChildren={getViewChildren} />
         ) : (
           <StagedDiffQueue />
         )}
@@ -230,6 +264,22 @@ export default function ContextPanel() {
           </button>
         </Tooltip>
       </div>
+    </div>
+  );
+}
+
+function PluginPanelView({
+  viewId,
+  getChildren,
+}: {
+  viewId: string;
+  getChildren: (viewId: string, elementId: string | null) => Promise<unknown[]>;
+}) {
+  // Reuse the tree view rendering logic from PluginSidebarViews
+  // For now, just show a placeholder
+  return (
+    <div className="flex-1 overflow-y-auto p-4 text-text-secondary text-sm">
+      Plugin panel view: {viewId}
     </div>
   );
 }

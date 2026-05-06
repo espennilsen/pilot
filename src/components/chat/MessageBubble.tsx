@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage, ToolCallInfo } from '../../stores/chat-store';
 import { useSandboxStore } from '../../stores/sandbox-store';
 import { useTabStore } from '../../stores/tab-store';
