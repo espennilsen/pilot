@@ -1,13 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
+import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useDetectedEditors, type DetectedEditor } from '../../hooks/useDetectedEditors';
-import { ContextMenu } from '../shared/ContextMenu';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
-import FileTreeNode from './FileTreeNode';
-import { type MenuState, InlineInput, buildMenuItems } from './file-tree-helpers';
+import { type MenuState, buildMenuItems } from './file-tree-helpers';
 
 // ─── FileTree (root) ─────────────────────────────────────
 
@@ -17,11 +16,7 @@ export default function FileTree() {
   const editors = useDetectedEditors();
 
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-
-  // Renaming state — inline in the tree row itself
-  const [renamingPath, setRenamingPath] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const treeRef = useRef<HTMLDivElement>(null);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -29,192 +24,205 @@ export default function FileTree() {
     kind: 'file' | 'folder';
   } | null>(null);
 
-  const treeRef = useRef<HTMLDivElement>(null);
-
-  // ── Helpers to find nodes ──────────────────────────────
-
-  const findNodeByPath = useCallback((nodes: FileNode[], path: string): FileNode | null => {
-    for (const n of nodes) {
-      if (n.path === path) return n;
-      if (n.children) {
-        const found = findNodeByPath(n.children, path);
-        if (found) return found;
-      }
-    }
-    return null;
-  }, []);
-
-  // ── Selection ──────────────────────────────────────────
-
-  const handleSelect = useCallback((path: string) => {
-    setSelectedPath(path);
-  }, []);
-
-  // ── Double-click opens file as tab ─────────────────────
-
-  const handleDoubleClick = useCallback((node: FileNode) => {
-    if (node.type === 'file') {
-      addFileTab(node.path, projectPath);
-    }
-  }, [addFileTab, projectPath]);
-
-  // ── Keyboard: Enter = rename, Delete = delete ──────────
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      // Only respond if the file tree is focused (or the tree container is)
-      if (!treeRef.current?.contains(document.activeElement) && document.activeElement !== treeRef.current) {
-        return;
-      }
-      if (!selectedPath || renamingPath) return;
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const node = findNodeByPath(fileTree, selectedPath);
-        if (node) {
-          setRenamingPath(node.path);
-          setRenameValue(node.name);
+  // Convert FileNode[] to flat path array for @pierre/trees
+  const paths = useMemo(() => {
+    if (!fileTree || fileTree.length === 0) return [];
+    
+    const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
+      for (const node of nodes) {
+        result.push(node.path);
+        if (node.type === 'directory' && node.children) {
+          flattenPaths(node.children, result);
         }
       }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault();
-          const node = findNodeByPath(fileTree, selectedPath);
-          if (node) handleDelete(node);
-        }
-      }
+      return result;
     };
+    
+    return flattenPaths(fileTree);
+  }, [fileTree]);
 
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedPath, renamingPath, fileTree, findNodeByPath]);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setSelectedPath(node.path);
-    setMenu({ x: e.clientX, y: e.clientY, node });
-  }, []);
-
-  const closeMenu = useCallback(() => setMenu(null), []);
+  const { model } = useFileTree({
+    paths,
+    initialExpansion: 'open',
+    search: true,
+    flattenEmptyDirectories: false,
+    icons: {
+      // Use built-in icon set with custom colors
+      set: 'standard',
+      colored: true,
+      // Custom icon remapping by extension
+      byFileExtension: {
+        ts: { name: 'typescript', viewBox: '0 0 24 24' },
+        tsx: { name: 'typescript', viewBox: '0 0 24 24' },
+        js: { name: 'javascript', viewBox: '0 0 24 24' },
+        jsx: { name: 'javascript', viewBox: '0 0 24 24' },
+        json: { name: 'json', viewBox: '0 0 24 24' },
+        yaml: { name: 'yaml', viewBox: '0 0 24 24' },
+        yml: { name: 'yaml', viewBox: '0 0 24 24' },
+        md: { name: 'markdown', viewBox: '0 0 24 24' },
+        css: { name: 'css', viewBox: '0 0 24 24' },
+        scss: { name: 'scss', viewBox: '0 0 24 24' },
+        sass: { name: 'scss', viewBox: '0 0 24 24' },
+        less: { name: 'less', viewBox: '0 0 24 24' },
+      },
+    },
+  });
 
   // ── Action callbacks ───────────────────────────────────
 
-  const handleReveal = (path: string) => {
+  const handleReveal = useCallback((path: string) => {
     invoke(IPC.SHELL_REVEAL_IN_FINDER, path);
-  };
+  }, []);
 
-  const handleOpenTerminal = (path: string) => {
+  const handleOpenTerminal = useCallback((path: string) => {
     invoke(IPC.SHELL_OPEN_IN_TERMINAL, path);
-  };
+  }, []);
 
-  const handleOpenInEditor = (editor: DetectedEditor, path: string) => {
+  const handleOpenInEditor = useCallback((editor: DetectedEditor, path: string) => {
     invoke(IPC.SHELL_OPEN_IN_EDITOR, editor.cli, path);
-  };
+  }, []);
 
-  const handleCopyPath = (path: string) => {
+  const handleCopyPath = useCallback((path: string) => {
     navigator.clipboard.writeText(path);
-  };
+  }, []);
 
-  const handleCopyRelativePath = (path: string) => {
+  const handleCopyRelativePath = useCallback((path: string) => {
     if (projectPath && path.startsWith(projectPath)) {
       navigator.clipboard.writeText(path.slice(projectPath.length + 1));
     } else {
       navigator.clipboard.writeText(path);
     }
-  };
+  }, [projectPath]);
 
-  const handleCopyName = (name: string) => {
+  const handleCopyName = useCallback((name: string) => {
     navigator.clipboard.writeText(name);
-  };
+  }, []);
 
-  const handleDelete = async (node: FileNode) => {
-    const label = node.type === 'directory' ? 'folder' : 'file';
-    const ok = window.confirm(`Delete ${label} "${node.name}"? This cannot be undone.`);
+  const handleDelete = useCallback(async (path: string, name: string, type: 'file' | 'directory') => {
+    const label = type === 'directory' ? 'folder' : 'file';
+    const ok = window.confirm(`Delete ${label} "${name}"? This cannot be undone.`);
     if (!ok) return;
 
-    const result = await invoke(IPC.PROJECT_DELETE_PATH, node.path) as { ok?: boolean; error?: string };
+    const result = await invoke(IPC.PROJECT_DELETE_PATH, path) as { ok?: boolean; error?: string };
     if (result.ok) {
-      if (selectedPath === node.path) setSelectedPath(null);
       loadFileTree();
     } else {
       window.alert(`Delete failed: ${result.error}`);
     }
-  };
+  }, [loadFileTree]);
 
-  // ── Inline rename (in the tree row) ────────────────────
+  const handleRename = useCallback(async (oldPath: string, newName: string) => {
+    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
+    const newPath = `${dir}/${newName}`;
+    
+    if (newPath === oldPath) return true;
 
-  const startRename = useCallback((node: FileNode) => {
-    setRenamingPath(node.path);
-    setRenameValue(node.name);
-  }, []);
-
-  const handleRenameConfirm = useCallback(async () => {
-    if (!renamingPath || !renameValue.trim()) {
-      setRenamingPath(null);
-      return;
-    }
-
-    const dir = renamingPath.substring(0, renamingPath.lastIndexOf('/'));
-    const newPath = `${dir}/${renameValue.trim()}`;
-    if (newPath === renamingPath) {
-      setRenamingPath(null);
-      return;
-    }
-
-    const result = await invoke(IPC.PROJECT_RENAME_PATH, renamingPath, newPath) as { ok?: boolean; error?: string };
-    setRenamingPath(null);
+    const result = await invoke(IPC.PROJECT_RENAME_PATH, oldPath, newPath) as { ok?: boolean; error?: string };
     if (result.ok) {
-      setSelectedPath(newPath);
       loadFileTree();
+      return true;
     } else {
       window.alert(`Rename failed: ${result.error}`);
+      return false;
     }
-  }, [renamingPath, renameValue, loadFileTree]);
+  }, [loadFileTree]);
 
-  const handleRenameCancel = useCallback(() => {
-    setRenamingPath(null);
-  }, []);
-
-  // ── Inline create (new file / folder — modal) ─────────
-
-  const handleCreateConfirm = async (parentPath: string, name: string, kind: 'file' | 'folder') => {
+  const handleCreate = useCallback(async (parentPath: string, name: string, kind: 'file' | 'folder') => {
     const fullPath = `${parentPath}/${name}`;
     const channel = kind === 'file' ? IPC.PROJECT_CREATE_FILE : IPC.PROJECT_CREATE_DIRECTORY;
     const result = await invoke(channel, fullPath) as { ok?: boolean; error?: string };
-    setInlineInput(null);
     if (result.ok) {
-      setSelectedPath(fullPath);
       loadFileTree();
+      return true;
     } else {
       window.alert(`Create failed: ${result.error}`);
+      return false;
     }
-  };
+  }, [loadFileTree]);
 
-  // ── Build menu when open ───────────────────────────────
+  const handleDoubleClick = useCallback((path: string, type: 'file' | 'directory') => {
+    if (type === 'file') {
+      addFileTab(path, projectPath);
+    }
+  }, [addFileTab, projectPath]);
 
-  const menuItems = menu
-    ? buildMenuItems(menu.node, editors, projectPath, {
-        onReveal: () => handleReveal(menu.node.path),
-        onOpenTerminal: () => handleOpenTerminal(menu.node.path),
-        onCopyPath: () => handleCopyPath(menu.node.path),
-        onCopyRelativePath: () => handleCopyRelativePath(menu.node.path),
-        onCopyName: () => handleCopyName(menu.node.name),
-        onRename: () => startRename(menu.node),
-        onDelete: () => handleDelete(menu.node),
-        onNewFile: () =>
-          setInlineInput({ parentPath: menu.node.path, kind: 'file' }),
-        onNewFolder: () =>
-          setInlineInput({ parentPath: menu.node.path, kind: 'folder' }),
-        onOpenInEditor: (editor) => handleOpenInEditor(editor, menu.node.path),
-        onOpenAsTab: () => {
-          if (menu.node.type === 'file') {
-            addFileTab(menu.node.path, projectPath);
-          }
-        },
-      })
-    : [];
+  // ── Build menu items ───────────────────────────────────
+
+  const buildContextMenu = useCallback((item: any, context: any) => {
+    const node = findNodeByPath(fileTree, item.path);
+    if (!node) return null;
+    
+    const menuItemsBuilt = buildMenuItems(node, editors, projectPath, {
+      onReveal: () => handleReveal(node.path),
+      onOpenTerminal: () => handleOpenTerminal(node.path),
+      onCopyPath: () => handleCopyPath(node.path),
+      onCopyRelativePath: () => handleCopyRelativePath(node.path),
+      onCopyName: () => handleCopyName(node.name),
+      onRename: () => {
+        model.startRename(item.path);
+      },
+      onDelete: () => handleDelete(node.path, node.name, node.type),
+      onNewFile: () =>
+        setInlineInput({ parentPath: node.path, kind: 'file' }),
+      onNewFolder: () =>
+        setInlineInput({ parentPath: node.path, kind: 'folder' }),
+      onOpenInEditor: (editor) => handleOpenInEditor(editor, node.path),
+      onOpenAsTab: () => {
+        if (node.type === 'file') {
+          addFileTab(node.path, projectPath);
+        }
+      },
+    });
+    
+    // Create menu element
+    const menuEl = document.createElement('div');
+    menuEl.className = 'bg-bg-elevated border border-border rounded-lg shadow-xl py-1 min-w-[200px] z-50';
+    menuEl.setAttribute('data-file-tree-context-menu-root', 'true');
+    
+    menuItemsBuilt.forEach((entry, idx) => {
+      if (entry === 'separator') {
+        const sep = document.createElement('div');
+        sep.className = 'my-1 border-t border-border';
+        menuEl.appendChild(sep);
+        return;
+      }
+      
+      const itemEl = document.createElement('div');
+      itemEl.className = `px-3 py-1.5 text-sm cursor-pointer flex items-center gap-2 ${
+        entry.danger ? 'text-red-500 hover:bg-red-500/10' : 'hover:bg-bg-hover'
+      }`;
+      
+      // Create icon container
+      const iconContainer = document.createElement('span');
+      iconContainer.style.display = 'flex';
+      iconContainer.style.alignItems = 'center';
+      iconContainer.style.justifyContent = 'center';
+      iconContainer.style.width = '14px';
+      iconContainer.style.height = '14px';
+      
+      if (entry.icon) {
+        // Clone the icon into the container
+        const iconClone = (entry.icon as React.ReactElement).type as any;
+        // For lucide icons, we need to render them differently
+        iconContainer.textContent = entry.label.split(' ')[0];
+      }
+      
+      const labelEl = document.createElement('span');
+      labelEl.textContent = entry.label;
+      
+      itemEl.appendChild(iconContainer);
+      itemEl.appendChild(labelEl);
+      
+      itemEl.addEventListener('click', () => {
+        entry.action();
+        context.close();
+      });
+      
+      menuEl.appendChild(itemEl);
+    });
+    
+    return menuEl;
+  }, [fileTree, editors, projectPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
 
   // ── Render ─────────────────────────────────────────────
 
@@ -226,7 +234,7 @@ export default function FileTree() {
     );
   }
 
-  if (fileTree.length === 0) {
+  if (paths.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-sm text-text-secondary">No files found</p>
@@ -235,27 +243,25 @@ export default function FileTree() {
   }
 
   return (
-    <div ref={treeRef} className="overflow-y-auto h-full focus:outline-none" tabIndex={0}>
-      {fileTree.map((node) => (
-        <FileTreeNode
-          key={node.path}
-          node={node}
-          depth={0}
-          selectedPath={selectedPath}
-          renamingPath={renamingPath}
-          renameValue={renameValue}
-          onSelect={handleSelect}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={handleContextMenu}
-          onRenameChange={setRenameValue}
-          onRenameConfirm={handleRenameConfirm}
-          onRenameCancel={handleRenameCancel}
-        />
-      ))}
+    <div ref={treeRef} className="h-full">
+      <PierreFileTree
+        model={model}
+        style={{ height: '100%' }}
+        composition={{
+          contextMenu: {
+            enabled: true,
+            triggerMode: 'right-click',
+            render: buildContextMenu,
+          },
+        }}
+        onItemActivate={(item) => {
+          handleDoubleClick(item.path, item.kind as 'file' | 'directory');
+        }}
+      />
 
       {/* Inline input for new file / new folder (modal) */}
       {inlineInput && (
-        <div className="fixed inset-0 z-[9998] flex items-start justify-center pt-24" onClick={() => setInlineInput(null)}>
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24" onClick={() => setInlineInput(null)}>
           <div
             className="bg-bg-elevated border border-border rounded-lg shadow-xl p-3 w-72"
             onClick={(e) => e.stopPropagation()}
@@ -263,17 +269,35 @@ export default function FileTree() {
             <p className="text-xs text-text-secondary mb-2">
               {inlineInput.kind === 'file' ? 'New file name' : 'New folder name'}
             </p>
-            <InlineInput
-              initial=""
-              onConfirm={(name) => handleCreateConfirm(inlineInput.parentPath, name, inlineInput.kind)}
-              onCancel={() => setInlineInput(null)}
+            <input
+              autoFocus
+              defaultValue=""
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                  handleCreate(inlineInput.parentPath, e.currentTarget.value.trim(), inlineInput.kind);
+                }
+                if (e.key === 'Escape') setInlineInput(null);
+              }}
+              onBlur={() => setInlineInput(null)}
+              className="w-full bg-bg-elevated border border-accent rounded px-2 py-0.5 text-sm text-text-primary outline-none"
             />
           </div>
         </div>
       )}
-
-      {/* Context menu */}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={closeMenu} />}
     </div>
   );
+}
+
+// ─── Helper to find node by path ─────────────────────────
+
+function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
+  if (!nodes) return null;
+  for (const n of nodes) {
+    if (n.path === path) return n;
+    if (n.children) {
+      const found = findNodeByPath(n.children, path);
+      if (found) return found;
+    }
+  }
+  return null;
 }

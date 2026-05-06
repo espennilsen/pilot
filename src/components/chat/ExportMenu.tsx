@@ -76,8 +76,6 @@ export default function ExportMenu() {
     } catch (err) {
       console.error('Export failed:', err);
       setError(err instanceof Error ? err.message : 'Export failed');
-    }
-  }, [activeTabId, activeTab]);
     } finally {
       setIsExporting(false);
     }
@@ -163,11 +161,6 @@ export default function ExportMenu() {
               </div>
             </>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
         </div>
       )}
     </div>

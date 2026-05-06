@@ -1,8 +1,3 @@
-import { useState } from 'react';
-import {
-  FolderSearch, Terminal, Copy, Clipboard, Pencil, Trash2,
-  FilePlus, FolderPlus, ExternalLink,
-} from 'lucide-react';
 import type { FileNode } from '../../../shared/types';
 import type { DetectedEditor } from '../../hooks/useDetectedEditors';
 import type { MenuEntry } from '../shared/ContextMenu';
@@ -13,36 +8,6 @@ export interface MenuState {
   x: number;
   y: number;
   node: FileNode;
-}
-
-// ─── Inline input for new file/folder ────────────────────
-
-export function InlineInput({
-  initial,
-  onConfirm,
-  onCancel,
-}: {
-  initial: string;
-  onConfirm: (value: string) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(initial);
-
-  return (
-    <input
-      autoFocus
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && value.trim()) {
-          onConfirm(value.trim());
-        }
-        if (e.key === 'Escape') onCancel();
-      }}
-      onBlur={() => onCancel()}
-      className="w-full bg-bg-elevated border border-accent rounded px-2 py-0.5 text-sm text-text-primary outline-none"
-    />
-  );
 }
 
 // ─── Build menu items ────────────────────────────────────
@@ -72,7 +37,7 @@ export function buildMenuItems(
   if (!isDir) {
     items.push({
       label: 'Open in Tab',
-      icon: <ExternalLink className="w-3.5 h-3.5" />,
+      icon: null,
       action: callbacks.onOpenAsTab,
     });
   }
@@ -82,7 +47,7 @@ export function buildMenuItems(
     for (const editor of editors) {
       items.push({
         label: `Open in ${editor.name}`,
-        icon: <ExternalLink className="w-3.5 h-3.5" />,
+        icon: null,
         action: () => callbacks.onOpenInEditor(editor),
       });
     }
@@ -93,12 +58,12 @@ export function buildMenuItems(
   // OS integration
   items.push({
     label: window.api.platform === 'darwin' ? 'Reveal in Finder' : window.api.platform === 'win32' ? 'Reveal in Explorer' : 'Reveal in File Manager',
-    icon: <FolderSearch className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onReveal,
   });
   items.push({
     label: 'Open in Terminal',
-    icon: <Terminal className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onOpenTerminal,
   });
 
@@ -107,19 +72,19 @@ export function buildMenuItems(
   // Clipboard
   items.push({
     label: 'Copy Path',
-    icon: <Clipboard className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onCopyPath,
   });
   if (projectPath) {
     items.push({
       label: 'Copy Relative Path',
-      icon: <Copy className="w-3.5 h-3.5" />,
+      icon: null,
       action: callbacks.onCopyRelativePath,
     });
   }
   items.push({
     label: 'Copy Name',
-    icon: <Copy className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onCopyName,
   });
 
@@ -129,12 +94,12 @@ export function buildMenuItems(
   if (isDir) {
     items.push({
       label: 'New File…',
-      icon: <FilePlus className="w-3.5 h-3.5" />,
+      icon: null,
       action: callbacks.onNewFile,
     });
     items.push({
       label: 'New Folder…',
-      icon: <FolderPlus className="w-3.5 h-3.5" />,
+      icon: null,
       action: callbacks.onNewFolder,
     });
     items.push('separator');
@@ -143,13 +108,13 @@ export function buildMenuItems(
   // Rename & Delete
   items.push({
     label: 'Rename…',
-    icon: <Pencil className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onRename,
     shortcut: '↵',
   });
   items.push({
     label: 'Delete',
-    icon: <Trash2 className="w-3.5 h-3.5" />,
+    icon: null,
     action: callbacks.onDelete,
     danger: true,
   });
