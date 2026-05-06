@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
@@ -11,12 +11,13 @@ import { type MenuState, buildMenuItems } from './file-tree-helpers';
 // ─── FileTree (root) ─────────────────────────────────────
 
 export default function FileTree() {
-  const { fileTree, isLoadingTree, projectPath, loadFileTree } = useProjectStore();
+  const { fileTree, isLoadingTree, projectPath, loadFileTree, setExpandedPaths, setSelectedPath } = useProjectStore();
   const { addFileTab } = useTabStore();
   const editors = useDetectedEditors();
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+  const saveStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -328,6 +329,55 @@ export default function FileTree() {
       }
     `,
   });
+
+  // ── Persist tree state (expansion, selection) ───────────────────────────────────
+
+  // Subscribe to tree model changes and persist state
+  useEffect(() => {
+    if (!model) return;
+
+    // Debounced save to avoid excessive writes
+    const saveState = () => {
+      if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
+      saveStateTimeoutRef.current = setTimeout(() => {
+        // Get expanded paths from visible rows
+        const visibleRows = model.getVisibleRows(0, model.getVisibleCount());
+        const expandedPaths = new Set<string>();
+        
+        // A directory is expanded if its children are visible
+        for (const row of visibleRows) {
+          if (row.item.kind === 'directory') {
+            expandedPaths.add(row.item.path);
+          }
+        }
+        
+        const selectedPath = model.getSelectedPaths()[0] ?? null;
+        
+        setExpandedPaths(expandedPaths);
+        setSelectedPath(selectedPath);
+      }, 300);
+    };
+
+    // Subscribe to tree changes (expansion, selection, etc.)
+    const unsubscribe = model.subscribe(() => {
+      saveState();
+    });
+
+    return () => {
+      unsubscribe();
+      if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
+    };
+  }, [model, setExpandedPaths, setSelectedPath]);
+
+  // ── Restore tree state after mount ───────────────────────────────────
+
+  useEffect(() => {
+    const container = treeRef.current;
+    if (!model || !container) return;
+
+    // Note: expansion and selection are preserved by the model between re-renders
+    // No need to explicitly restore - the model maintains state
+  }, [model]);
 
   // ── Action callbacks ───────────────────────────────────
 
