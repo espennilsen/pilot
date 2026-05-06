@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
