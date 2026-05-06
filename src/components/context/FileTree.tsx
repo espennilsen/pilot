@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
-import type { FileNode } from '../../../shared/types';
+import { preparePresortedFileTreeInput } from '@pierre/trees';
 import { useProjectStore } from '../../stores/project-store';
 import { useTabStore } from '../../stores/tab-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useDetectedEditors, type DetectedEditor } from '../../hooks/useDetectedEditors';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
@@ -13,11 +14,13 @@ import { type MenuState, buildMenuItems } from './file-tree-helpers';
 export default function FileTree() {
   const { fileTree, isLoadingTree, projectPath, loadFileTree, setExpandedPaths, setSelectedPath } = useProjectStore();
   const { addFileTab } = useTabStore();
+  const { contextPanelTab } = useUIStore();
   const editors = useDetectedEditors();
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const saveStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(false);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -49,11 +52,18 @@ export default function FileTree() {
     return flattenPaths(fileTree);
   }, [fileTree, projectPath]);
 
+  // Prepare optimized input for @pierre/trees
+  const preparedInput = useMemo(() => {
+    return preparePresortedFileTreeInput(paths);
+  }, [paths]);
+
   const { model } = useFileTree({
-    paths,
+    preparedInput,
     initialExpansion: 'closed',
     search: true,
     flattenEmptyDirectories: false,
+    // Give the tree a sensible initial row budget as fallback
+    initialVisibleRowCount: 15,
     icons: {
       // Use built-in icon set with colors
       set: 'complete',
@@ -332,19 +342,15 @@ export default function FileTree() {
 
   // ── Persist tree state (expansion, selection) ───────────────────────────────────
 
-  // Subscribe to tree model changes and persist state
   useEffect(() => {
-    if (!model) return;
+    if (!model || !isMountedRef.current) return;
 
-    // Debounced save to avoid excessive writes
     const saveState = () => {
       if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
       saveStateTimeoutRef.current = setTimeout(() => {
-        // Get expanded paths from visible rows
         const visibleRows = model.getVisibleRows(0, model.getVisibleCount());
         const expandedPaths = new Set<string>();
         
-        // A directory is expanded if its children are visible
         for (const row of visibleRows) {
           if (row.item.kind === 'directory') {
             expandedPaths.add(row.item.path);
@@ -358,7 +364,6 @@ export default function FileTree() {
       }, 300);
     };
 
-    // Subscribe to tree changes (expansion, selection, etc.)
     const unsubscribe = model.subscribe(() => {
       saveState();
     });
@@ -369,49 +374,37 @@ export default function FileTree() {
     };
   }, [model, setExpandedPaths, setSelectedPath]);
 
-  // ── Restore tree state after mount ───────────────────────────────────
+  // ── Mount tree only when Files tab becomes active ───────────────────────────────────
 
   useEffect(() => {
     const container = treeRef.current;
     if (!model || !container) return;
 
-    // Note: expansion and selection are preserved by the model between re-renders
-    // No need to explicitly restore - the model maintains state
-  }, [model]);
-
-  // ── Refresh tree when container becomes visible ───────────────────────────────────
-
-  useEffect(() => {
-    const container = treeRef.current;
-    if (!model || !container) return;
-
-    // Use ResizeObserver to detect when container becomes visible
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        // Only refresh if container has actual dimensions (is visible)
-        if (width > 0 && height > 0) {
-          // Force a refresh by focusing the current focused path
+    // Only mount when the Files tab is active
+    if (contextPanelTab === 'files') {
+      // Wait for layout to settle
+      const rafId = requestAnimationFrame(() => {
+        if (container.offsetParent !== null) {
+          isMountedRef.current = true;
+          // Force tree to recalculate viewport
           const focusedPath = model.getFocusedPath();
           if (focusedPath) {
-            requestAnimationFrame(() => {
-              model.focusPath(focusedPath);
-            });
+            model.focusPath(focusedPath);
           }
         }
-      }
-    });
+      });
 
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [model]);
+      return () => {
+        cancelAnimationFrame(rafId);
+      };
+    } else {
+      // Mark as unmounted when tab changes
+      isMountedRef.current = false;
+    }
+  }, [model, contextPanelTab]);
 
   // ── Action callbacks ───────────────────────────────────
 
-  // Helper to reconstruct full path from relative path
   const toFullPath = useCallback((relativePath: string) => {
     return projectPath ? `${projectPath}/${relativePath}` : relativePath;
   }, [projectPath]);
@@ -491,10 +484,7 @@ export default function FileTree() {
     }
   }, [addFileTab, toFullPath, projectPath]);
 
-  // ── Build menu items ───────────────────────────────────
-
   const buildContextMenu = useCallback((item: any, context: any) => {
-    // item.path is relative, need to find the node with full path
     const fullPath = toFullPath(item.path);
     const node = findNodeByPath(fileTree, fullPath);
     if (!node) return null;
@@ -521,7 +511,6 @@ export default function FileTree() {
       },
     });
     
-    // Create menu element
     const menuEl = document.createElement('div');
     menuEl.className = 'bg-bg-elevated border border-border rounded-lg shadow-xl py-1 min-w-[200px] z-50';
     menuEl.setAttribute('data-file-tree-context-menu-root', 'true');
@@ -539,7 +528,6 @@ export default function FileTree() {
         entry.danger ? 'text-red-500 hover:bg-red-500/10' : 'hover:bg-bg-hover'
       }`;
       
-      // Create icon container
       const iconContainer = document.createElement('span');
       iconContainer.style.display = 'flex';
       iconContainer.style.alignItems = 'center';
@@ -548,9 +536,7 @@ export default function FileTree() {
       iconContainer.style.height = '14px';
       
       if (entry.icon) {
-        // Clone the icon into the container
         const iconClone = (entry.icon as React.ReactElement).type as any;
-        // For lucide icons, we need to render them differently
         iconContainer.textContent = entry.label.split(' ')[0];
       }
       
@@ -606,7 +592,6 @@ export default function FileTree() {
         }}
       />
 
-      {/* Inline input for new file / new folder (modal) */}
       {inlineInput && (
         <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24" onClick={() => setInlineInput(null)}>
           <div
@@ -634,8 +619,6 @@ export default function FileTree() {
     </div>
   );
 }
-
-// ─── Helper to find node by path ─────────────────────────
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
   if (!nodes) return null;
