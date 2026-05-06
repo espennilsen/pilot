@@ -379,6 +379,36 @@ export default function FileTree() {
     // No need to explicitly restore - the model maintains state
   }, [model]);
 
+  // ── Refresh tree when container becomes visible ───────────────────────────────────
+
+  useEffect(() => {
+    const container = treeRef.current;
+    if (!model || !container) return;
+
+    // Use ResizeObserver to detect when container becomes visible
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Only refresh if container has actual dimensions (is visible)
+        if (width > 0 && height > 0) {
+          // Force a refresh by focusing the current focused path
+          const focusedPath = model.getFocusedPath();
+          if (focusedPath) {
+            requestAnimationFrame(() => {
+              model.focusPath(focusedPath);
+            });
+          }
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [model]);
+
   // ── Action callbacks ───────────────────────────────────
 
   // Helper to reconstruct full path from relative path
