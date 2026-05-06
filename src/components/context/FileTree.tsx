@@ -54,10 +54,10 @@ export default function FileTree() {
     search: true,
     flattenEmptyDirectories: false,
     icons: {
-      // Use built-in icon set with custom colors
-      set: 'standard',
+      // Use built-in icon set with colors
+      set: 'complete',
       colored: true,
-      // Custom icon remapping by extension
+      // Custom icon remapping by extension with colors
       byFileExtension: {
         ts: { name: 'typescript', viewBox: '0 0 24 24' },
         tsx: { name: 'typescript', viewBox: '0 0 24 24' },
@@ -72,6 +72,71 @@ export default function FileTree() {
         sass: { name: 'scss', viewBox: '0 0 24 24' },
         less: { name: 'less', viewBox: '0 0 24 24' },
       },
+      // Custom sprite sheet with colored icons
+      spriteSheet: `
+        <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+          <symbol id="file-icon-typescript" viewBox="0 0 24 24">
+            <path fill="#3178C6" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="10" font-weight="bold" fill="white">TS</text>
+          </symbol>
+          <symbol id="file-icon-javascript" viewBox="0 0 24 24">
+            <path fill="#F7DF1E" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">JS</text>
+          </symbol>
+          <symbol id="file-icon-json" viewBox="0 0 24 24">
+            <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="7" y="17" font-size="8" font-weight="bold" fill="white">{}</text>
+          </symbol>
+          <symbol id="file-icon-yaml" viewBox="0 0 24 24">
+            <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">YML</text>
+          </symbol>
+          <symbol id="file-icon-markdown" viewBox="0 0 24 24">
+            <path fill="#519aba" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">MD</text>
+          </symbol>
+          <symbol id="file-icon-css" viewBox="0 0 24 24">
+            <path fill="#563d7c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">CSS</text>
+          </symbol>
+          <symbol id="file-icon-scss" viewBox="0 0 24 24">
+            <path fill="#c6538c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="5" y="18" font-size="9" font-weight="bold" fill="white">SCSS</text>
+          </symbol>
+          <symbol id="file-icon-less" viewBox="0 0 24 24">
+            <path fill="#1d365d" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">LESS</text>
+          </symbol>
+          <symbol id="file-icon-python" viewBox="0 0 24 24">
+            <path fill="#3776ab" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="5" y="18" font-size="8" font-weight="bold" fill="white">PY</text>
+          </symbol>
+          <symbol id="file-icon-rust" viewBox="0 0 24 24">
+            <path fill="#dea584" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">RS</text>
+          </symbol>
+          <symbol id="file-icon-react" viewBox="0 0 24 24">
+            <path fill="#61dafb" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">⚛</text>
+          </symbol>
+          <symbol id="file-icon-git" viewBox="0 0 24 24">
+            <path fill="#f05032" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">GIT</text>
+          </symbol>
+          <symbol id="file-icon-docker" viewBox="0 0 24 24">
+            <path fill="#2496ed" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">🐳</text>
+          </symbol>
+          <symbol id="file-icon-html" viewBox="0 0 24 24">
+            <path fill="#e34f26" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">HTML</text>
+          </symbol>
+          <symbol id="file-icon-image" viewBox="0 0 24 24">
+            <path fill="#a8a8a8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <circle cx="12" cy="12" r="3" fill="white"/>
+          </symbol>
+        </svg>
+      `,
     },
     // Custom styling to match app theme
     unsafeCSS: `
