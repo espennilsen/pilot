@@ -26,13 +26,18 @@ export default function FileTree() {
 
   // Convert FileNode[] to flat path array for @pierre/trees
   // Note: Only include files - directories are inferred from path structure
+  // Strip project root to show relative paths
   const paths = useMemo(() => {
-    if (!fileTree || fileTree.length === 0) return [];
+    if (!fileTree || fileTree.length === 0 || !projectPath) return [];
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
         if (node.type === 'file') {
-          result.push(node.path);
+          // Strip project root to get relative path
+          const relativePath = node.path.startsWith(projectPath + '/')
+            ? node.path.slice(projectPath.length + 1)
+            : node.path;
+          result.push(relativePath);
         } else if (node.children) {
           flattenPaths(node.children, result);
         }
@@ -41,7 +46,7 @@ export default function FileTree() {
     };
     
     return flattenPaths(fileTree);
-  }, [fileTree]);
+  }, [fileTree, projectPath]);
 
   const { model } = useFileTree({
     paths,
@@ -72,54 +77,57 @@ export default function FileTree() {
 
   // ── Action callbacks ───────────────────────────────────
 
-  const handleReveal = useCallback((path: string) => {
-    invoke(IPC.SHELL_REVEAL_IN_FINDER, path);
-  }, []);
-
-  const handleOpenTerminal = useCallback((path: string) => {
-    invoke(IPC.SHELL_OPEN_IN_TERMINAL, path);
-  }, []);
-
-  const handleOpenInEditor = useCallback((editor: DetectedEditor, path: string) => {
-    invoke(IPC.SHELL_OPEN_IN_EDITOR, editor.cli, path);
-  }, []);
-
-  const handleCopyPath = useCallback((path: string) => {
-    navigator.clipboard.writeText(path);
-  }, []);
-
-  const handleCopyRelativePath = useCallback((path: string) => {
-    if (projectPath && path.startsWith(projectPath)) {
-      navigator.clipboard.writeText(path.slice(projectPath.length + 1));
-    } else {
-      navigator.clipboard.writeText(path);
-    }
+  // Helper to reconstruct full path from relative path
+  const toFullPath = useCallback((relativePath: string) => {
+    return projectPath ? `${projectPath}/${relativePath}` : relativePath;
   }, [projectPath]);
+
+  const handleReveal = useCallback((relativePath: string) => {
+    invoke(IPC.SHELL_REVEAL_IN_FINDER, toFullPath(relativePath));
+  }, [toFullPath]);
+
+  const handleOpenTerminal = useCallback((relativePath: string) => {
+    invoke(IPC.SHELL_OPEN_IN_TERMINAL, toFullPath(relativePath));
+  }, [toFullPath]);
+
+  const handleOpenInEditor = useCallback((editor: DetectedEditor, relativePath: string) => {
+    invoke(IPC.SHELL_OPEN_IN_EDITOR, editor.cli, toFullPath(relativePath));
+  }, [toFullPath]);
+
+  const handleCopyPath = useCallback((relativePath: string) => {
+    navigator.clipboard.writeText(toFullPath(relativePath));
+  }, [toFullPath]);
+
+  const handleCopyRelativePath = useCallback((relativePath: string) => {
+    navigator.clipboard.writeText(relativePath);
+  }, []);
 
   const handleCopyName = useCallback((name: string) => {
     navigator.clipboard.writeText(name);
   }, []);
 
-  const handleDelete = useCallback(async (path: string, name: string, type: 'file' | 'directory') => {
+  const handleDelete = useCallback(async (relativePath: string, name: string, type: 'file' | 'directory') => {
+    const fullPath = toFullPath(relativePath);
     const label = type === 'directory' ? 'folder' : 'file';
     const ok = window.confirm(`Delete ${label} "${name}"? This cannot be undone.`);
     if (!ok) return;
 
-    const result = await invoke(IPC.PROJECT_DELETE_PATH, path) as { ok?: boolean; error?: string };
+    const result = await invoke(IPC.PROJECT_DELETE_PATH, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
       loadFileTree();
     } else {
       window.alert(`Delete failed: ${result.error}`);
     }
-  }, [loadFileTree]);
+  }, [toFullPath, loadFileTree]);
 
-  const handleRename = useCallback(async (oldPath: string, newName: string) => {
-    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
-    const newPath = `${dir}/${newName}`;
+  const handleRename = useCallback(async (oldRelativePath: string, newName: string) => {
+    const oldFullPath = toFullPath(oldRelativePath);
+    const dir = oldFullPath.substring(0, oldFullPath.lastIndexOf('/'));
+    const newFullPath = `${dir}/${newName}`;
     
-    if (newPath === oldPath) return true;
+    if (newFullPath === oldFullPath) return true;
 
-    const result = await invoke(IPC.PROJECT_RENAME_PATH, oldPath, newPath) as { ok?: boolean; error?: string };
+    const result = await invoke(IPC.PROJECT_RENAME_PATH, oldFullPath, newFullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
       loadFileTree();
       return true;
@@ -127,10 +135,11 @@ export default function FileTree() {
       window.alert(`Rename failed: ${result.error}`);
       return false;
     }
-  }, [loadFileTree]);
+  }, [toFullPath, loadFileTree]);
 
-  const handleCreate = useCallback(async (parentPath: string, name: string, kind: 'file' | 'folder') => {
-    const fullPath = `${parentPath}/${name}`;
+  const handleCreate = useCallback(async (parentRelativePath: string, name: string, kind: 'file' | 'folder') => {
+    const fullParentPath = toFullPath(parentRelativePath);
+    const fullPath = `${fullParentPath}/${name}`;
     const channel = kind === 'file' ? IPC.PROJECT_CREATE_FILE : IPC.PROJECT_CREATE_DIRECTORY;
     const result = await invoke(channel, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
@@ -140,38 +149,40 @@ export default function FileTree() {
       window.alert(`Create failed: ${result.error}`);
       return false;
     }
-  }, [loadFileTree]);
+  }, [toFullPath, loadFileTree]);
 
-  const handleDoubleClick = useCallback((path: string, type: 'file' | 'directory') => {
+  const handleDoubleClick = useCallback((relativePath: string, type: 'file' | 'directory') => {
     if (type === 'file') {
-      addFileTab(path, projectPath);
+      addFileTab(toFullPath(relativePath), projectPath);
     }
-  }, [addFileTab, projectPath]);
+  }, [addFileTab, toFullPath, projectPath]);
 
   // ── Build menu items ───────────────────────────────────
 
   const buildContextMenu = useCallback((item: any, context: any) => {
-    const node = findNodeByPath(fileTree, item.path);
+    // item.path is relative, need to find the node with full path
+    const fullPath = toFullPath(item.path);
+    const node = findNodeByPath(fileTree, fullPath);
     if (!node) return null;
     
     const menuItemsBuilt = buildMenuItems(node, editors, projectPath, {
-      onReveal: () => handleReveal(node.path),
-      onOpenTerminal: () => handleOpenTerminal(node.path),
-      onCopyPath: () => handleCopyPath(node.path),
-      onCopyRelativePath: () => handleCopyRelativePath(node.path),
+      onReveal: () => handleReveal(item.path),
+      onOpenTerminal: () => handleOpenTerminal(item.path),
+      onCopyPath: () => handleCopyPath(item.path),
+      onCopyRelativePath: () => handleCopyRelativePath(item.path),
       onCopyName: () => handleCopyName(node.name),
       onRename: () => {
         model.startRename(item.path);
       },
-      onDelete: () => handleDelete(node.path, node.name, node.type),
+      onDelete: () => handleDelete(item.path, node.name, node.type),
       onNewFile: () =>
-        setInlineInput({ parentPath: node.path, kind: 'file' }),
+        setInlineInput({ parentPath: item.path, kind: 'file' }),
       onNewFolder: () =>
-        setInlineInput({ parentPath: node.path, kind: 'folder' }),
-      onOpenInEditor: (editor) => handleOpenInEditor(editor, node.path),
+        setInlineInput({ parentPath: item.path, kind: 'folder' }),
+      onOpenInEditor: (editor) => handleOpenInEditor(editor, item.path),
       onOpenAsTab: () => {
         if (node.type === 'file') {
-          addFileTab(node.path, projectPath);
+          addFileTab(fullPath, projectPath);
         }
       },
     });
@@ -224,7 +235,7 @@ export default function FileTree() {
     });
     
     return menuEl;
-  }, [fileTree, editors, projectPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
+  }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
 
   // ── Render ─────────────────────────────────────────────
 
