@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
 import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import type { FileNode } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
@@ -17,7 +17,6 @@ export default function FileTree() {
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -492,40 +491,6 @@ export default function FileTree() {
     return menuEl;
   }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
 
-  // ── Resize observer to refresh tree when container becomes visible ───────────────────────────────────
-
-  useEffect(() => {
-    const container = treeRef.current;
-    if (!container || !model) return;
-
-    // Give the tree a moment to initialize, then check if we need to resize
-    const initTimer = setTimeout(() => {
-      if (container.offsetParent !== null) {
-        // Container is visible, trigger resize
-        model.setViewportHeight(container.clientHeight);
-      }
-    }, 100);
-
-    // Set up resize observer to handle tab switches
-    resizeObserverRef.current = new ResizeObserver(() => {
-      if (container.offsetParent !== null) {
-        // Container became visible, refresh the tree
-        requestAnimationFrame(() => {
-          model.setViewportHeight(container.clientHeight);
-        });
-      }
-    });
-
-    resizeObserverRef.current.observe(container);
-
-    return () => {
-      clearTimeout(initTimer);
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
-      }
-    };
-  }, [model]);
-
   // ── Render ─────────────────────────────────────────────
 
   if (isLoadingTree) {
@@ -545,7 +510,7 @@ export default function FileTree() {
   }
 
   return (
-    <div ref={treeRef} className="h-full">
+    <div ref={treeRef} className="h-full" style={{ minHeight: 0, position: 'relative' }}>
       <PierreFileTree
         model={model}
         style={{ height: '100%' }}
