@@ -17,6 +17,7 @@ export default function FileTree() {
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -490,6 +491,40 @@ export default function FileTree() {
     
     return menuEl;
   }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab]);
+
+  // ── Resize observer to refresh tree when container becomes visible ───────────────────────────────────
+
+  useEffect(() => {
+    const container = treeRef.current;
+    if (!container || !model) return;
+
+    // Give the tree a moment to initialize, then check if we need to resize
+    const initTimer = setTimeout(() => {
+      if (container.offsetParent !== null) {
+        // Container is visible, trigger resize
+        model.setViewportHeight(container.clientHeight);
+      }
+    }, 100);
+
+    // Set up resize observer to handle tab switches
+    resizeObserverRef.current = new ResizeObserver(() => {
+      if (container.offsetParent !== null) {
+        // Container became visible, refresh the tree
+        requestAnimationFrame(() => {
+          model.setViewportHeight(container.clientHeight);
+        });
+      }
+    });
+
+    resizeObserverRef.current.observe(container);
+
+    return () => {
+      clearTimeout(initTimer);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, [model]);
 
   // ── Render ─────────────────────────────────────────────
 
