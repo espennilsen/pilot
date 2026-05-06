@@ -59,81 +59,191 @@ export default function FileTree() {
       colored: true,
       // Custom icon remapping by extension with colors
       byFileExtension: {
-        ts: { name: 'typescript', viewBox: '0 0 24 24' },
-        tsx: { name: 'typescript', viewBox: '0 0 24 24' },
-        js: { name: 'javascript', viewBox: '0 0 24 24' },
-        jsx: { name: 'javascript', viewBox: '0 0 24 24' },
-        json: { name: 'json', viewBox: '0 0 24 24' },
-        yaml: { name: 'yaml', viewBox: '0 0 24 24' },
-        yml: { name: 'yaml', viewBox: '0 0 24 24' },
-        md: { name: 'markdown', viewBox: '0 0 24 24' },
-        css: { name: 'css', viewBox: '0 0 24 24' },
-        scss: { name: 'scss', viewBox: '0 0 24 24' },
-        sass: { name: 'scss', viewBox: '0 0 24 24' },
-        less: { name: 'less', viewBox: '0 0 24 24' },
+        // TypeScript/JavaScript
+        ts: 'typescript',
+        tsx: 'typescript',
+        mts: 'typescript',
+        cts: 'typescript',
+        js: 'javascript',
+        jsx: 'javascript',
+        mjs: 'javascript',
+        cjs: 'javascript',
+        // JSON/YAML
+        json: 'json',
+        jsonc: 'json',
+        yaml: 'yaml',
+        yml: 'yaml',
+        // Markdown
+        md: 'markdown',
+        mdx: 'markdown',
+        // Stylesheets
+        css: 'css',
+        scss: 'scss',
+        sass: 'scss',
+        less: 'less',
+        // Python
+        py: 'python',
+        pyw: 'python',
+        ipynb: 'python',
+        // Rust
+        rs: 'rust',
+        toml: 'rust',
+        // Git
+        gitignore: 'git',
+        gitattributes: 'git',
+        gitmodules: 'git',
+        // Docker
+        dockerfile: 'docker',
+        dockerignore: 'docker',
+        // HTML
+        html: 'html',
+        htm: 'html',
+        xhtml: 'html',
+        // Images
+        png: 'image',
+        jpg: 'image',
+        jpeg: 'image',
+        gif: 'image',
+        svg: 'image',
+        webp: 'image',
+        ico: 'image',
+        bmp: 'image',
+        // Other common types
+        sh: 'shell',
+        bash: 'shell',
+        zsh: 'shell',
+        fish: 'shell',
+        go: 'go',
+        java: 'java',
+        class: 'java',
+        kt: 'kotlin',
+        kts: 'kotlin',
+        swift: 'swift',
+        rb: 'ruby',
+        erb: 'ruby',
+        php: 'php',
+        sql: 'database',
+        db: 'database',
+        sqlite: 'database',
+        xml: 'xml',
+        rss: 'xml',
+        env: 'config',
+        local: 'config',
+        lock: 'lock',
+        pdf: 'pdf',
+        txt: 'text',
+        log: 'text',
       },
       // Custom sprite sheet with colored icons
       spriteSheet: `
         <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-          <symbol id="file-icon-typescript" viewBox="0 0 24 24">
+          <symbol id="typescript" viewBox="0 0 24 24">
             <path fill="#3178C6" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="10" font-weight="bold" fill="white">TS</text>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">TS</text>
           </symbol>
-          <symbol id="file-icon-javascript" viewBox="0 0 24 24">
+          <symbol id="javascript" viewBox="0 0 24 24">
             <path fill="#F7DF1E" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">JS</text>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="black">JS</text>
           </symbol>
-          <symbol id="file-icon-json" viewBox="0 0 24 24">
+          <symbol id="json" viewBox="0 0 24 24">
             <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="7" y="17" font-size="8" font-weight="bold" fill="white">{}</text>
+            <text x="8" y="17" font-size="10" font-weight="bold" fill="white">{}</text>
           </symbol>
-          <symbol id="file-icon-yaml" viewBox="0 0 24 24">
+          <symbol id="yaml" viewBox="0 0 24 24">
             <path fill="#CB9D06" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">YML</text>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">YML</text>
           </symbol>
-          <symbol id="file-icon-markdown" viewBox="0 0 24 24">
+          <symbol id="markdown" viewBox="0 0 24 24">
             <path fill="#519aba" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">MD</text>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">MD</text>
           </symbol>
-          <symbol id="file-icon-css" viewBox="0 0 24 24">
+          <symbol id="css" viewBox="0 0 24 24">
             <path fill="#563d7c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">CSS</text>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">CSS</text>
           </symbol>
-          <symbol id="file-icon-scss" viewBox="0 0 24 24">
+          <symbol id="scss" viewBox="0 0 24 24">
             <path fill="#c6538c" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="18" font-size="9" font-weight="bold" fill="white">SCSS</text>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">SCSS</text>
           </symbol>
-          <symbol id="file-icon-less" viewBox="0 0 24 24">
+          <symbol id="less" viewBox="0 0 24 24">
             <path fill="#1d365d" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">LESS</text>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">LESS</text>
           </symbol>
-          <symbol id="file-icon-python" viewBox="0 0 24 24">
+          <symbol id="python" viewBox="0 0 24 24">
             <path fill="#3776ab" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="5" y="18" font-size="8" font-weight="bold" fill="white">PY</text>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PY</text>
           </symbol>
-          <symbol id="file-icon-rust" viewBox="0 0 24 24">
+          <symbol id="rust" viewBox="0 0 24 24">
             <path fill="#dea584" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">RS</text>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="black">RS</text>
           </symbol>
-          <symbol id="file-icon-react" viewBox="0 0 24 24">
-            <path fill="#61dafb" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="black">⚛</text>
-          </symbol>
-          <symbol id="file-icon-git" viewBox="0 0 24 24">
+          <symbol id="git" viewBox="0 0 24 24">
             <path fill="#f05032" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">GIT</text>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">GIT</text>
           </symbol>
-          <symbol id="file-icon-docker" viewBox="0 0 24 24">
+          <symbol id="docker" viewBox="0 0 24 24">
             <path fill="#2496ed" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">🐳</text>
+            <text x="7" y="17" font-size="10" fill="white">🐳</text>
           </symbol>
-          <symbol id="file-icon-html" viewBox="0 0 24 24">
+          <symbol id="html" viewBox="0 0 24 24">
             <path fill="#e34f26" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <text x="6" y="18" font-size="9" font-weight="bold" fill="white">HTML</text>
+            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">HTML</text>
           </symbol>
-          <symbol id="file-icon-image" viewBox="0 0 24 24">
+          <symbol id="image" viewBox="0 0 24 24">
             <path fill="#a8a8a8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
             <circle cx="12" cy="12" r="3" fill="white"/>
+          </symbol>
+          <symbol id="shell" viewBox="0 0 24 24">
+            <path fill="#4eaa25" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="9" y="17" font-size="10" font-weight="bold" fill="white">$</text>
+          </symbol>
+          <symbol id="go" viewBox="0 0 24 24">
+            <path fill="#00ADD8" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">GO</text>
+          </symbol>
+          <symbol id="java" viewBox="0 0 24 24">
+            <path fill="#5382a1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">JAVA</text>
+          </symbol>
+          <symbol id="kotlin" viewBox="0 0 24 24">
+            <path fill="#7F52FF" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="5" y="17" font-size="7" font-weight="bold" fill="white">KT</text>
+          </symbol>
+          <symbol id="swift" viewBox="0 0 24 24">
+            <path fill="#F05138" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">SWIFT</text>
+          </symbol>
+          <symbol id="ruby" viewBox="0 0 24 24">
+            <path fill="#CC342D" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">RB</text>
+          </symbol>
+          <symbol id="php" viewBox="0 0 24 24">
+            <path fill="#777BB4" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PHP</text>
+          </symbol>
+          <symbol id="database" viewBox="0 0 24 24">
+            <path fill="#4479A1" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="5" y="17" font-size="8" font-weight="bold" fill="white">SQL</text>
+          </symbol>
+          <symbol id="xml" viewBox="0 0 24 24">
+            <path fill="#F16529" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="7" y="17" font-size="9" font-weight="bold" fill="white">&lt;</text>
+          </symbol>
+          <symbol id="config" viewBox="0 0 24 24">
+            <path fill="#6D8088" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <circle cx="12" cy="12" r="4" fill="white"/>
+          </symbol>
+          <symbol id="lock" viewBox="0 0 24 24">
+            <path fill="#E6B422" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <path d="M12 8a2 2 0 0 0-2 2v1a2 2 0 0 0 4 0v-1a2 2 0 0 0-2-2z" fill="white"/>
+          </symbol>
+          <symbol id="pdf" viewBox="0 0 24 24">
+            <path fill="#F04531" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <text x="6" y="17" font-size="8" font-weight="bold" fill="white">PDF</text>
+          </symbol>
+          <symbol id="text" viewBox="0 0 24 24">
+            <path fill="#A8B5C0" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.5"/>
           </symbol>
         </svg>
       `,
