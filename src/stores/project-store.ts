@@ -27,6 +27,7 @@ interface ProjectStore {
   gitignoreProjectPath: string | null;
 
   setProjectPath: (path: string) => void;
+  clearProject: () => void;
   loadFileTree: () => Promise<void>;
   selectFile: (path: string) => Promise<void>;
   clearPreview: () => void;
@@ -67,6 +68,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ projectPath: path });
     invoke(IPC.PROJECT_SET_DIRECTORY, path);
     get().loadFileTree();
+  },
+
+  clearProject: () => {
+    set({
+      projectPath: null,
+      fileTree: [],
+      selectedFilePath: null,
+      previewContent: null,
+      previewError: null,
+      isEditing: false,
+      editContent: '',
+      isSaving: false,
+      saveError: null,
+    });
+    invoke(IPC.PROJECT_SET_DIRECTORY, null);
   },
 
   loadFileTree: async () => {

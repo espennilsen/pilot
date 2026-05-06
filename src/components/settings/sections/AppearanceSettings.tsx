@@ -145,6 +145,7 @@ function CustomThemeCard({
 export function AppearanceSettings() {
   const { theme, setTheme, customThemeSlug, setCustomThemeSlug } = useAppSettingsStore();
   const { customThemes, activeCustomTheme, loadThemes, setActiveCustomTheme, importTheme, exportTheme, deleteTheme } = useThemeStore();
+  const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editingTheme, setEditingTheme] = useState<CustomTheme | null | 'new'>(null);
 
@@ -168,6 +169,7 @@ export function AppearanceSettings() {
       // If deleting the active custom theme, switch to dark
       if (theme === 'custom' && customThemeSlug === slug) {
         await setTheme('dark');
+        await setCustomThemeSlug(undefined);
         setActiveCustomTheme(null);
       }
       await deleteTheme(slug);

@@ -79,6 +79,12 @@ export const PILOT_THEMES_DIR = join(PILOT_APP_DIR, 'themes');
 // Log files directory
 export const PILOT_LOGS_DIR = join(PILOT_APP_DIR, 'logs');
 
+// Plugin install directory (npm packages live here)
+export const PILOT_PLUGINS_DIR = join(PILOT_APP_DIR, 'plugins');
+
+// Plugin registry (installed plugins + enabled state)
+export const PILOT_PLUGIN_REGISTRY_FILE = join(PILOT_APP_DIR, 'plugin-registry.json');
+
 // ─── Default Pi Agent Directory ──────────────────────────────────────────
 // Pilot uses its own app directory as the default agent dir.
 // Users can override this in Settings → General → Pi Config Directory.
@@ -96,6 +102,7 @@ export function ensurePilotAppDirs(): void {
     PILOT_PROMPTS_DIR,
     PILOT_THEMES_DIR,
     PILOT_LOGS_DIR,
+    PILOT_PLUGINS_DIR,        // ← ADD THIS
   ];
   for (const dir of dirs) {
     if (!existsSync(dir)) {

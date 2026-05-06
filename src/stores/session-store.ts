@@ -26,6 +26,7 @@ interface SessionStore {
   showArchived: boolean;
 
   loadSessions: (projectPaths?: string[]) => Promise<void>;
+  clearSessions: () => void;
   pinSession: (path: string) => void;
   unpinSession: (path: string) => void;
   archiveSession: (path: string) => void;
@@ -68,6 +69,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       console.error('Failed to load sessions:', error);
       set({ sessions: [], isLoading: false });
     }
+  },
+
+  clearSessions: () => {
+    set({ sessions: [], isLoading: false });
   },
 
   pinSession: (path: string) => {

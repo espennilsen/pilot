@@ -4,6 +4,10 @@ import appIcon from '../../assets/icon-48.png';
 export default function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac = window.api.platform === 'darwin';
+  // On Windows the main process provides native titleBarOverlay controls;
+  // custom buttons are only needed on Linux (which runs frame:false with no overlay).
+  const isWindows = window.api.platform === 'win32';
+  const showCustomControls = !isMac && !isWindows;
 
   useEffect(() => {
     // Get initial maximized state
@@ -43,9 +47,9 @@ export default function TitleBar() {
         <span className="text-text-secondary text-xs font-medium">Pilot</span>
       </div>
 
-      {/* Right side - window controls (Windows/Linux only) */}
-      <div className={isMac ? 'w-[78px]' : 'flex items-center'}>
-        {!isMac && (
+      {/* Right side — custom controls (Linux) or spacer for native overlay (Windows) */}
+      <div className={isMac ? 'w-[78px]' : isWindows ? 'w-[138px]' : 'flex items-center'}>
+        {showCustomControls && (
           <div className="flex" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             {/* Minimize button */}
             <button
@@ -108,6 +112,9 @@ export default function TitleBar() {
           </div>
         )}
       </div>
+      {/* Note: on Windows the native titleBarOverlay (configured in main/index.ts)
+           renders the OS window controls. The 138 px spacer above keeps the
+           centred app title from sliding under those native buttons. */}
     </div>
   );
 }

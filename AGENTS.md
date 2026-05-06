@@ -258,3 +258,17 @@ npm run preview    # Preview production build
 ```
 
 The app writes all config to `<PILOT_DIR>` — safe to delete that directory to reset to factory defaults.
+
+---
+
+## Task Management (MANDATORY)
+
+Use `hub_tasks` — **not td** — for all task tracking. td is retired.
+
+### Workflow:
+1. **Check board:** `hub_tasks({ action: "board" })`
+2. **Create task:** `hub_tasks({ action: "create", title: "...", project: "pilot" })`
+3. **Transition through states:** `queued → planning → building → reviewing → pr_ready → approved`
+4. **Self-report:** `hub_tasks({ action: "report", hubTaskId: "...", toState: "..." })`
+
+Create a hub task before starting any non-trivial work. Reference the hub task ID in commit messages.

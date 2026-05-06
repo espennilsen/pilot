@@ -1,0 +1,10 @@
+{
+  "name": "agent-test-plugin",
+  "version": "1.0.0",
+  "description": "Test plugin for agent integration - registers custom tools and skills",
+  "pilot": {
+    "plugins": ["./plugin.js"],
+    "permissions": ["agent:tools", "agent:skills", "agent:events", "ui:status-bar"]
+  },
+  "dependencies": {}
+}

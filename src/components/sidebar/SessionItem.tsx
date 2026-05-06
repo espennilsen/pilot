@@ -13,6 +13,9 @@ interface SessionItemProps {
   onUnpin: () => void;
   onArchive: () => void;
   onDelete?: () => void;
+  onExportMarkdown?: () => void;
+  onExportJson?: () => void;
+  onCopyClipboard?: () => void;
 }
 
 export function SessionItem({
@@ -23,6 +26,9 @@ export function SessionItem({
   onUnpin,
   onArchive,
   onDelete,
+  onExportMarkdown,
+  onExportJson,
+  onCopyClipboard,
 }: SessionItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -39,6 +45,25 @@ export function SessionItem({
     session.isArchived
       ? { label: 'Unarchive', icon: <Icon name="ArchiveRestore" size={14} />, action: onArchive }
       : { label: 'Archive', icon: <Icon name="Archive" size={14} />, action: onArchive },
+    'separator',
+    {
+      label: 'Export as Markdown',
+      icon: <Icon name="FileText" size={14} />,
+      action: onExportMarkdown ?? (() => {}),
+      disabled: !onExportMarkdown,
+    },
+    {
+      label: 'Export as JSON',
+      icon: <Icon name="FileJson" size={14} />,
+      action: onExportJson ?? (() => {}),
+      disabled: !onExportJson,
+    },
+    {
+      label: 'Copy to clipboard',
+      icon: <Icon name="Clipboard" size={14} />,
+      action: onCopyClipboard ?? (() => {}),
+      disabled: !onCopyClipboard,
+    },
     'separator',
     {
       label: 'Delete',

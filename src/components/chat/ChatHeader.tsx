@@ -1,5 +1,6 @@
 import { YoloIndicator } from '../sandbox/YoloIndicator';
 import { JailIndicator } from '../sandbox/JailIndicator';
+import ExportMenu from './ExportMenu';
 
 interface ChatHeaderProps {
   isStreaming: boolean;
@@ -13,6 +14,9 @@ export default function ChatHeader({ isStreaming }: ChatHeaderProps) {
       </div>
       
       <div className="flex items-center gap-2">
+        {/* Export */}
+        <ExportMenu />
+
         {/* Sandbox indicators */}
         <YoloIndicator />
         <JailIndicator />

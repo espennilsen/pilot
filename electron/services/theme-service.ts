@@ -15,6 +15,7 @@ import type { CustomTheme } from '../../shared/types';
 
 /** Only allow valid hex color values (3, 4, 6, or 8 hex digits). */
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /** Required keys in the colors object. */
 const REQUIRED_COLOR_KEYS = [
@@ -226,6 +227,7 @@ export class ThemeService {
       let slug = theme.slug;
       let counter = 1;
       while (existsSync(join(this.themesDir, `${slug}.json`))) {
+        if (counter > 1000) throw new Error('Too many slug collisions during import');
         const existing = this.get(slug);
         if (existing?.builtIn) {
           slug = `${theme.slug}-${counter++}`;

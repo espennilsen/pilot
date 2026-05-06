@@ -142,6 +142,13 @@ export function useTheme(): void {
     // Only load if we don't already have this theme cached
     if (store.activeCustomTheme?.slug !== customThemeSlug) {
       store.loadTheme(customThemeSlug).then((loaded) => {
+    const targetSlug = customThemeSlug;
+    const store = useThemeStore.getState();
+    // Only load if we don't already have this theme cached
+    if (store.activeCustomTheme?.slug !== targetSlug) {
+      store.loadTheme(targetSlug).then((loaded) => {
+        // Bail out if the user switched themes while we were loading
+        if (useAppSettingsStore.getState().customThemeSlug !== targetSlug) return;
         if (loaded) {
           store.setActiveCustomTheme(loaded);
         }
@@ -165,6 +172,7 @@ export function useTheme(): void {
   }, [theme]);
 
   // Cleanup custom theme overrides when switching away from custom mode
+  // On unmount, remove any lingering custom CSS variable overrides
   useEffect(() => {
     return () => {
       clearCustomThemeColors();

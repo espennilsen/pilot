@@ -5,12 +5,14 @@ import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useTaskStore } from '../../stores/task-store';
 import { useMemoryStore } from '../../stores/memory-store';
 import { useTabStore } from '../../stores/tab-store';
+import { usePluginStore } from '../../stores/plugin-store';
 import { isCompanionMode } from '../../lib/ipc-client';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
 import { SessionList } from './SessionList';
 import { SidebarMemoryPane } from './SidebarMemoryPane';
 import { SidebarTasksPane } from './SidebarTasksPane';
+import PluginSidebarViews from '../plugins/PluginSidebarViews';
 import { CommandCenter } from '../command-center/CommandCenter';
 import { Plus, ExternalLink, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
@@ -18,6 +20,7 @@ const PANE_LABELS: Record<SidebarPane, string> = {
   sessions: 'Sessions',
   memory: 'Memory',
   tasks: 'Tasks',
+  plugins: 'Plugins',
 };
 
 export default function Sidebar() {
@@ -28,6 +31,7 @@ export default function Sidebar() {
   const { memoryEnabled, setMemoryEnabled } = useMemoryStore();
   const { addTab, addTasksTab } = useTabStore();
   const { openProjectDialog } = useProjectStore();
+  const { activeViews: pluginViews } = usePluginStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -186,6 +190,25 @@ export default function Sidebar() {
           </button>
         </Tooltip>
 
+        {/* Plugins pane — only shown when plugins have registered sidebar views */}
+        {pluginViews.filter(v => v.location === 'sidebar').length > 0 && (
+          <Tooltip content="Plugins" position="right">
+            <button
+              className={`p-2 rounded-md transition-colors ${
+                sidebarVisible && sidebarPane === 'plugins'
+                  ? 'bg-accent/15 text-accent'
+                  : 'hover:bg-bg-elevated text-text-secondary'
+              }`}
+              onClick={() => {
+                if (!sidebarVisible) toggleSidebar();
+                handlePaneClick('plugins');
+              }}
+            >
+              <Icon name="Puzzle" className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        )}
+
         {/* Spacer pushes bottom icons down */}
         <div className="flex-1" />
 
@@ -308,6 +331,7 @@ export default function Sidebar() {
           )}
           {sidebarPane === 'memory' && <SidebarMemoryPane />}
           {sidebarPane === 'tasks' && <SidebarTasksPane />}
+          {sidebarPane === 'plugins' && <PluginSidebarViews />}
         </div>
       </div>
     </div>
