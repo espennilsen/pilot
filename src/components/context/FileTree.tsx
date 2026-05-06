@@ -25,13 +25,15 @@ export default function FileTree() {
   } | null>(null);
 
   // Convert FileNode[] to flat path array for @pierre/trees
+  // Note: Only include files - directories are inferred from path structure
   const paths = useMemo(() => {
     if (!fileTree || fileTree.length === 0) return [];
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
-        result.push(node.path);
-        if (node.type === 'directory' && node.children) {
+        if (node.type === 'file') {
+          result.push(node.path);
+        } else if (node.children) {
           flattenPaths(node.children, result);
         }
       }
