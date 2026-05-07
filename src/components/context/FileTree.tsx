@@ -506,13 +506,13 @@ export default function FileTree() {
     <div 
       ref={treeRef} 
       className="h-full w-full" 
-      style={{ minHeight: 0, position: 'relative', height: '100%' }}
+      style={{ minHeight: 0, position: 'relative', height: '500px' }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <PierreFileTree
         model={model}
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: '500px', width: '100%' }}
         initialViewportHeight={500}
         composition={{
           contextMenu: {
