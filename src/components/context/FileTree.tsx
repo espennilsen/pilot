@@ -57,12 +57,13 @@ export default function FileTree() {
   // ── Load file tree when project changes ─────────────────
 
   useEffect(() => {
-    if (projectPath && contextPanelTab === 'files') {
+    if (projectPath && contextPanelTab === 'files' && (!fileTree || fileTree.length === 0)) {
       loadFileTree();
     }
-  }, [projectPath, contextPanelTab, loadFileTree]);
+  }, [projectPath, contextPanelTab, fileTree, loadFileTree]);
 
   // Convert FileNode[] to flat path array for @pierre/trees
+  // Note: @pierre/trees infers directories from file paths, so we only emit files
   const paths = useMemo(() => {
     if (!fileTree || fileTree.length === 0 || !projectPath) return [];
     
@@ -70,10 +71,8 @@ export default function FileTree() {
       for (const node of nodes) {
         const relPath = makeRelativePath(projectPath, node.path);
         
-        // Include both files and directories
-        if (node.type === 'directory') {
-          result.push(relPath);
-        } else if (node.type === 'file') {
+        // Only emit files - directories are inferred from path structure
+        if (node.type === 'file') {
           result.push(relPath);
         }
         
