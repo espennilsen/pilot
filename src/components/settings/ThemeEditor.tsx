@@ -2,10 +2,6 @@
  * @file ThemeEditor — Full theme creation/editing panel with color pickers and live preview.
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { useThemeStore } from '../../stores/theme-store';
-import { useAppSettingsStore } from '../../stores/app-settings-store';
-import { Save, RotateCcw, Copy, Trash2, X } from 'lucide-react';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
