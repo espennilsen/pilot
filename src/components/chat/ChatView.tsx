@@ -177,6 +177,11 @@ export default function ChatView() {
   // Keyboard: Cmd/Ctrl+F opens find, Escape closes
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Only handle Cmd+F if focus is within the chat component
+      const chatContainer = document.querySelector('[data-chat-container]');
+      if (chatContainer && !chatContainer.contains(e.target as Node)) {
+        return;
+      }
       if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault();
         setFindVisible(true);
@@ -388,7 +393,7 @@ export default function ChatView() {
   }, []);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-bg-base">
+    <div className="flex-1 min-w-0 flex flex-col bg-bg-base" data-chat-container>
       {/* Chat Header */}
       <ChatHeader isStreaming={!!isStreaming} />
 
