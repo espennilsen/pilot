@@ -192,7 +192,7 @@ export function useWorkspacePersistence() {
         panelConfig: t.panelConfig ?? {
           sidebarVisible: true,
           contextPanelVisible: true,
-          contextPanelTab: 'files' as const,
+          contextPanelTab: 'changes' as const,
         },
         lastActiveAt: Date.now(),
         hasUnread: false,
@@ -209,7 +209,7 @@ export function useWorkspacePersistence() {
         useUIStore.setState({
           sidebarVisible: saved.ui.sidebarVisible ?? true,
           contextPanelVisible: saved.ui.contextPanelVisible ?? true,
-          contextPanelTab: saved.ui.contextPanelTab ?? 'files',
+          contextPanelTab: saved.ui.contextPanelTab ?? 'changes',
           focusMode: saved.ui.focusMode ?? false,
           sidebarWidth: saved.ui.sidebarWidth ?? 260,
           contextPanelWidth: saved.ui.contextPanelWidth ?? 320,
