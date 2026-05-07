@@ -64,10 +64,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showGitignorePrompt: false,
   gitignoreProjectPath: null,
 
-  setProjectPath: (path) => {
-    set({ projectPath: path });
-    invoke(IPC.PROJECT_SET_DIRECTORY, path);
-    get().loadFileTree();
+  setProjectPath: async (path) => {
+    set({ projectPath: path, fileTree: [] });
+    await invoke(IPC.PROJECT_SET_DIRECTORY, path);
+    // Don't set isLoadingTree here - let loadFileTree handle it
   },
 
   clearProject: () => {

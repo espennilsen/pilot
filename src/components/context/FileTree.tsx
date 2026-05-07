@@ -57,10 +57,10 @@ export default function FileTree() {
   // ── Load file tree when project changes or tab is selected ─────────────────
 
   useEffect(() => {
-    if (projectPath && contextPanelTab === 'files') {
+    if (projectPath && contextPanelTab === 'files' && !isLoadingTree && (!fileTree || fileTree.length === 0)) {
       loadFileTree();
     }
-  }, [projectPath, contextPanelTab, loadFileTree]);
+  }, [projectPath, contextPanelTab, isLoadingTree, fileTree, loadFileTree]);
 
   // Convert FileNode[] to flat path array for @pierre/trees
   // Note: @pierre/trees infers directories from file paths, so we only emit files
@@ -508,6 +508,7 @@ export default function FileTree() {
       tabIndex={0}
     >
       <PierreFileTree
+        key={projectPath}  // Force remount when project changes
         model={model}
         style={{ height: '100%', width: '100%' }}
         composition={{
