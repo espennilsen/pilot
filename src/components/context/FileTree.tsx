@@ -14,7 +14,7 @@ import { type MenuState, buildMenuItems } from './file-tree-helpers';
 // ─── FileTree (root) ─────────────────────────────────────
 
 export default function FileTree() {
-  const { fileTree, isLoadingTree, projectPath, loadFileTree, setExpandedPaths, setSelectedPath } = useProjectStore();
+  const { fileTree, isLoadingTree, projectPath, loadFileTree } = useProjectStore();
   const { addFileTab } = useTabStore();
   const { contextPanelTab } = useUIStore();
   const { status } = useGitStore();
@@ -351,32 +351,8 @@ export default function FileTree() {
 
   // ── Persist tree state ───────────────────────────────────
 
-  useEffect(() => {
-    if (!model) return;
-
-    const saveState = () => {
-      if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
-      saveStateTimeoutRef.current = setTimeout(() => {
-        // Note: @pierre/trees doesn't expose getVisibleRows/getVisibleCount
-        // We'll just save the selected path for now
-        const selectedPath = model.getSelectedPaths()[0] ?? null;
-        
-        // For expanded paths, we'd need to track expansion events separately
-        // For now, just save selection
-        setExpandedPaths(new Set()); // TODO: Track expanded paths properly
-        setSelectedPath(selectedPath);
-      }, 300);
-    };
-
-    const unsubscribe = model.subscribe(() => {
-      saveState();
-    });
-
-    return () => {
-      unsubscribe();
-      if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
-    };
-  }, [model, setExpandedPaths, setSelectedPath]);
+  // TODO: Track expanded paths through mutation events
+  // For now, we don't persist tree state
 
   // ── Keyboard shortcuts ───────────────────────────────────
 
