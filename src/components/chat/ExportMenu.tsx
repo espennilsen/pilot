@@ -55,8 +55,6 @@ export default function ExportMenu() {
   }, [open]);
 
   const doExport = useCallback(async (format: SessionExportFormat) => {
-    if (!activeTabId) return;
-    setError(null);
     if (!activeTabId || isExporting) return;
     setError(null);
     setIsExporting(true);
@@ -76,8 +74,6 @@ export default function ExportMenu() {
     } catch (err) {
       console.error('Export failed:', err);
       setError(err instanceof Error ? err.message : 'Export failed');
-    }
-  }, [activeTabId, activeTab]);
     } finally {
       setIsExporting(false);
     }
@@ -163,11 +159,6 @@ export default function ExportMenu() {
               </div>
             </>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
         </div>
       )}
     </div>

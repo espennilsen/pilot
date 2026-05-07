@@ -1,5 +1,4 @@
 import { ipcMain, dialog, clipboard, BrowserWindow } from 'electron';
-import { writeFile } from 'fs/promises';
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
@@ -11,7 +10,6 @@ import type { SessionExportOptions, SessionExportResult } from '../../shared/typ
 import type { Message } from '@mariozechner/pi-ai';
 import { formatAsMarkdown, formatAsJson } from '../services/session-export';
 import { parseSessionEntries, buildSessionContext } from '@mariozechner/pi-coding-agent';
-import { formatAsMarkdown, formatAsJson } from '../services/session-export';
 import { getPiAgentDir } from '../services/app-settings';
 import { isWithinDir } from '../utils/paths';
 
