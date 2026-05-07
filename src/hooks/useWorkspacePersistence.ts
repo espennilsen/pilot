@@ -209,7 +209,11 @@ export function useWorkspacePersistence() {
         useUIStore.setState({
           sidebarVisible: saved.ui.sidebarVisible ?? true,
           contextPanelVisible: saved.ui.contextPanelVisible ?? true,
-          contextPanelTab: saved.ui.contextPanelTab ?? 'changes',
+          // TODO: Restore last active tab once FileTree renders correctly on startup.
+          // Currently disabled because FileTree only renders when tab is reselected.
+          // Workaround: Always default to 'changes' tab to avoid blank FileTree render.
+          // contextPanelTab: saved.ui.contextPanelTab ?? 'changes',
+          contextPanelTab: 'changes', // Temporary: force 'changes' tab on startup
           focusMode: saved.ui.focusMode ?? false,
           sidebarWidth: saved.ui.sidebarWidth ?? 260,
           contextPanelWidth: saved.ui.contextPanelWidth ?? 320,
