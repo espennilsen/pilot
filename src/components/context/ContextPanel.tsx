@@ -137,7 +137,7 @@ export default function ContextPanel() {
   // Expanded: show the full panel with tabs, content, and collapse button
   return (
     <div
-      className="bg-bg-surface border-l border-border flex flex-col"
+      className="bg-bg-surface border-l border-border flex flex-col h-full"
       style={{ width: `${contextPanelWidth}px` }}
     >
       {/* Tab Switcher Header */}
