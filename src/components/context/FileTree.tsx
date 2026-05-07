@@ -30,6 +30,14 @@ export default function FileTree() {
     kind: 'file' | 'folder';
   } | null>(null);
 
+  // ── Load file tree when project changes ─────────────────
+
+  useEffect(() => {
+    if (projectPath && contextPanelTab === 'files') {
+      loadFileTree();
+    }
+  }, [projectPath, contextPanelTab, loadFileTree]);
+
   // Convert FileNode[] to flat path array for @pierre/trees
   const paths = useMemo(() => {
     if (!fileTree || fileTree.length === 0 || !projectPath) return [];
@@ -506,14 +514,13 @@ export default function FileTree() {
     <div 
       ref={treeRef} 
       className="h-full w-full" 
-      style={{ minHeight: 0, position: 'relative', height: '500px' }}
+      style={{ minHeight: 0, position: 'relative' }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <PierreFileTree
         model={model}
-        style={{ height: '500px', width: '100%' }}
-        initialViewportHeight={500}
+        style={{ height: '100%', width: '100%' }}
         composition={{
           contextMenu: {
             enabled: true,
