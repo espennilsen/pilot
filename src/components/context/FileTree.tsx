@@ -20,7 +20,7 @@ function joinPaths(...segments: string[]): string {
   return segments.filter(Boolean).join(pathSep);
 }
 
-function relativePath(from: string, to: string): string {
+function makeRelativePath(from: string, to: string): string {
   if (!to.startsWith(from)) return to;
   const prefix = from.endsWith(pathSep) ? from : from + pathSep;
   return to.startsWith(prefix) ? to.slice(prefix.length) : to.slice(from.length);
@@ -68,13 +68,13 @@ export default function FileTree() {
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
-        const relativePath = relativePath(projectPath, node.path);
+        const relPath = makeRelativePath(projectPath, node.path);
         
         // Include both files and directories
         if (node.type === 'directory') {
-          result.push(relativePath);
+          result.push(relPath);
         } else if (node.type === 'file') {
-          result.push(relativePath);
+          result.push(relPath);
         }
         
         if (node.children) {
@@ -101,24 +101,24 @@ export default function FileTree() {
     // Staged changes
     if (status.staged) {
       for (const file of status.staged) {
-        const relativePath = relativePath(projectPath, file);
-        entries.push({ path: relativePath, status: 'A' });
+        const relPath = makeRelativePath(projectPath, file);
+        entries.push({ path: relPath, status: 'A' });
       }
     }
     
     // Unstaged changes (modified)
     if (status.unstaged) {
       for (const file of status.unstaged) {
-        const relativePath = relativePath(projectPath, file);
-        entries.push({ path: relativePath, status: 'M' });
+        const relPath = makeRelativePath(projectPath, file);
+        entries.push({ path: relPath, status: 'M' });
       }
     }
     
     // Untracked files
     if (status.untracked) {
       for (const file of status.untracked) {
-        const relativePath = relativePath(projectPath, file);
-        entries.push({ path: relativePath, status: 'U' });
+        const relPath = makeRelativePath(projectPath, file);
+        entries.push({ path: relPath, status: 'U' });
       }
     }
     
