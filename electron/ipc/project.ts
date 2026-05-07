@@ -14,7 +14,6 @@ function buildFileTree(dirPath: string, ig: ReturnType<typeof ignore>, depth = 0
     return entries
       .filter(e => !ig.ignores(e.isDirectory() ? e.name + '/' : e.name))
       .sort((a, b) => {
-        // Directories first, then alphabetical
         if (a.isDirectory() && !b.isDirectory()) return -1;
         if (!a.isDirectory() && b.isDirectory()) return 1;
         return a.name.localeCompare(b.name);
@@ -36,9 +35,37 @@ function buildFileTree(dirPath: string, ig: ReturnType<typeof ignore>, depth = 0
         };
       });
   } catch {
-    /* Expected: directory may not exist or be unreadable */
     return [];
   }
+}
+
+// Pre-compute flat file paths for instant tree initialization
+function buildFilePaths(dirPath: string, ig: ReturnType<typeof ignore>, depth = 0, maxDepth = 5): string[] {
+  const result: string[] = [];
+  
+  const walk = (currentPath: string, currentDepth: number) => {
+    if (currentDepth >= maxDepth) return;
+    try {
+      const entries = readdirSync(currentPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (ig.ignores(entry.isDirectory() ? entry.name + '/' : entry.name)) continue;
+        
+        const fullPath = join(currentPath, entry.name);
+        const relPath = relative(dirPath, fullPath);
+        
+        if (entry.isDirectory()) {
+          walk(fullPath, currentDepth + 1);
+        } else {
+          result.push(relPath);
+        }
+      }
+    } catch {
+      // Skip unreadable directories
+    }
+  };
+  
+  walk(dirPath, 0);
+  return result;
 }
 
 export function registerProjectIpc() {
@@ -59,17 +86,15 @@ export function registerProjectIpc() {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send(IPC.PROJECT_FS_CHANGED);
     }
-    // Forward to companion clients
     try {
       companionBridge.forwardEvent(IPC.PROJECT_FS_CHANGED, undefined);
-    } catch { /* Expected: companion bridge not initialized yet during startup */ }
+    } catch { /* Expected: companion bridge not initialized */ }
   }
 
   function startWatching(projectPath: string) {
     stopWatching();
     try {
       fsWatcher = watch(projectPath, { recursive: true }, (_eventType, filename) => {
-        // Ignore changes in directories we don't show in the tree
         if (filename) {
           const topDir = filename.split(/[/\\]/)[0];
           const settings = loadAppSettings();
@@ -77,12 +102,11 @@ export function registerProjectIpc() {
           const ig = ignore().add(patterns);
           if (ig.ignores(topDir) || ig.ignores(topDir + '/')) return;
         }
-        // Debounce — batch rapid changes into one notification
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(notifyFsChanged, 300);
       });
-    } catch { /* Expected: watch target may not exist */
-      // fs.watch may fail on some platforms/paths — degrade gracefully
+    } catch {
+      // fs.watch may fail — degrade gracefully
     }
   }
 
@@ -103,12 +127,26 @@ export function registerProjectIpc() {
     if (path) startWatching(path);
   });
 
-  ipcMain.handle(IPC.PROJECT_FILE_TREE, async () => {
+  ipcMain.handle(IPC.PROJECT_FILE_TREE, async (_event, requestedProjectPath?: string | null) => {
+    const projectPath = requestedProjectPath || currentProjectPath;
+    if (!projectPath) return [];
+    const settings = loadAppSettings();
+    const patterns = settings.hiddenPaths ?? DEFAULT_HIDDEN_PATHS;
+    const ig = ignore().add(patterns);
+    return buildFileTree(projectPath, ig);
+  });
+
+  // Pre-computed file paths for instant tree initialization (no SSR overhead)
+  ipcMain.handle(IPC.PROJECT_FILE_PATHS, async () => {
     if (!currentProjectPath) return [];
     const settings = loadAppSettings();
     const patterns = settings.hiddenPaths ?? DEFAULT_HIDDEN_PATHS;
     const ig = ignore().add(patterns);
-    return buildFileTree(currentProjectPath, ig);
+    try {
+      return buildFilePaths(currentProjectPath, ig);
+    } catch {
+      return [];
+    }
   });
 
   ipcMain.handle(IPC.PROJECT_FILE_SEARCH, async (_event, query: string, includeDirs?: boolean) => {
@@ -123,7 +161,7 @@ export function registerProjectIpc() {
         const entries = readdirSync(dirPath, { withFileTypes: true });
         for (const entry of entries) {
           if (results.length >= maxResults) return;
-          if (IGNORED.has(entry.name) || entry.name.startsWith('.')) continue;
+          if (entry.name.startsWith('.')) continue;
           const fullPath = join(dirPath, entry.name);
           const relPath = relative(currentProjectPath!, fullPath);
           if (entry.isDirectory()) {
@@ -147,7 +185,7 @@ export function registerProjectIpc() {
   ipcMain.handle(IPC.PROJECT_READ_FILE, async (_event, filePath: string) => {
     try {
       const stat = statSync(filePath);
-      if (stat.size > 1024 * 1024) { // 1MB limit
+      if (stat.size > 1024 * 1024) {
         return { error: 'File too large to preview (>1MB)' };
       }
       const content = readFileSync(filePath, 'utf-8');
@@ -209,7 +247,6 @@ export function registerProjectIpc() {
     }
   });
 
-  // Open directory dialog
   ipcMain.handle(IPC.PROJECT_OPEN_DIALOG, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -222,19 +259,17 @@ export function registerProjectIpc() {
     return null;
   });
 
-  // Check if project is a git repo that needs .pilot in .gitignore
   ipcMain.handle(IPC.PROJECT_CHECK_GITIGNORE, async (_event, projectPath: string) => {
     try {
       const gitDir = join(projectPath, '.git');
-      if (!existsSync(gitDir)) return { needsUpdate: false }; // Not a git repo
+      if (!existsSync(gitDir)) return { needsUpdate: false };
 
       const pilotDir = join(projectPath, '.pilot');
-      if (existsSync(pilotDir)) return { needsUpdate: false }; // .pilot already exists, too late to suggest
+      if (existsSync(pilotDir)) return { needsUpdate: false };
 
       const gitignorePath = join(projectPath, '.gitignore');
       if (existsSync(gitignorePath)) {
         const content = readFileSync(gitignorePath, 'utf-8');
-        // Check if .pilot is already covered (exact line match, with or without trailing slash)
         const lines = content.split(/\r?\n/);
         const alreadyIgnored = lines.some(line => {
           const trimmed = line.trim();
@@ -245,18 +280,15 @@ export function registerProjectIpc() {
 
       return { needsUpdate: true };
     } catch {
-      /* Expected: .git or .gitignore may not exist, or file read may fail */
       return { needsUpdate: false };
     }
   });
 
-  // Add .pilot to .gitignore
   ipcMain.handle(IPC.PROJECT_ADD_GITIGNORE, async (_event, projectPath: string) => {
     try {
       const gitignorePath = join(projectPath, '.gitignore');
       if (existsSync(gitignorePath)) {
         const content = readFileSync(gitignorePath, 'utf-8');
-        // Ensure we add on a new line
         const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
         appendFileSync(gitignorePath, `${separator}.pilot\n`, 'utf-8');
       } else {

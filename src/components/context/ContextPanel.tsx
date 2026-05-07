@@ -17,8 +17,9 @@ import DesktopPanel from '../desktop/DesktopPanel';
 
 export default function ContextPanel() {
   const { contextPanelVisible, contextPanelWidth, contextPanelTab, setContextPanelTab, toggleContextPanel } = useUIStore();
-  const { projectPath, openProjectDialog } = useProjectStore();
+  const { projectPath: fallbackProjectPath, openProjectDialog } = useProjectStore();
   const activeTabId = useTabStore((s) => s.activeTabId);
+  const tabs = useTabStore((s) => s.tabs);
   const getPendingDiffs = useSandboxStore((s) => s.getPendingDiffs);
   const { activeViews: pluginViews, getViewChildren } = usePluginStore();
   const pluginPanelViews = pluginViews.filter(v => v.location === 'panel');
@@ -33,6 +34,8 @@ export default function ContextPanel() {
 
   // Desktop tab: visible when the global setting is on
   const desktopEnabled = useAppSettingsStore((s) => s.desktopEnabled);
+  const activeTabProjectPath = tabs.find((t) => t.id === activeTabId)?.projectPath ?? null;
+  const projectPath = activeTabProjectPath ?? fallbackProjectPath;
 
   // If the active tab was 'tasks', fall back to 'changes'
   // Also fall back if desktop tab is selected but desktop is disabled
@@ -47,7 +50,7 @@ export default function ContextPanel() {
   if (!contextPanelVisible) {
     // Collapsed: show only a thin activity bar to re-expand
     return (
-      <div className="flex flex-col items-center w-10 flex-shrink-0 bg-bg-surface border-l border-border py-2 gap-1">
+      <div className="flex flex-col items-center w-10 shrink-0 bg-bg-surface border-l border-border py-2 gap-1">
         {/* Changes */}
         <Tooltip content="Changes" position="left">
           <button
@@ -247,7 +250,7 @@ export default function ContextPanel() {
               </button>
             </div>
           ) : (
-            <FileTree />
+            <FileTree projectPath={projectPath} />
           )
         ) : effectiveTab === 'git' ? (
           <GitPanel />

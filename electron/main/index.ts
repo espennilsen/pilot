@@ -252,8 +252,6 @@ async function createWindow() {
   });
 
   // Save window bounds on resize/position changes
-
-  // Save window bounds on resize/position changes
   let saveWindowBoundsTimeout: NodeJS.Timeout | null = null;
   const saveWindowBounds = () => {
     if (saveWindowBoundsTimeout) clearTimeout(saveWindowBoundsTimeout);
@@ -261,9 +259,9 @@ async function createWindow() {
       if (!mainWindow) return;
       const bounds = mainWindow.getBounds();
       const isMaximized = mainWindow.isMaximized();
-      const workspace = await service.load();
+      const existing = await service.load() ?? {};
       await service.save({
-        ...workspace!,
+        ...existing,
         windowBounds: bounds,
         windowMaximized: isMaximized,
       });

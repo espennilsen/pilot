@@ -571,9 +571,10 @@ export default function FileTree({ projectPath }: FileTreeProps) {
             <input
               autoFocus
               defaultValue=""
-              onKeyDown={(e) => {
+              onKeyDown={async (e) => {
                 if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                  handleCreate(inlineInput.parentPath, e.currentTarget.value.trim(), inlineInput.kind);
+                  const success = await handleCreate(inlineInput.parentPath, e.currentTarget.value.trim(), inlineInput.kind);
+                  if (success) setInlineInput(null);
                 }
                 if (e.key === 'Escape') setInlineInput(null);
               }}
