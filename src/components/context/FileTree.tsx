@@ -169,8 +169,10 @@ export default function FileTree() {
     }
   }, [addFileTab, toFullPath, projectPath]);
 
-  const handleDragDrop = useCallback(async (draggedPaths: readonly string[], targetPath: string, dropType: 'into' | 'before' | 'after') => {
+  const handleDragDrop = useCallback(async (draggedPaths: readonly string[], target: { path: string; kind: 'directory' | 'root' }, dropType: 'into' | 'before' | 'after') => {
     if (!projectPath) return;
+    
+    const targetPath = target.path;
     
     for (const draggedPath of draggedPaths) {
       const fullDraggedPath = toFullPath(draggedPath);
@@ -209,8 +211,11 @@ export default function FileTree() {
     dragAndDrop: {
       enabled: true,
       canDrag: (draggedPaths) => draggedPaths.length > 0,
-      canDrop: (dropContext) => !dropContext.draggedPaths.includes(dropContext.targetPath),
-      onDropComplete: (dropResult) => console.log('Drop completed:', dropResult),
+      canDrop: (dropContext) => !dropContext.draggedPaths.includes(dropContext.target.path),
+      onDropComplete: (dropResult) => {
+        console.log('Drop completed:', dropResult);
+        handleDragDrop(dropResult.draggedPaths, dropResult.target, 'into');
+      },
       onDropError: (error) => window.alert(`Move failed: ${error}`),
       openOnDropDelay: 300,
     },
@@ -344,18 +349,13 @@ export default function FileTree() {
     const saveState = () => {
       if (saveStateTimeoutRef.current) clearTimeout(saveStateTimeoutRef.current);
       saveStateTimeoutRef.current = setTimeout(() => {
-        const visibleRows = model.getVisibleRows(0, model.getVisibleCount());
-        const expandedPaths = new Set<string>();
-        
-        for (const row of visibleRows) {
-          if (row.item.kind === 'directory') {
-            expandedPaths.add(row.item.path);
-          }
-        }
-        
+        // Note: @pierre/trees doesn't expose getVisibleRows/getVisibleCount
+        // We'll just save the selected path for now
         const selectedPath = model.getSelectedPaths()[0] ?? null;
         
-        setExpandedPaths(expandedPaths);
+        // For expanded paths, we'd need to track expansion events separately
+        // For now, just save selection
+        setExpandedPaths(new Set()); // TODO: Track expanded paths properly
         setSelectedPath(selectedPath);
       }, 300);
     };
@@ -523,9 +523,6 @@ export default function FileTree() {
         }}
         onItemActivate={(item) => {
           handleDoubleClick(item.path, item.kind as 'file' | 'directory');
-        }}
-        onDrop={(draggedPaths, targetPath, dropType) => {
-          handleDragDrop(draggedPaths, targetPath, dropType);
         }}
       />
 
