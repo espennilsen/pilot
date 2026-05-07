@@ -177,6 +177,13 @@ export default function ChatView() {
   // Keyboard: Cmd/Ctrl+F opens find, Escape closes
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Escape always closes the find bar, regardless of focus position
+      if (e.key === 'Escape' && findVisible) {
+        e.preventDefault();
+        setFindVisible(false);
+        return;
+      }
+
       // Only handle Cmd+F if focus is within the chat component
       const chatContainer = document.querySelector('[data-chat-container]');
       if (chatContainer && !chatContainer.contains(e.target as Node)) {
@@ -185,10 +192,6 @@ export default function ChatView() {
       if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault();
         setFindVisible(true);
-      }
-      if (e.key === 'Escape' && findVisible) {
-        e.preventDefault();
-        setFindVisible(false);
       }
     };
     window.addEventListener('keydown', handleKey);

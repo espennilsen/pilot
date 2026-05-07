@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useMemo, useEffect, KeyboardEvent } from 'react';
+import path from 'path';
 import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection, useFileTreeSearch } from '@pierre/trees/react';
 import { preparePresortedFileTreeInput } from '@pierre/trees';
 import type { FileNode } from '../../../shared/types';
@@ -22,7 +23,6 @@ export default function FileTree() {
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
-  const saveStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -44,12 +44,16 @@ export default function FileTree() {
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
-        if (node.type === 'file') {
-          const relativePath = node.path.startsWith(projectPath + '/')
-            ? node.path.slice(projectPath.length + 1)
-            : node.path;
+        const relativePath = path.relative(projectPath, node.path);
+        
+        // Include both files and directories
+        if (node.type === 'directory') {
           result.push(relativePath);
-        } else if (node.children) {
+        } else if (node.type === 'file') {
+          result.push(relativePath);
+        }
+        
+        if (node.children) {
           flattenPaths(node.children, result);
         }
       }
@@ -68,44 +72,28 @@ export default function FileTree() {
   const gitStatusEntries = useMemo(() => {
     if (!projectPath || !status) return [];
     
-    const entries: Array<{ path: string; status: 'M' | 'A' | 'D' | 'U' | 'R' }> = [];
+    const entries: Array<{ path: string; status: 'M' | 'A' | 'D' | 'U' }> = [];
     
-    // Modified files
-    if (status.modified) {
-      for (const file of status.modified) {
-        const relativePath = file.startsWith(projectPath + '/') 
-          ? file.slice(projectPath.length + 1) 
-          : file;
-        entries.push({ path: relativePath, status: 'M' });
-      }
-    }
-    
-    // Added files
-    if (status.added) {
-      for (const file of status.added) {
-        const relativePath = file.startsWith(projectPath + '/') 
-          ? file.slice(projectPath.length + 1) 
-          : file;
+    // Staged changes
+    if (status.staged) {
+      for (const file of status.staged) {
+        const relativePath = path.relative(projectPath, file);
         entries.push({ path: relativePath, status: 'A' });
       }
     }
     
-    // Deleted files
-    if (status.deleted) {
-      for (const file of status.deleted) {
-        const relativePath = file.startsWith(projectPath + '/') 
-          ? file.slice(projectPath.length + 1) 
-          : file;
-        entries.push({ path: relativePath, status: 'D' });
+    // Unstaged changes (modified)
+    if (status.unstaged) {
+      for (const file of status.unstaged) {
+        const relativePath = path.relative(projectPath, file);
+        entries.push({ path: relativePath, status: 'M' });
       }
     }
     
     // Untracked files
     if (status.untracked) {
       for (const file of status.untracked) {
-        const relativePath = file.startsWith(projectPath + '/') 
-          ? file.slice(projectPath.length + 1) 
-          : file;
+        const relativePath = path.relative(projectPath, file);
         entries.push({ path: relativePath, status: 'U' });
       }
     }
@@ -116,7 +104,7 @@ export default function FileTree() {
   // ── Action callbacks ───────────────────────────────────
 
   const toFullPath = useCallback((relativePath: string) => {
-    return projectPath ? `${projectPath}/${relativePath}` : relativePath;
+    return projectPath ? path.join(projectPath, relativePath) : relativePath;
   }, [projectPath]);
 
   const handleReveal = useCallback((relativePath: string) => {
@@ -159,7 +147,7 @@ export default function FileTree() {
 
   const handleCreate = useCallback(async (parentRelativePath: string, name: string, kind: 'file' | 'folder') => {
     const fullParentPath = toFullPath(parentRelativePath);
-    const fullPath = `${fullParentPath}/${name}`;
+    const fullPath = path.join(fullParentPath, name);
     const channel = kind === 'file' ? IPC.PROJECT_CREATE_FILE : IPC.PROJECT_CREATE_DIRECTORY;
     const result = await invoke(channel, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
@@ -188,12 +176,12 @@ export default function FileTree() {
       
       let newPath: string;
       if (dropType === 'into') {
-        const fileName = draggedPath.split('/').pop();
-        newPath = `${fullTargetPath}/${fileName}`;
+        const fileName = path.basename(draggedPath);
+        newPath = path.join(fullTargetPath, fileName);
       } else {
-        const parentDir = fullDraggedPath.substring(0, fullDraggedPath.lastIndexOf('/'));
-        const fileName = draggedPath.split('/').pop();
-        newPath = `${parentDir}/${fileName}`;
+        const parentDir = path.dirname(fullDraggedPath);
+        const fileName = path.basename(draggedPath);
+        newPath = path.join(parentDir, fileName);
       }
       
       if (newPath !== fullDraggedPath) {
@@ -233,8 +221,8 @@ export default function FileTree() {
       onError: (error) => window.alert(`Rename failed: ${error}`),
       onRename: async (event) => {
         const oldFullPath = toFullPath(event.oldPath);
-        const dir = oldFullPath.substring(0, oldFullPath.lastIndexOf('/'));
-        const newFullPath = `${dir}/${event.newName}`;
+        const dir = path.dirname(oldFullPath);
+        const newFullPath = path.join(dir, event.newName);
         
         if (newFullPath === oldFullPath) return;
         
@@ -348,8 +336,6 @@ export default function FileTree() {
       [data-git-status="U"] { color: #6a737d; }
     `,
   });
-
-  // ── Persist tree state ───────────────────────────────────
 
   // TODO: Track expanded paths through mutation events
   // For now, we don't persist tree state

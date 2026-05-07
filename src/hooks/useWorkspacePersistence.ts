@@ -262,7 +262,7 @@ export function useWorkspacePersistence() {
       }
 
       if (restTabs.length > 0) {
-        const results = await Promise.allSettled(
+        await Promise.allSettled(
           restTabs.map(async (tab) => {
             await openTabSession(tab.id, tab);
             addWiredSession(`${tab.id}::${tab.projectPath}`);
