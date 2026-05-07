@@ -288,7 +288,6 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
     setError(null);
     try {
       // Auto-generate slug from name if creating new or name changed
-      const theme = { ...draft };
       const theme = { ...(parsedFromJson ?? draft) };
       if (isNew || theme.name !== original.name) {
         theme.slug = slugify(theme.name);
@@ -347,10 +346,6 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
   const handleDelete = async () => {
     if (!initialTheme) return;
     try {
-      await deleteTheme(initialTheme.slug);
-      // Reset mode if we just deleted the active theme
-      if (useThemeStore.getState().activeCustomTheme === null) {
-        await setTheme('dark');
       const wasActive = useThemeStore.getState().activeCustomTheme?.slug === initialTheme.slug;
       await deleteTheme(initialTheme.slug);
       // Only reset mode if we just deleted the currently active theme
@@ -451,141 +446,6 @@ export function ThemeEditor({ initialTheme, onClose }: ThemeEditorProps) {
 
       {/* Body — editor + preview side by side */}
       <div className="flex-1 overflow-hidden flex">
-        {/* Left: Color editors */}
-        <div className="w-[280px] overflow-y-auto border-r border-border p-4 space-y-4">
-          {/* Name & Base */}
-          <div className="space-y-2">
-            <div>
-              <label className="text-xs text-text-secondary block mb-1">Name</label>
-              <input
-                type="text"
-                value={draft.name}
-                onChange={(e) => updateDraft({ name: e.target.value })}
-                disabled={isReadOnly}
-                className="text-xs bg-bg-base border border-border rounded px-2 py-1 text-text-primary w-full focus:outline-none focus:border-accent disabled:opacity-60"
-                placeholder="My Theme"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-text-secondary block mb-1">Base</label>
-              <select
-                value={draft.base}
-                onChange={(e) => updateDraft({ base: e.target.value as 'dark' | 'light' })}
-                disabled={isReadOnly}
-                className="text-xs bg-bg-base border border-border rounded px-2 py-1 text-text-primary w-full focus:outline-none focus:border-accent disabled:opacity-60"
-              >
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
-            </div>
-          </div>
-
-          {/* App Colors */}
-          <div>
-            <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">App Colors</h4>
-            {Object.entries(APP_COLOR_LABELS).map(([key, label]) => (
-              <ColorRow
-                key={key}
-                label={label}
-                value={draft.colors[key] ?? '#000000'}
-                onChange={(v) => !isReadOnly && updateColor(key, v)}
-              />
-            ))}
-          </div>
-
-          {/* Terminal Colors (collapsible) */}
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showTerminal}
-                onChange={(e) => {
-                  setShowTerminal(e.target.checked);
-                  if (!e.target.checked) {
-                    updateDraft({ terminal: undefined });
-                  }
-                }}
-                disabled={isReadOnly}
-                className="accent-accent"
-              />
-              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Terminal Colors</span>
-            </label>
-            {showTerminal && (
-              <div className="mt-2">
-                {Object.entries(TERMINAL_COLOR_LABELS).map(([key, label]) => (
-                  <ColorRow
-                    key={key}
-                    label={label}
-                    value={draft.terminal?.[key] ?? '#000000'}
-                    onChange={(v) => !isReadOnly && updateTerminalColor(key, v)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Syntax Colors (collapsible) */}
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showSyntax}
-                onChange={(e) => {
-                  setShowSyntax(e.target.checked);
-                  if (!e.target.checked) {
-                    updateDraft({ syntax: undefined });
-                  }
-                }}
-                disabled={isReadOnly}
-                className="accent-accent"
-              />
-              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Syntax Colors</span>
-            </label>
-            {showSyntax && (
-              <div className="mt-2">
-                {Object.entries(SYNTAX_COLOR_LABELS).map(([key, label]) => (
-                  <ColorRow
-                    key={key}
-                    label={label}
-                    value={draft.syntax?.[key] ?? '#808080'}
-                    onChange={(v) => !isReadOnly && updateSyntaxColor(key, v)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Delete */}
-          {initialTheme && !initialTheme.builtIn && (
-            <div className="pt-2 border-t border-border">
-              {!confirmDelete ? (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-error hover:bg-error/10 rounded transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Theme
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-error">Confirm delete?</span>
-                  <button
-                    onClick={handleDelete}
-                    className="text-xs px-2 py-1 bg-error text-white rounded hover:bg-error/80"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(false)}
-                    className="text-xs px-2 py-1 bg-bg-surface border border-border rounded"
-                  >
-                    No
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
         {/* Left: Visual color editors OR JSON code editor */}
         {editorMode === 'visual' ? (
           <div className="w-[280px] overflow-y-auto border-r border-border p-4 space-y-4">

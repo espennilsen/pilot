@@ -31,8 +31,6 @@ import { registerThemeIpc } from '../ipc/theme';
 import { DesktopService } from '../services/desktop-service';
 import { ThemeService } from '../services/theme-service';
 import { registerPluginsIpc } from '../ipc/plugins';
-import { DesktopService } from '../services/desktop-service';
-import { ThemeService } from '../services/theme-service';
 import { OllamaService } from '../services/ollama-service';
 import { registerOllamaIpc } from '../ipc/ollama';
 import { McpManager } from '../services/mcp-manager';
