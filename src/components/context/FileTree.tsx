@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState, useMemo, useEffect, KeyboardEvent } from 'react';
-import path from 'path';
 import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection, useFileTreeSearch } from '@pierre/trees/react';
 import { preparePresortedFileTreeInput } from '@pierre/trees';
 import type { FileNode } from '../../../shared/types';
@@ -11,6 +10,31 @@ import { useDetectedEditors, type DetectedEditor } from '../../hooks/useDetected
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
 import { type MenuState, buildMenuItems } from './file-tree-helpers';
+
+// ─── Browser-safe path utilities ───────────────────────────
+
+const isWindows = navigator.platform.toLowerCase().includes('win');
+const pathSep = isWindows ? '\\' : '/';
+
+function joinPaths(...segments: string[]): string {
+  return segments.filter(Boolean).join(pathSep);
+}
+
+function relativePath(from: string, to: string): string {
+  if (!to.startsWith(from)) return to;
+  const prefix = from.endsWith(pathSep) ? from : from + pathSep;
+  return to.startsWith(prefix) ? to.slice(prefix.length) : to.slice(from.length);
+}
+
+function dirname(p: string): string {
+  const idx = p.lastIndexOf(pathSep);
+  return idx === -1 ? '' : p.slice(0, idx);
+}
+
+function basename(p: string): string {
+  const idx = p.lastIndexOf(pathSep);
+  return idx === -1 ? p : p.slice(idx + 1);
+}
 
 // ─── FileTree (root) ─────────────────────────────────────
 
@@ -44,7 +68,7 @@ export default function FileTree() {
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
-        const relativePath = path.relative(projectPath, node.path);
+        const relativePath = relativePath(projectPath, node.path);
         
         // Include both files and directories
         if (node.type === 'directory') {
@@ -77,7 +101,7 @@ export default function FileTree() {
     // Staged changes
     if (status.staged) {
       for (const file of status.staged) {
-        const relativePath = path.relative(projectPath, file);
+        const relativePath = relativePath(projectPath, file);
         entries.push({ path: relativePath, status: 'A' });
       }
     }
@@ -85,7 +109,7 @@ export default function FileTree() {
     // Unstaged changes (modified)
     if (status.unstaged) {
       for (const file of status.unstaged) {
-        const relativePath = path.relative(projectPath, file);
+        const relativePath = relativePath(projectPath, file);
         entries.push({ path: relativePath, status: 'M' });
       }
     }
@@ -93,7 +117,7 @@ export default function FileTree() {
     // Untracked files
     if (status.untracked) {
       for (const file of status.untracked) {
-        const relativePath = path.relative(projectPath, file);
+        const relativePath = relativePath(projectPath, file);
         entries.push({ path: relativePath, status: 'U' });
       }
     }
@@ -104,7 +128,7 @@ export default function FileTree() {
   // ── Action callbacks ───────────────────────────────────
 
   const toFullPath = useCallback((relativePath: string) => {
-    return projectPath ? path.join(projectPath, relativePath) : relativePath;
+    return projectPath ? joinPaths(projectPath, relativePath) : relativePath;
   }, [projectPath]);
 
   const handleReveal = useCallback((relativePath: string) => {
@@ -147,7 +171,7 @@ export default function FileTree() {
 
   const handleCreate = useCallback(async (parentRelativePath: string, name: string, kind: 'file' | 'folder') => {
     const fullParentPath = toFullPath(parentRelativePath);
-    const fullPath = path.join(fullParentPath, name);
+    const fullPath = joinPaths(fullParentPath, name);
     const channel = kind === 'file' ? IPC.PROJECT_CREATE_FILE : IPC.PROJECT_CREATE_DIRECTORY;
     const result = await invoke(channel, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
@@ -176,12 +200,12 @@ export default function FileTree() {
       
       let newPath: string;
       if (dropType === 'into') {
-        const fileName = path.basename(draggedPath);
-        newPath = path.join(fullTargetPath, fileName);
+        const fileName = basename(draggedPath);
+        newPath = joinPaths(fullTargetPath, fileName);
       } else {
-        const parentDir = path.dirname(fullDraggedPath);
-        const fileName = path.basename(draggedPath);
-        newPath = path.join(parentDir, fileName);
+        const parentDir = dirname(fullDraggedPath);
+        const fileName = basename(draggedPath);
+        newPath = joinPaths(parentDir, fileName);
       }
       
       if (newPath !== fullDraggedPath) {
@@ -221,8 +245,8 @@ export default function FileTree() {
       onError: (error) => window.alert(`Rename failed: ${error}`),
       onRename: async (event) => {
         const oldFullPath = toFullPath(event.oldPath);
-        const dir = path.dirname(oldFullPath);
-        const newFullPath = path.join(dir, event.newName);
+        const dir = dirname(oldFullPath);
+        const newFullPath = joinPaths(dir, event.newName);
         
         if (newFullPath === oldFullPath) return;
         
