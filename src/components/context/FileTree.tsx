@@ -361,8 +361,12 @@ export default function FileTree() {
     `,
   });
 
-  // TODO: Track expanded paths through mutation events
-  // For now, we don't persist tree state
+  // TODO: Tree state persistence (expansion/selection) - deferred
+  // This is intentionally not implemented yet because:
+  // 1. @pierre/trees doesn't expose getVisibleRows/getVisibleCount methods
+  // 2. Would require tracking mutation events to capture expansion changes
+  // 3. Adds complexity for marginal UX benefit (tree re-expands on project switch anyway)
+  // Can be revisited if user feedback indicates strong need for persistence.
 
   // ── Keyboard shortcuts ───────────────────────────────────
 
