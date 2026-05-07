@@ -416,7 +416,7 @@ export default function FileTree() {
     }
   }, [model, fileTree, projectPath, toFullPath, handleDelete, addFileTab]);
 
-  const buildContextMenu = useCallback((item: any, context: any) => {
+  const buildContextMenu = useCallback((item: { kind: 'directory' | 'file'; name: string; path: string }, context: { close: (opts?: { restoreFocus?: boolean }) => void; anchorElement: HTMLElement; anchorRect: any }) => {
     const fullPath = toFullPath(item.path);
     const node = findNodeByPath(fileTree, fullPath);
     if (!node) return null;
@@ -443,7 +443,7 @@ export default function FileTree() {
     menuEl.className = 'bg-bg-elevated border border-border rounded-lg shadow-xl py-1 min-w-[200px] z-50';
     menuEl.setAttribute('data-file-tree-context-menu-root', 'true');
     
-    menuItemsBuilt.forEach((entry, idx) => {
+    menuItemsBuilt.forEach((entry) => {
       if (entry === 'separator') {
         const sep = document.createElement('div');
         sep.className = 'my-1 border-t border-border';
@@ -475,7 +475,7 @@ export default function FileTree() {
       
       itemEl.addEventListener('click', () => {
         entry.action();
-        context.close();
+        context.close({ restoreFocus: false });
       });
       
       menuEl.appendChild(itemEl);
