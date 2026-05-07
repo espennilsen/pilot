@@ -1,12 +1,15 @@
 import { useCallback, useRef, useState, useMemo, useEffect, KeyboardEvent } from 'react';
-import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection, useFileTreeSearch } from '@pierre/trees/react';
+import { FileTree as PierreFileTree, useFileTree } from '@pierre/trees/react';
 import { preparePresortedFileTreeInput } from '@pierre/trees';
-import type { FileNode } from '../../../shared/types';
+
+const EMPTY_PREPARED_INPUT = preparePresortedFileTreeInput([]);
+import type { FileNode, GitFileChange } from '../../../shared/types';
 import { useProjectStore } from '../../stores/project-store';
 import { useTabStore } from '../../stores/tab-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useGitStore } from '../../stores/git-store';
 import { useDetectedEditors, type DetectedEditor } from '../../hooks/useDetectedEditors';
+import { useFileWatcher } from '../../hooks/useFileWatcher';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
 import { type MenuState, buildMenuItems } from './file-tree-helpers';
@@ -36,17 +39,46 @@ function basename(p: string): string {
   return idx === -1 ? p : p.slice(idx + 1);
 }
 
+function getRelativeDropTargetPath(target: unknown): string {
+  if (!target || typeof target !== 'object') return '';
+  const maybeTarget = target as Record<string, unknown>;
+  if (typeof maybeTarget.directoryPath === 'string') return maybeTarget.directoryPath;
+  if (typeof maybeTarget.hoveredPath === 'string') return maybeTarget.hoveredPath;
+  if (typeof maybeTarget.flattenedSegmentPath === 'string') return maybeTarget.flattenedSegmentPath;
+  return '';
+}
+
+function normalizeTreeGitStatus(status: GitFileChange['status'] | 'untracked'): 'added' | 'deleted' | 'modified' | 'renamed' | 'untracked' {
+  if (status === 'copied') return 'modified';
+  return status;
+}
+
 // ─── FileTree (root) ─────────────────────────────────────
 
-export default function FileTree() {
-  const { fileTree, isLoadingTree, projectPath, loadFileTree } = useProjectStore();
+interface FileTreeProps {
+  projectPath: string;
+}
+
+export default function FileTree({ projectPath }: FileTreeProps) {
+  const { fileTree, fileTreeProjectPath, isLoadingTree, loadFileTree } = useProjectStore();
   const { addFileTab } = useTabStore();
   const { contextPanelTab } = useUIStore();
   const { status } = useGitStore();
   const editors = useDetectedEditors();
 
-  const [menu, setMenu] = useState<MenuState | null>(null);
+  // Listen for filesystem changes (external edits, git operations, etc.)
+  useFileWatcher();
+
   const treeRef = useRef<HTMLDivElement>(null);
+  const projectPathRef = useRef(projectPath);
+  const fileTreeRef = useRef(fileTree);
+  const loadFileTreeRef = useRef(loadFileTree);
+
+  useEffect(() => {
+    projectPathRef.current = projectPath;
+    fileTreeRef.current = fileTree;
+    loadFileTreeRef.current = loadFileTree;
+  }, [projectPath, fileTree, loadFileTree]);
 
   // Inline creation (new file / new folder — modal overlay)
   const [inlineInput, setInlineInput] = useState<{
@@ -57,15 +89,15 @@ export default function FileTree() {
   // ── Load file tree when project changes or tab is selected ─────────────────
 
   useEffect(() => {
-    if (projectPath && contextPanelTab === 'files' && !isLoadingTree && (!fileTree || fileTree.length === 0)) {
-      loadFileTree();
-    }
-  }, [projectPath, contextPanelTab, isLoadingTree, fileTree, loadFileTree]);
+    if (!projectPath || contextPanelTab !== 'files') return;
+    // Fetch on project/tab transition; updates afterwards are handled by useFileWatcher.
+    loadFileTree(projectPath);
+  }, [projectPath, contextPanelTab, loadFileTree]);
 
   // Convert FileNode[] to flat path array for @pierre/trees
   // Note: @pierre/trees infers directories from file paths, so we only emit files
   const paths = useMemo(() => {
-    if (!fileTree || fileTree.length === 0 || !projectPath) return [];
+    if (!fileTree || fileTree.length === 0 || !projectPath || fileTreeProjectPath !== projectPath) return [];
     
     const flattenPaths = (nodes: FileNode[], result: string[] = []) => {
       for (const node of nodes) {
@@ -84,7 +116,7 @@ export default function FileTree() {
     };
     
     return flattenPaths(fileTree);
-  }, [fileTree, projectPath]);
+  }, [fileTree, projectPath, fileTreeProjectPath]);
 
   // Prepare optimized input for large tree handling
   const preparedInput = useMemo(() => {
@@ -95,21 +127,21 @@ export default function FileTree() {
   const gitStatusEntries = useMemo(() => {
     if (!projectPath || !status) return [];
     
-    const entries: Array<{ path: string; status: 'M' | 'A' | 'D' | 'U' }> = [];
+    const entries: Array<{ path: string; status: ReturnType<typeof normalizeTreeGitStatus> }> = [];
     
     // Staged changes
     if (status.staged) {
       for (const file of status.staged) {
-        const relPath = makeRelativePath(projectPath, file);
-        entries.push({ path: relPath, status: 'A' });
+        const relPath = makeRelativePath(projectPath, file.path);
+        entries.push({ path: relPath, status: normalizeTreeGitStatus(file.status) });
       }
     }
     
     // Unstaged changes (modified)
     if (status.unstaged) {
       for (const file of status.unstaged) {
-        const relPath = makeRelativePath(projectPath, file);
-        entries.push({ path: relPath, status: 'M' });
+        const relPath = makeRelativePath(projectPath, file.path);
+        entries.push({ path: relPath, status: normalizeTreeGitStatus(file.status) });
       }
     }
     
@@ -117,7 +149,7 @@ export default function FileTree() {
     if (status.untracked) {
       for (const file of status.untracked) {
         const relPath = makeRelativePath(projectPath, file);
-        entries.push({ path: relPath, status: 'U' });
+        entries.push({ path: relPath, status: normalizeTreeGitStatus('untracked') });
       }
     }
     
@@ -129,6 +161,11 @@ export default function FileTree() {
   const toFullPath = useCallback((relativePath: string) => {
     return projectPath ? joinPaths(projectPath, relativePath) : relativePath;
   }, [projectPath]);
+
+  const toFullPathCurrent = useCallback((relativePath: string) => {
+    const currentProjectPath = projectPathRef.current;
+    return currentProjectPath ? joinPaths(currentProjectPath, relativePath) : relativePath;
+  }, []);
 
   const handleReveal = useCallback((relativePath: string) => {
     invoke(IPC.SHELL_REVEAL_IN_FINDER, toFullPath(relativePath));
@@ -162,7 +199,7 @@ export default function FileTree() {
 
     const result = await invoke(IPC.PROJECT_DELETE_PATH, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
-      loadFileTree();
+      loadFileTree(projectPath);
     } else {
       window.alert(`Delete failed: ${result.error}`);
     }
@@ -174,7 +211,7 @@ export default function FileTree() {
     const channel = kind === 'file' ? IPC.PROJECT_CREATE_FILE : IPC.PROJECT_CREATE_DIRECTORY;
     const result = await invoke(channel, fullPath) as { ok?: boolean; error?: string };
     if (result.ok) {
-      loadFileTree();
+      loadFileTree(projectPath);
       return true;
     } else {
       window.alert(`Create failed: ${result.error}`);
@@ -182,31 +219,19 @@ export default function FileTree() {
     }
   }, [toFullPath, loadFileTree]);
 
-  const handleDoubleClick = useCallback((relativePath: string, type: 'file' | 'directory') => {
-    if (type === 'file') {
-      addFileTab(toFullPath(relativePath), projectPath);
-    }
-  }, [addFileTab, toFullPath, projectPath]);
+  const handleDragDrop = useCallback(async (draggedPaths: readonly string[], target: { path: string; kind: 'directory' | 'root' }) => {
+    const currentProjectPath = projectPathRef.current;
+    if (!currentProjectPath) return;
 
-  const handleDragDrop = useCallback(async (draggedPaths: readonly string[], target: { path: string; kind: 'directory' | 'root' }, dropType: 'into' | 'before' | 'after') => {
-    if (!projectPath) return;
-    
     const targetPath = target.path;
-    
+
     for (const draggedPath of draggedPaths) {
-      const fullDraggedPath = toFullPath(draggedPath);
-      const fullTargetPath = toFullPath(targetPath);
-      
-      let newPath: string;
-      if (dropType === 'into') {
-        const fileName = basename(draggedPath);
-        newPath = joinPaths(fullTargetPath, fileName);
-      } else {
-        const parentDir = dirname(fullDraggedPath);
-        const fileName = basename(draggedPath);
-        newPath = joinPaths(parentDir, fileName);
-      }
-      
+      const fullDraggedPath = toFullPathCurrent(draggedPath);
+      const fullTargetPath = toFullPathCurrent(targetPath);
+
+      const fileName = basename(draggedPath);
+      const newPath = joinPaths(fullTargetPath, fileName);
+
       if (newPath !== fullDraggedPath) {
         const result = await invoke(IPC.PROJECT_RENAME_PATH, fullDraggedPath, newPath) as { ok?: boolean; error?: string };
         if (!result.ok) {
@@ -215,12 +240,12 @@ export default function FileTree() {
         }
       }
     }
-    
-    loadFileTree();
-  }, [projectPath, toFullPath, loadFileTree]);
+
+    loadFileTreeRef.current(currentProjectPath);
+  }, [toFullPathCurrent]);
 
   const { model } = useFileTree({
-    preparedInput,
+    preparedInput: EMPTY_PREPARED_INPUT,
     initialExpansion: 'closed',
     search: false,
     flattenEmptyDirectories: false,
@@ -228,30 +253,33 @@ export default function FileTree() {
     overscan: 15,
     stickyFolders: true,
     dragAndDrop: {
-      enabled: true,
       canDrag: (draggedPaths) => draggedPaths.length > 0,
-      canDrop: (dropContext) => !dropContext.draggedPaths.includes(dropContext.target.path),
+      canDrop: (dropContext) => {
+        const targetPath = getRelativeDropTargetPath(dropContext.target);
+        return targetPath ? !dropContext.draggedPaths.includes(targetPath) : false;
+      },
       onDropComplete: (dropResult) => {
-        console.log('Drop completed:', dropResult);
-        handleDragDrop(dropResult.draggedPaths, dropResult.target, 'into');
+        const targetPath = getRelativeDropTargetPath(dropResult.target);
+        if (!targetPath) return;
+        const currentProjectPath = projectPathRef.current;
+        if (!currentProjectPath) return;
+        handleDragDrop(dropResult.draggedPaths, { path: targetPath, kind: 'directory' });
       },
       onDropError: (error) => window.alert(`Move failed: ${error}`),
       openOnDropDelay: 300,
     },
     renaming: {
-      enabled: true,
       canRename: () => true,
       onError: (error) => window.alert(`Rename failed: ${error}`),
       onRename: async (event) => {
-        const oldFullPath = toFullPath(event.oldPath);
-        const dir = dirname(oldFullPath);
-        const newFullPath = joinPaths(dir, event.newName);
+        const oldFullPath = toFullPathCurrent(event.sourcePath);
+        const newFullPath = toFullPathCurrent(event.destinationPath);
         
         if (newFullPath === oldFullPath) return;
         
         const result = await invoke(IPC.PROJECT_RENAME_PATH, oldFullPath, newFullPath) as { ok?: boolean; error?: string };
         if (result.ok) {
-          loadFileTree();
+          loadFileTreeRef.current(projectPathRef.current);
         } else {
           throw new Error(result.error || 'Rename failed');
         }
@@ -353,10 +381,11 @@ export default function FileTree() {
       [part="search-input"]:focus { border-color: var(--accent) !important; outline: none !important; }
       [part="search"] { padding: 8px !important; border-bottom: 1px solid var(--border) !important; }
       [part="git-status"] { font-size: 10px; font-weight: bold; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
-      [data-git-status="M"] { color: #f0a020; }
-      [data-git-status="A"] { color: #2ea043; }
-      [data-git-status="D"] { color: #d73a49; }
-      [data-git-status="U"] { color: #6a737d; }
+      [data-git-status="modified"] { color: #f0a020; }
+      [data-git-status="added"] { color: #2ea043; }
+      [data-git-status="deleted"] { color: #d73a49; }
+      [data-git-status="untracked"] { color: #6a737d; }
+      [data-git-status="renamed"] { color: #3b82f6; }
     `,
   });
 
@@ -471,7 +500,7 @@ export default function FileTree() {
       itemEl.appendChild(labelEl);
       
       itemEl.addEventListener('click', () => {
-        entry.action();
+        entry.action?.();
         context.close({ restoreFocus: false });
       });
       
@@ -479,7 +508,25 @@ export default function FileTree() {
     });
     
     return menuEl;
-  }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, handleCreate, addFileTab, model]);
+  }, [fileTree, editors, projectPath, toFullPath, handleReveal, handleOpenTerminal, handleCopyPath, handleCopyRelativePath, handleCopyName, handleDelete, addFileTab, model]);
+
+  useEffect(() => {
+    model.resetPaths(paths);
+  }, [model, paths]);
+
+  useEffect(() => {
+    model.setGitStatus(gitStatusEntries);
+  }, [model, gitStatusEntries]);
+
+  useEffect(() => {
+    model.setComposition({
+      contextMenu: {
+        enabled: true,
+        triggerMode: 'right-click',
+        render: buildContextMenu,
+      },
+    });
+  }, [model, buildContextMenu]);
 
   // ── Render ─────────────────────────────────────────────
 
@@ -508,23 +555,12 @@ export default function FileTree() {
       tabIndex={0}
     >
       <PierreFileTree
-        key={projectPath}  // Force remount when project changes
         model={model}
         style={{ height: '100%', width: '100%' }}
-        composition={{
-          contextMenu: {
-            enabled: true,
-            triggerMode: 'right-click',
-            render: buildContextMenu,
-          },
-        }}
-        onItemActivate={(item) => {
-          handleDoubleClick(item.path, item.kind as 'file' | 'directory');
-        }}
       />
 
       {inlineInput && (
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24" onClick={() => setInlineInput(null)}>
+        <div className="fixed inset-0 z-9999 flex items-start justify-center pt-24" onClick={() => setInlineInput(null)}>
           <div
             className="bg-bg-elevated border border-border rounded-lg shadow-xl p-3 w-72"
             onClick={(e) => e.stopPropagation()}
