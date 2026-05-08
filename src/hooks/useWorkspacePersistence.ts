@@ -47,6 +47,7 @@ function serializeTab(tab: TabState): SavedTabState {
 function collectWorkspaceState(): WorkspaceState {
   const tabStore = useTabStore.getState();
   const uiStore = useUIStore.getState();
+  const projectStore = useProjectStore.getState();
 
   return {
     tabs: tabStore.tabs.map(serializeTab),
@@ -60,6 +61,10 @@ function collectWorkspaceState(): WorkspaceState {
       contextPanelWidth: uiStore.contextPanelWidth,
       terminalVisible: uiStore.terminalVisible,
       terminalHeight: uiStore.terminalHeight,
+      // Tree view state
+      treeExpandedPaths: projectStore.expandedPaths ? Array.from(projectStore.expandedPaths) : undefined,
+      treeSelectedPath: projectStore.selectedPath ?? undefined,
+      treeScrollTop: projectStore.treeScrollTop ?? undefined,
     },
   };
 }
@@ -187,7 +192,7 @@ export function useWorkspacePersistence() {
         panelConfig: t.panelConfig ?? {
           sidebarVisible: true,
           contextPanelVisible: true,
-          contextPanelTab: 'files' as const,
+          contextPanelTab: 'changes' as const,
         },
         lastActiveAt: Date.now(),
         hasUnread: false,
@@ -204,13 +209,28 @@ export function useWorkspacePersistence() {
         useUIStore.setState({
           sidebarVisible: saved.ui.sidebarVisible ?? true,
           contextPanelVisible: saved.ui.contextPanelVisible ?? true,
-          contextPanelTab: saved.ui.contextPanelTab ?? 'files',
+          // TODO: Restore last active tab once FileTree renders correctly on startup.
+          // Currently disabled because FileTree only renders when tab is reselected.
+          // Workaround: Always default to 'changes' tab to avoid blank FileTree render.
+          // contextPanelTab: saved.ui.contextPanelTab ?? 'changes',
+          contextPanelTab: 'changes', // Temporary: force 'changes' tab on startup
           focusMode: saved.ui.focusMode ?? false,
           sidebarWidth: saved.ui.sidebarWidth ?? 260,
           contextPanelWidth: saved.ui.contextPanelWidth ?? 320,
           terminalVisible: saved.ui.terminalVisible ?? false,
           terminalHeight: saved.ui.terminalHeight ?? 250,
         });
+      }
+      
+      // Restore tree view state
+      if (saved.ui?.treeExpandedPaths) {
+        useProjectStore.getState().setExpandedPaths(new Set(saved.ui.treeExpandedPaths));
+      }
+      if (saved.ui?.treeSelectedPath !== undefined) {
+        useProjectStore.getState().setSelectedPath(saved.ui.treeSelectedPath);
+      }
+      if (saved.ui?.treeScrollTop !== undefined) {
+        useProjectStore.getState().setTreeScrollTop(saved.ui.treeScrollTop);
       }
 
       // ── 3. Restore project path for active tab ────────────
@@ -242,7 +262,7 @@ export function useWorkspacePersistence() {
       }
 
       if (restTabs.length > 0) {
-        const results = await Promise.allSettled(
+        await Promise.allSettled(
           restTabs.map(async (tab) => {
             await openTabSession(tab.id, tab);
             addWiredSession(`${tab.id}::${tab.projectPath}`);

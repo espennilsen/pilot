@@ -8,8 +8,8 @@ import { updateSessionMeta, removeSessionMeta } from '../services/session-metada
 import type { SessionMeta } from '../services/session-metadata';
 import type { SessionExportOptions, SessionExportResult } from '../../shared/types';
 import type { Message } from '@mariozechner/pi-ai';
-import { parseSessionEntries, buildSessionContext } from '@mariozechner/pi-coding-agent';
 import { formatAsMarkdown, formatAsJson } from '../services/session-export';
+import { parseSessionEntries, buildSessionContext } from '@mariozechner/pi-coding-agent';
 import { getPiAgentDir } from '../services/app-settings';
 import { isWithinDir } from '../utils/paths';
 

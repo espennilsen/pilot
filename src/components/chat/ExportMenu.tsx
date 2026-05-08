@@ -55,6 +55,8 @@ export default function ExportMenu() {
   }, [open]);
 
   const doExport = useCallback(async (format: SessionExportFormat) => {
+    if (!activeTabId) return;
+    setError(null);
     if (!activeTabId || isExporting) return;
     setError(null);
     setIsExporting(true);
