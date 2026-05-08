@@ -566,6 +566,10 @@ export interface SavedUIState {
   contextPanelWidth: number;
   terminalVisible: boolean;
   terminalHeight: number;
+  // Tree view state
+  treeExpandedPaths?: string[];
+  treeSelectedPath?: string | null;
+  treeScrollTop?: number;
 }
 
 export interface WorkspaceState {

@@ -96,6 +96,8 @@ export default function ChatView() {
   const { onboardingComplete, load: loadAppSettings } = useAppSettingsStore();
   const { projectPath, openProjectDialog } = useProjectStore();
 
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
   // Load auth status and app settings on mount
   useEffect(() => {
     loadAuthStatus();
@@ -177,13 +179,20 @@ export default function ChatView() {
   // Keyboard: Cmd/Ctrl+F opens find, Escape closes
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-        e.preventDefault();
-        setFindVisible(true);
-      }
+      // Escape always closes the find bar, regardless of focus position
       if (e.key === 'Escape' && findVisible) {
         e.preventDefault();
         setFindVisible(false);
+        return;
+      }
+
+      // Only handle Cmd+F if focus is within the chat component
+      if (chatContainerRef.current && !chatContainerRef.current.contains(e.target as Node)) {
+        return;
+      }
+      if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        setFindVisible(true);
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -388,7 +397,7 @@ export default function ChatView() {
   }, []);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-bg-base">
+    <div ref={chatContainerRef} className="flex-1 min-w-0 flex flex-col bg-bg-base" data-chat-container>
       {/* Chat Header */}
       <ChatHeader isStreaming={!!isStreaming} />
 

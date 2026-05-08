@@ -97,7 +97,7 @@ export const useUIStore = create<UIStore>((set) => ({
   sidebarVisible: true,
   sidebarPane: 'sessions' as SidebarPane,
   contextPanelVisible: true,
-  contextPanelTab: 'files',
+  contextPanelTab: 'changes',
   focusMode: false,
   sidebarWidth: 260,
   contextPanelWidth: 320,

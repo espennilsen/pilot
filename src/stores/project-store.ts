@@ -7,9 +7,12 @@ import { IPC } from '../../shared/ipc';
 import { invoke } from '../lib/ipc-client';
 import { useTabStore } from './tab-store';
 
+let directoryReadyPromise: Promise<void> = Promise.resolve();
+
 interface ProjectStore {
   projectPath: string | null;
   fileTree: FileNode[];
+  fileTreeProjectPath: string | null;
   selectedFilePath: string | null;
   previewContent: string | null;
   previewError: string | null;
@@ -28,7 +31,7 @@ interface ProjectStore {
 
   setProjectPath: (path: string) => void;
   clearProject: () => void;
-  loadFileTree: () => Promise<void>;
+  loadFileTree: (projectPathOverride?: string | null) => Promise<void>;
   selectFile: (path: string) => Promise<void>;
   clearPreview: () => void;
   openProjectDialog: () => Promise<void>;
@@ -50,6 +53,7 @@ interface ProjectStore {
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projectPath: null,
   fileTree: [],
+  fileTreeProjectPath: null,
   selectedFilePath: null,
   previewContent: null,
   previewError: null,
@@ -64,16 +68,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showGitignorePrompt: false,
   gitignoreProjectPath: null,
 
-  setProjectPath: (path) => {
-    set({ projectPath: path });
-    invoke(IPC.PROJECT_SET_DIRECTORY, path);
-    get().loadFileTree();
+  setProjectPath: async (path) => {
+    set({ projectPath: path, fileTree: [], fileTreeProjectPath: null });
+    // Track project directory activation so tree loads cannot race ahead
+    // and accidentally fetch files for the previously active project.
+    directoryReadyPromise = (async () => {
+      await invoke(IPC.PROJECT_SET_DIRECTORY, path);
+    })();
+    await directoryReadyPromise;
+    // Don't set isLoadingTree here - let loadFileTree handle it
   },
 
   clearProject: () => {
     set({
       projectPath: null,
       fileTree: [],
+      fileTreeProjectPath: null,
       selectedFilePath: null,
       previewContent: null,
       previewError: null,
@@ -85,13 +95,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     invoke(IPC.PROJECT_SET_DIRECTORY, null);
   },
 
-  loadFileTree: async () => {
-    set({ isLoadingTree: true });
+  loadFileTree: async (projectPathOverride) => {
+    const requestedProjectPath = projectPathOverride ?? get().projectPath;
+    const currentStoreProjectPath = get().projectPath;
+    if (!requestedProjectPath) {
+      set({ fileTree: [], fileTreeProjectPath: null, isLoadingTree: false });
+      return;
+    }
+
+    // Clear stale tree immediately so project switches cannot briefly display
+    // data from another project while the next tree fetch is in flight.
+    set({ fileTree: [], fileTreeProjectPath: null, isLoadingTree: true });
     try {
-      const tree = await invoke(IPC.PROJECT_FILE_TREE) as FileNode[];
-      set({ fileTree: tree, isLoadingTree: false });
+      await directoryReadyPromise;
+      // Reassert the active directory immediately before reading the tree.
+      // This avoids edge-case ordering where another tab/project switch updates
+      // main-process state between setProjectPath() and this fetch.
+      await invoke(IPC.PROJECT_SET_DIRECTORY, requestedProjectPath);
+      // Request tree for the explicit project path to avoid stale reads when
+      // main-process global project state lags behind rapid tab switches.
+      const tree = await invoke(IPC.PROJECT_FILE_TREE, requestedProjectPath) as FileNode[];
+      // Ignore stale responses when user switched projects mid-request.
+      if (get().projectPath !== requestedProjectPath) {
+        set({ isLoadingTree: false });
+        return;
+      }
+      set({ fileTree: tree, fileTreeProjectPath: requestedProjectPath, isLoadingTree: false });
     } catch { /* Expected: project directory may not be accessible */
-      set({ fileTree: [], isLoadingTree: false });
+      set({ fileTree: [], fileTreeProjectPath: null, isLoadingTree: false });
     }
   },
 
