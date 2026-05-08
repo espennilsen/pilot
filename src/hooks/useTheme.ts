@@ -138,13 +138,11 @@ export function useTheme(): void {
   useEffect(() => {
     if (theme !== 'custom' || !customThemeSlug) return;
 
-    const targetSlug = customThemeSlug;
     const store = useThemeStore.getState();
     // Only load if we don't already have this theme cached
-    if (store.activeCustomTheme?.slug !== targetSlug) {
-      store.loadTheme(targetSlug).then((loaded) => {
-        // Bail out if the user switched themes while we were loading
-        if (useAppSettingsStore.getState().customThemeSlug !== targetSlug) return;
+    if (store.activeCustomTheme?.slug !== customThemeSlug) {
+      store.loadTheme(customThemeSlug).then((loaded) => {
+        if (useAppSettingsStore.getState().customThemeSlug !== customThemeSlug) return;
         if (loaded) {
           store.setActiveCustomTheme(loaded);
         }
@@ -167,6 +165,7 @@ export function useTheme(): void {
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
+  // Cleanup custom theme overrides when switching away from custom mode
   // On unmount, remove any lingering custom CSS variable overrides
   useEffect(() => {
     return () => {
