@@ -401,7 +401,6 @@ export default function FileTree({ projectPath }: FileTreeProps) {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const isMac = /mac/i.test(navigator.userAgent);
     const modKey = isMac ? e.metaKey : e.ctrlKey;
-    const modKey = isMac ? e.metaKey : e.ctrlKey;
     
     if (modKey && e.key === 'f') {
       e.preventDefault();
