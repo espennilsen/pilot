@@ -2,6 +2,12 @@
 
 All notable changes to Pilot are documented here, grouped by date.
 
+## 2026-05-08
+
+### Fixed
+- **FileTree scrollbar truncated** — the `@pierre/trees` virtual scroller used default `itemHeight: 30px` while the CSS overrode `--trees-row-height` to 32px. This 2px discrepancy per row caused the calculated total scroll height to undershoot the actual rendered content, making the last few files unreachable. Passed explicit `itemHeight: 32` to `useFileTree()` to match CSS. (#37)
+- **Duplicate `const modKey` in FileTree** — removed a duplicate variable declaration left from a merge conflict resolution. (#37)
+
 ## 2026-04-21
 
 ### Fixed
