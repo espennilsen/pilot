@@ -16,7 +16,7 @@ import { type MenuState, buildMenuItems } from './file-tree-helpers';
 
 // ─── Browser-safe path utilities ───────────────────────────
 
-const isWindows = navigator.platform.toLowerCase().includes('win');
+const isWindows = /windows/i.test(navigator.userAgent);
 const pathSep = isWindows ? '\\' : '/';
 
 function joinPaths(...segments: string[]): string {
@@ -399,7 +399,8 @@ export default function FileTree({ projectPath }: FileTreeProps) {
   // ── Keyboard shortcuts ───────────────────────────────────
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const isMac = /mac/i.test(navigator.userAgent);
+    const modKey = isMac ? e.metaKey : e.ctrlKey;
     const modKey = isMac ? e.metaKey : e.ctrlKey;
     
     if (modKey && e.key === 'f') {
