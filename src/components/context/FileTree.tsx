@@ -249,6 +249,7 @@ export default function FileTree({ projectPath }: FileTreeProps) {
     initialExpansion: 'closed',
     search: false,
     flattenEmptyDirectories: false,
+    itemHeight: 32,
     initialVisibleRowCount: Math.min(30, paths.length),
     overscan: 15,
     stickyFolders: true,
