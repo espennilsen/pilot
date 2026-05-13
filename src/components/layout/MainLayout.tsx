@@ -1,5 +1,7 @@
 import { useUIStore } from '../../stores/ui-store';
 import { useTabStore } from '../../stores/tab-store';
+import { useSplitPaneStore } from '../../stores/split-pane-store';
+import SplitPaneView from './SplitPaneView';
 import { ResizeHandle } from '../shared/ResizeHandle';
 import Sidebar from '../sidebar/Sidebar';
 import ChatView from '../chat/ChatView';
@@ -14,6 +16,7 @@ import ArtifactPanel from '../artifacts/ArtifactPanel';
 export default function MainLayout() {
   const { sidebarVisible, contextPanelVisible, setSidebarWidth, setContextPanelWidth } = useUIStore();
   const activeTab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const splitMode = useSplitPaneStore(s => s.layout.mode);
 
   const handleSidebarResize = (delta: number) => {
     const currentWidth = useUIStore.getState().sidebarWidth;
@@ -26,6 +29,9 @@ export default function MainLayout() {
   };
 
   const renderMainContent = () => {
+    if (splitMode === 'split') {
+      return <SplitPaneView />;
+    }
     switch (activeTab?.type) {
       case 'file':
         return <FileEditor />;
