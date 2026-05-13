@@ -153,6 +153,18 @@ function TerminalPaneContent({ node }: { node: SplitNode }) {
   );
 }
 
+function isValidNode(node: unknown): node is SplitNode {
+  if (!node || typeof node !== 'object') return false;
+  const n = node as Record<string, unknown>;
+  if (n.type !== 'leaf' && n.type !== 'split') return false;
+  if (typeof n.id !== 'string') return false;
+  if (n.type === 'split') {
+    if (!n.first || !n.second) return false;
+    if (typeof n.ratio !== 'number') return false;
+  }
+  return true;
+}
+
 function TerminalNodeView({ node }: { node: SplitNode }) {
   const { setRatio } = useTerminalSplitStore();
 
@@ -173,9 +185,11 @@ function TerminalNodeView({ node }: { node: SplitNode }) {
 
 export default function TerminalSplitView() {
   const root = useTerminalSplitStore(s => s.root);
-  const { init } = useTerminalSplitStore();
+  const { init, reset } = useTerminalSplitStore();
 
-  if (!root) {
+  // Auto-initialise if root is null or invalid (stale persistence data)
+  if (!isValidNode(root)) {
+    if (root) reset();
     init();
     return null;
   }

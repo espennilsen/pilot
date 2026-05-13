@@ -81,6 +81,22 @@ function ChatPane({ node }: { node: SplitNode }) {
 }
 
 /**
+ * Check if a value is a valid SplitNode tree (not stale persistence data).
+ * Old persistence had `mode` instead of `type`.
+ */
+function isValidNode(node: unknown): node is SplitNode {
+  if (!node || typeof node !== 'object') return false;
+  const n = node as Record<string, unknown>;
+  if (n.type !== 'leaf' && n.type !== 'split') return false;
+  if (typeof n.id !== 'string') return false;
+  if (n.type === 'split') {
+    if (!n.first || !n.second) return false;
+    if (typeof n.ratio !== 'number') return false;
+  }
+  return true;
+}
+
+/**
  * Recursive renderer for the split tree.
  */
 function SplitNodeView({ node }: { node: SplitNode }) {
@@ -103,12 +119,14 @@ function SplitNodeView({ node }: { node: SplitNode }) {
 
 export default function SplitPaneView() {
   const root = useSplitPaneStore(s => s.root);
-  const { init } = useSplitPaneStore();
+  const { init, reset } = useSplitPaneStore();
 
-  // Auto-initialise if root is null
-  if (!root) {
+  // Auto-initialise if root is null or invalid (e.g. stale persistence data
+  // from the old flat SplitLayout model which used `mode` instead of `type`)
+  if (!isValidNode(root)) {
+    if (root) reset(); // clear invalid state
     init();
-    return null; // will re-render with root
+    return null; // will re-render with valid root on next cycle
   }
 
   return (
