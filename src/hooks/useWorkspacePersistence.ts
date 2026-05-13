@@ -5,6 +5,8 @@ import { useUIStore } from '../stores/ui-store';
 import { useProjectStore } from '../stores/project-store';
 import { useChatStore } from '../stores/chat-store';
 import { useSessionStore } from '../stores/session-store';
+import { useSplitPaneStore } from '../stores/split-pane-store';
+import { useTerminalSplitStore } from '../stores/terminal-split-store';
 import { invoke } from '../lib/ipc-client';
 import { IPC } from '../../shared/ipc';
 import type { WorkspaceState, SavedTabState } from '../../shared/types';
@@ -48,6 +50,8 @@ function collectWorkspaceState(): WorkspaceState {
   const tabStore = useTabStore.getState();
   const uiStore = useUIStore.getState();
   const projectStore = useProjectStore.getState();
+  const splitStore = useSplitPaneStore.getState();
+  const termSplitStore = useTerminalSplitStore.getState();
 
   return {
     tabs: tabStore.tabs.map(serializeTab),
@@ -65,6 +69,8 @@ function collectWorkspaceState(): WorkspaceState {
       treeExpandedPaths: projectStore.expandedPaths ? Array.from(projectStore.expandedPaths) : undefined,
       treeSelectedPath: projectStore.selectedPath ?? undefined,
       treeScrollTop: projectStore.treeScrollTop ?? undefined,
+      splitLayout: splitStore.layout,
+      terminalSplitLayout: termSplitStore.layout,
     },
   };
 }
@@ -231,6 +237,14 @@ export function useWorkspacePersistence() {
       }
       if (saved.ui?.treeScrollTop !== undefined) {
         useProjectStore.getState().setTreeScrollTop(saved.ui.treeScrollTop);
+      }
+
+      // Restore split layouts
+      if (saved.ui.splitLayout) {
+        useSplitPaneStore.setState({ layout: saved.ui.splitLayout });
+      }
+      if (saved.ui.terminalSplitLayout) {
+        useTerminalSplitStore.setState({ layout: saved.ui.terminalSplitLayout });
       }
 
       // ── 3. Restore project path for active tab ────────────
