@@ -52,21 +52,6 @@ function ChatPane({ node }: { node: SplitNode }) {
         )}
       </div>
 
-      {/* Tab selector (if multiple tabs available) */}
-      {tabs.filter(t => t.type === 'chat').length > 1 && (
-        <div className="absolute top-1 left-1 z-10">
-          <select
-            value={node.tabId ?? ''}
-            onChange={(e) => setPaneTab(node.id, e.target.value || null)}
-            className="text-xs bg-bg-surface/90 border border-border rounded px-1.5 py-0.5 text-text-secondary"
-          >
-            {tabs.filter(t => t.type === 'chat').map(t => (
-              <option key={t.id} value={t.id}>{t.title}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className={`flex-1 flex flex-col overflow-hidden ${activeTabId === node.tabId ? '' : 'opacity-75'}`}
         onClick={() => node.tabId && useTabStore.getState().switchTab(node.tabId)}>
         {node.tabId && currentTab ? (
