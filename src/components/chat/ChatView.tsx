@@ -85,12 +85,18 @@ function scrollToMatchInContainer(match: TextMatch, container: HTMLElement) {
   container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
 }
 
-export default function ChatView() {
-  const activeTabId = useTabStore(s => s.activeTabId);
+interface ChatViewProps {
+  /** Override which tab to render. Falls back to the global activeTabId. */
+  tabId?: string | null;
+}
+
+export default function ChatView({ tabId }: ChatViewProps = {}) {
+  const storeActiveTabId = useTabStore(s => s.activeTabId);
+  const resolvedTabId = tabId ?? storeActiveTabId;
   const messagesByTab = useChatStore(s => s.messagesByTab);
-  const messages = useMemo(() => (activeTabId ? messagesByTab[activeTabId] ?? [] : []), [messagesByTab, activeTabId]);
-  const isStreaming = useChatStore(s => activeTabId ? s.streamingByTab[activeTabId] : false);
-  const suggestions = useChatStore(s => activeTabId ? s.suggestionsByTab[activeTabId] ?? EMPTY_SUGGESTIONS : EMPTY_SUGGESTIONS);
+  const messages = useMemo(() => (resolvedTabId ? messagesByTab[resolvedTabId] ?? [] : []), [messagesByTab, resolvedTabId]);
+  const isStreaming = useChatStore(s => resolvedTabId ? s.streamingByTab[resolvedTabId] : false);
+  const suggestions = useChatStore(s => resolvedTabId ? s.suggestionsByTab[resolvedTabId] ?? EMPTY_SUGGESTIONS : EMPTY_SUGGESTIONS);
   const { sendMessage, steerAgent, followUpAgent, abortAgent, cycleModel, selectModel, cycleThinking } = useAgentSession();
   const { hasAnyAuth, loadStatus: loadAuthStatus } = useAuthStore();
   const { onboardingComplete, load: loadAppSettings } = useAppSettingsStore();
@@ -109,23 +115,23 @@ export default function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  const prevTabIdRef = useRef(activeTabId);
+  const prevTabIdRef = useRef(resolvedTabId);
 
   // Scroll to bottom: instant during streaming or tab switch, smooth for new messages
   useEffect(() => {
     if (!autoScroll || !messagesEndRef.current) return;
-    const isTabSwitch = prevTabIdRef.current !== activeTabId;
-    prevTabIdRef.current = activeTabId;
+    const isTabSwitch = prevTabIdRef.current !== resolvedTabId;
+    prevTabIdRef.current = resolvedTabId;
     // Use instant scroll during streaming to keep up with rapid content additions.
     // Smooth scroll can't keep pace and causes the view to lag behind.
     const behavior = isTabSwitch || isStreaming ? 'instant' : 'smooth';
     messagesEndRef.current.scrollIntoView({ behavior });
-  }, [messages, autoScroll, activeTabId, isStreaming]);
+  }, [messages, autoScroll, resolvedTabId, isStreaming]);
 
   // Reset auto-scroll when switching tabs
   useEffect(() => {
     setAutoScroll(true);
-  }, [activeTabId]);
+  }, [resolvedTabId]);
 
   // Smart scroll pause: stop auto-scroll when user scrolls up
   const handleScroll = () => {
@@ -143,7 +149,7 @@ export default function ChatView() {
   // Reset editing state when tab switches
   useEffect(() => {
     setEditingIndex(null);
-  }, [activeTabId]);
+  }, [resolvedTabId]);
 
   // ── In-page find ──────────────────────────────────────────────────────
 
@@ -244,7 +250,7 @@ export default function ChatView() {
    * then re-prompt with the same user text.
    */
   const handleRegenerate = useCallback(async (assistantMsgIndex: number) => {
-    if (!activeTabId || isStreaming) return;
+    if (!resolvedTabId || isStreaming) return;
     setEditingIndex(null);
 
     // Find the user message that preceded this assistant message
@@ -253,7 +259,7 @@ export default function ChatView() {
 
     try {
       // Get fork points from the SDK session
-      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
+      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, resolvedTabId) as Array<{ entryId: string; text: string }>;
       
       // Find the entry ID for this user message by matching text.
       // If the user sent the same message multiple times, count prior occurrences
@@ -272,7 +278,7 @@ export default function ChatView() {
       }
 
       // Fork the session at this entry
-      const forkResult = await invoke(IPC.SESSION_FORK, activeTabId, forkPoint.entryId) as {
+      const forkResult = await invoke(IPC.SESSION_FORK, resolvedTabId, forkPoint.entryId) as {
         selectedText: string;
         cancelled: boolean;
         history: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }>;
@@ -285,9 +291,9 @@ export default function ChatView() {
 
       // Clear renderer messages and reload from the forked session history
       const { clearMessages, addMessage } = useChatStore.getState();
-      clearMessages(activeTabId);
+      clearMessages(resolvedTabId);
       for (const h of forkResult.history) {
-        addMessage(activeTabId, {
+        addMessage(resolvedTabId, {
           id: crypto.randomUUID(),
           role: h.role,
           content: h.content,
@@ -301,15 +307,15 @@ export default function ChatView() {
       } catch (sendErr) {
         console.error('[ChatView] sendMessage failed during regenerate:', sendErr);
         // Restore original messages
-        clearMessages(activeTabId);
+        clearMessages(resolvedTabId);
         for (const msg of originalMessages) {
-          addMessage(activeTabId, msg);
+          addMessage(resolvedTabId, msg);
         }
       }
     } catch (err) {
       console.error('[ChatView] Regenerate failed:', err);
     }
-  }, [activeTabId, messages, isStreaming, sendMessage]);
+  }, [resolvedTabId, messages, isStreaming, sendMessage]);
 
   /**
    * Edit & resend: enter editing mode for a user message.
@@ -322,14 +328,14 @@ export default function ChatView() {
    * Submit the edited message: fork at the original user message, then send the edited text.
    */
   const handleEditSubmit = useCallback(async (editedContent: string) => {
-    if (!activeTabId || editingIndex === null || isStreaming) return;
+    if (!resolvedTabId || editingIndex === null || isStreaming) return;
 
     const originalMsg = messages[editingIndex];
     if (!originalMsg || originalMsg.role !== 'user') return;
 
     try {
       // Get fork points
-      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, activeTabId) as Array<{ entryId: string; text: string }>;
+      const forkPoints = await invoke(IPC.SESSION_GET_FORK_POINTS, resolvedTabId) as Array<{ entryId: string; text: string }>;
       
       // Count prior user messages with the same content up to editingIndex
       const sameTextBefore = messages
@@ -347,7 +353,7 @@ export default function ChatView() {
       }
 
       // Fork the session
-      const forkResult = await invoke(IPC.SESSION_FORK, activeTabId, forkPoint.entryId) as {
+      const forkResult = await invoke(IPC.SESSION_FORK, resolvedTabId, forkPoint.entryId) as {
         selectedText: string;
         cancelled: boolean;
         history: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }>;
@@ -363,9 +369,9 @@ export default function ChatView() {
 
       // Clear and reload from forked history
       const { clearMessages, addMessage } = useChatStore.getState();
-      clearMessages(activeTabId);
+      clearMessages(resolvedTabId);
       for (const h of forkResult.history) {
-        addMessage(activeTabId, {
+        addMessage(resolvedTabId, {
           id: crypto.randomUUID(),
           role: h.role,
           content: h.content,
@@ -381,16 +387,16 @@ export default function ChatView() {
       } catch (sendErr) {
         console.error('[ChatView] sendMessage failed during edit & resend:', sendErr);
         // Restore original messages
-        clearMessages(activeTabId);
+        clearMessages(resolvedTabId);
         for (const msg of originalMessages) {
-          addMessage(activeTabId, msg);
+          addMessage(resolvedTabId, msg);
         }
       }
     } catch (err) {
       console.error('[ChatView] Edit & resend failed:', err);
       setEditingIndex(null);
     }
-  }, [activeTabId, editingIndex, messages, isStreaming, sendMessage]);
+  }, [resolvedTabId, editingIndex, messages, isStreaming, sendMessage]);
 
   const handleEditCancel = useCallback(() => {
     setEditingIndex(null);
@@ -482,7 +488,7 @@ export default function ChatView() {
         onSelectModel={selectModel}
         onCycleThinking={cycleThinking}
         isStreaming={!!isStreaming}
-        disabled={showWelcome || !activeTabId || !projectPath}
+        disabled={showWelcome || !resolvedTabId || !projectPath}
       />
     </div>
   );
