@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useSplitPaneStore, type SplitNode } from '../../stores/split-pane-store';
 import { useTabStore } from '../../stores/tab-store';
 import { SplitContainer } from '../shared/SplitContainer';
@@ -120,14 +121,19 @@ function SplitNodeView({ node }: { node: SplitNode }) {
 export default function SplitPaneView() {
   const root = useSplitPaneStore(s => s.root);
   const { init, reset } = useSplitPaneStore();
+  const didInitRef = useRef(false);
 
-  // Auto-initialise if root is null or invalid (e.g. stale persistence data
-  // from the old flat SplitLayout model which used `mode` instead of `type`)
-  if (!isValidNode(root)) {
-    if (root) reset(); // clear invalid state
-    init();
-    return null; // will re-render with valid root on next cycle
-  }
+  // Validate and initialise on mount — never call setState during render
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    if (!isValidNode(root)) {
+      if (root) reset();
+      init();
+    }
+  }, [root, init, reset]);
+
+  if (!isValidNode(root)) return null;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
