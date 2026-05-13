@@ -4,6 +4,8 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useUIStore } from '../../stores/ui-store';
+import { useTerminalSplitStore } from '../../stores/terminal-split-store';
+import TerminalSplitView from './TerminalSplitView';
 import { useProjectStore } from '../../stores/project-store';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useThemeStore } from '../../stores/theme-store';
@@ -25,6 +27,8 @@ export default function Terminal() {
     terminalVisible, terminalHeight, setTerminalHeight, toggleTerminal,
     terminalTabs, activeTerminalId, addTerminalTab, closeTerminalTab, setActiveTerminal,
   } = useUIStore();
+  const tSplitLayout = useTerminalSplitStore(s => s.layout);
+  const { split: tSplit, unsplit: tUnsplit } = useTerminalSplitStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const instancesRef = useRef<Map<string, TermInstance>>(new Map());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -224,54 +228,58 @@ export default function Terminal() {
       />
 
       {/* Body: terminal content + tab sidebar */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Terminal content area */}
-        <div
-          ref={containerRef}
-          className="flex-1 pl-2 pt-1"
-          style={{ minHeight: 0, overflow: 'hidden' }}
-        />
+      {tSplitLayout.mode === 'split' ? (
+        <TerminalSplitView />
+      ) : (
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          {/* Terminal content area */}
+          <div
+            ref={containerRef}
+            className="flex-1 pl-2 pt-1"
+            style={{ minHeight: 0, overflow: 'hidden' }}
+          />
 
-        {/* Tab sidebar on the right */}
-        <div className="w-[140px] flex-shrink-0 bg-bg-surface border-l border-border flex flex-col">
-          {/* New terminal button */}
-          <button
-            onClick={() => addTerminalTab()}
-            className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors border-b border-border"
-            title="New Terminal"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Terminal</span>
-          </button>
+          {/* Tab sidebar on the right */}
+          <div className="w-[140px] flex-shrink-0 bg-bg-surface border-l border-border flex flex-col">
+            {/* New terminal button */}
+            <button
+              onClick={() => addTerminalTab()}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors border-b border-border"
+              title="New Terminal"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Terminal</span>
+            </button>
 
-          {/* Tab list */}
-          <div className="flex-1 overflow-y-auto">
-            {terminalTabs.map((tab) => (
-              <div
-                key={tab.id}
-                onClick={() => setActiveTerminal(tab.id)}
-                className={`flex items-center justify-between px-2 py-1.5 text-xs cursor-pointer transition-colors group ${
-                  tab.id === activeTerminalId
-                    ? 'bg-bg-elevated text-text-primary'
-                    : 'text-text-secondary hover:bg-bg-elevated/50 hover:text-text-primary'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <TerminalIcon className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{tab.name}</span>
-                </div>
-                <button
-                  onClick={(e) => handleClose(e, tab.id)}
-                  className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-bg-base transition-opacity"
-                  title="Close terminal"
+            {/* Tab list */}
+            <div className="flex-1 overflow-y-auto">
+              {terminalTabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveTerminal(tab.id)}
+                  className={`flex items-center justify-between px-2 py-1.5 text-xs cursor-pointer transition-colors group ${
+                    tab.id === activeTerminalId
+                      ? 'bg-bg-elevated text-text-primary'
+                      : 'text-text-secondary hover:bg-bg-elevated/50 hover:text-text-primary'
+                  }`}
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <TerminalIcon className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{tab.name}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleClose(e, tab.id)}
+                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-bg-base transition-opacity"
+                    title="Close terminal"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
