@@ -10,7 +10,6 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { shortcutLabel } from '../../lib/keybindings';
 import { IPC } from '../../../shared/ipc';
 import { invoke } from '../../lib/ipc-client';
-import { useSplitPaneStore } from '../../stores/split-pane-store';
 
 type ProjectStatus = 'idle' | 'empty' | 'streaming' | 'pending' | 'error';
 
@@ -90,7 +89,6 @@ function useProjectStatus(projectPath: string | null): ProjectStatus {
 export function TabBar() {
   const { tabs, activeTabId, addTab, closeTab, reopenClosedTab, switchTab } = useTabStore();
   const { openProjectDialog } = useProjectStore();
-  const { split, layout, unsplit } = useSplitPaneStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -256,39 +254,11 @@ export function TabBar() {
       {showRightArrow && (
         <button
           onClick={scrollRight}
-          className="absolute right-12 z-10 w-8 h-full bg-gradient-to-l from-bg-base to-transparent flex items-center justify-end pr-1 hover:from-bg-surface transition-colors"
+          className="absolute right-8 z-10 w-8 h-full bg-gradient-to-l from-bg-base to-transparent flex items-center justify-end pr-1 hover:from-bg-surface transition-colors"
           aria-label="Scroll right"
         >
           <Icon name="ChevronRight" size={16} className="text-text-secondary" />
         </button>
-      )}
-
-      {layout.mode === 'single' && (
-        <>
-          <Tooltip content="Split Vertically" position="bottom">
-            <button onClick={() => split('vertical')}
-              className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors"
-              aria-label="Split vertically">
-              <Icon name="Columns" size={16} className="text-text-secondary" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Split Horizontally" position="bottom">
-            <button onClick={() => split('horizontal')}
-              className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors"
-              aria-label="Split horizontally">
-              <Icon name="Rows" size={16} className="text-text-secondary" />
-            </button>
-          </Tooltip>
-        </>
-      )}
-      {layout.mode === 'split' && (
-        <Tooltip content="Close Split" position="bottom">
-          <button onClick={() => unsplit()}
-            className="w-10 h-full flex items-center justify-center border-l border-border hover:bg-bg-surface transition-colors text-accent"
-            aria-label="Close split">
-            <Icon name="Combine" size={16} />
-          </button>
-        </Tooltip>
       )}
 
       <Tooltip content="Open Project" position="bottom">
