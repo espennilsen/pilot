@@ -8,7 +8,7 @@ export interface KeybindingDef {
   label: string;
   /** Default key combo: "mod+key" where mod is meta/ctrl/alt/shift, joined with "+" */
   defaultCombo: string;
-  category: 'View' | 'Tabs' | 'Sandbox' | 'Developer' | 'General';
+  category: 'View' | 'Tabs' | 'Sandbox' | 'Developer' | 'General' | 'Layout';
   /** Display symbol for command palette (e.g. ⌘B) */
   displaySymbol: string;
 }
@@ -49,6 +49,11 @@ export const DEFAULT_KEYBINDINGS: KeybindingDef[] = [
   { id: 'open-prompts',         label: 'Prompt Library',       defaultCombo: 'meta+/',             category: 'General',   displaySymbol: shortcutLabel('/') },
   { id: 'open-tasks',           label: 'Open Task Board',      defaultCombo: 'meta+shift+t',       category: 'General',   displaySymbol: shortcutLabel('T', true) },
   { id: 'stop-agent',           label: 'Stop Agent',           defaultCombo: 'escape',             category: 'General',   displaySymbol: 'Esc' },
+  { id: 'split-vertical',       label: 'Split Vertically',     defaultCombo: 'meta+alt+\\',         category: 'Layout',    displaySymbol: comboToSymbol('meta+alt+\\') },
+  { id: 'split-horizontal',     label: 'Split Horizontally',   defaultCombo: 'meta+alt+-',          category: 'Layout',    displaySymbol: comboToSymbol('meta+alt+-') },
+  { id: 'unsplit',              label: 'Close Split',          defaultCombo: 'meta+alt+0',          category: 'Layout',    displaySymbol: comboToSymbol('meta+alt+0') },
+  { id: 'terminal-split',       label: 'Split Terminal',       defaultCombo: 'meta+alt+]',          category: 'Layout',    displaySymbol: comboToSymbol('meta+alt+]') },
+  { id: 'terminal-unsplit',     label: 'Close Terminal Split', defaultCombo: 'meta+alt+[',          category: 'Layout',    displaySymbol: comboToSymbol('meta+alt+[') },
 ];
 
 /** Parse "meta+shift+b" → { key: 'b', modifiers: ['meta', 'shift'] } */

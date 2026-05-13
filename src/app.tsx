@@ -36,6 +36,8 @@ import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
 import { useGitStore } from './stores/git-store';
+import { useSplitPaneStore } from './stores/split-pane-store';
+import { useTerminalSplitStore } from './stores/terminal-split-store';
 import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
 
@@ -323,6 +325,11 @@ function App() {
         useChatStore.getState().setQueued(tabId, { steering: [], followUp: [] });
       }
     },
+    'split-vertical':     () => useSplitPaneStore.getState().split('vertical'),
+    'split-horizontal':   () => useSplitPaneStore.getState().split('horizontal'),
+    'unsplit':            () => useSplitPaneStore.getState().unsplit(),
+    'terminal-split':     () => useTerminalSplitStore.getState().split('vertical'),
+    'terminal-unsplit':   () => useTerminalSplitStore.getState().unsplit(),
   }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, projectPath, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
 
   // Build shortcut configs from keybinding defs + overrides
