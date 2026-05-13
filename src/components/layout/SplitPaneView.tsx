@@ -1,49 +1,119 @@
-import { useSplitPaneStore } from '../../stores/split-pane-store';
+import { useSplitPaneStore, type SplitNode } from '../../stores/split-pane-store';
 import { useTabStore } from '../../stores/tab-store';
 import { SplitContainer } from '../shared/SplitContainer';
 import ChatView from '../chat/ChatView';
 import { Icon } from '../shared/Icon';
+import { Tooltip } from '../shared/Tooltip';
 
-function ChatPane({ tabId, isFocused }: { tabId: string | null; isFocused: boolean }) {
+/**
+ * Single pane cell — shows a chat for a given tab, with split/close buttons.
+ */
+function ChatPane({ node }: { node: SplitNode }) {
   const tabs = useTabStore(s => s.tabs);
-  const currentTab = tabs.find(t => t.id === tabId);
-  if (!tabId || !currentTab) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-text-secondary">
-        <p className="text-sm">No tab in this pane</p>
-      </div>
-    );
-  }
+  const activeTabId = useTabStore(s => s.activeTabId);
+  const { splitPane, closePane, setPaneTab } = useSplitPaneStore();
+  const currentTab = tabs.find(t => t.id === node.tabId);
+  const leaves = useSplitPaneStore(s => s.getLeaves());
+  const isOnlyLeaf = leaves.length <= 1;
+
+  if (node.type !== 'leaf') return null;
+
   return (
-    <div className={`flex-1 flex flex-col overflow-hidden ${isFocused ? '' : 'opacity-75'}`}
-      onClick={() => useTabStore.getState().switchTab(tabId)}>
-      <ChatView tabId={tabId} />
+    <div className="flex-1 flex flex-col overflow-hidden relative group/pane">
+      {/* Pane toolbar — shown on hover or when focused */}
+      <div className={`
+        absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded bg-bg-surface/90 border border-border
+        transition-opacity
+        ${activeTabId === node.tabId ? 'opacity-100' : 'opacity-0 group-hover/pane:opacity-100'}
+      `}>
+        <Tooltip content="Split Vertically" position="bottom">
+          <button onClick={() => splitPane(node.id, 'vertical')}
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-bg-elevated transition-colors"
+            aria-label="Split vertically">
+            <Icon name="Columns" size={13} className="text-text-secondary" />
+          </button>
+        </Tooltip>
+        <Tooltip content="Split Horizontally" position="bottom">
+          <button onClick={() => splitPane(node.id, 'horizontal')}
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-bg-elevated transition-colors"
+            aria-label="Split horizontally">
+            <Icon name="Rows" size={13} className="text-text-secondary" />
+          </button>
+        </Tooltip>
+        {!isOnlyLeaf && (
+          <Tooltip content="Close Pane" position="bottom">
+            <button onClick={() => closePane(node.id)}
+              className="flex items-center justify-center w-6 h-6 rounded hover:bg-error/20 text-text-secondary hover:text-error transition-colors"
+              aria-label="Close pane">
+              <Icon name="X" size={13} />
+            </button>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Tab selector (if multiple tabs available) */}
+      {tabs.filter(t => t.type === 'chat').length > 1 && (
+        <div className="absolute top-1 left-1 z-10">
+          <select
+            value={node.tabId ?? ''}
+            onChange={(e) => setPaneTab(node.id, e.target.value || null)}
+            className="text-xs bg-bg-surface/90 border border-border rounded px-1.5 py-0.5 text-text-secondary"
+          >
+            {tabs.filter(t => t.type === 'chat').map(t => (
+              <option key={t.id} value={t.id}>{t.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className={`flex-1 flex flex-col overflow-hidden ${activeTabId === node.tabId ? '' : 'opacity-75'}`}
+        onClick={() => node.tabId && useTabStore.getState().switchTab(node.tabId)}>
+        {node.tabId && currentTab ? (
+          <ChatView tabId={node.tabId} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-text-secondary">
+            <p className="text-sm">No tab selected</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function SplitPaneView() {
-  const layout = useSplitPaneStore(s => s.layout);
-  const { unsplit, setSplitRatio, getPaneTabIds } = useSplitPaneStore();
-  const activeTabId = useTabStore(s => s.activeTabId);
-  const [primaryTabId, secondaryTabId] = getPaneTabIds();
+/**
+ * Recursive renderer for the split tree.
+ */
+function SplitNodeView({ node }: { node: SplitNode }) {
+  const { setRatio } = useSplitPaneStore();
 
-  if (layout.mode === 'single') return null;
+  if (node.type === 'leaf') {
+    return <ChatPane node={node} />;
+  }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      <SplitContainer
-        direction={layout.direction}
-        ratio={layout.splitRatio}
-        onRatioChange={setSplitRatio}
-        firstChild={<ChatPane tabId={primaryTabId} isFocused={activeTabId === primaryTabId} />}
-        secondChild={<ChatPane tabId={secondaryTabId} isFocused={activeTabId === secondaryTabId} />}
-      />
-      <button onClick={unsplit}
-        className="absolute top-2 right-2 z-20 p-1 rounded bg-bg-surface/80 border border-border hover:bg-bg-elevated transition-colors"
-        aria-label="Close split">
-        <Icon name="X" size={14} className="text-text-secondary" />
-      </button>
+    <SplitContainer
+      direction={node.direction!}
+      ratio={node.ratio ?? 0.5}
+      onRatioChange={(ratio) => setRatio(node.id, ratio)}
+      firstChild={<SplitNodeView node={node.first!} />}
+      secondChild={<SplitNodeView node={node.second!} />}
+    />
+  );
+}
+
+export default function SplitPaneView() {
+  const root = useSplitPaneStore(s => s.root);
+  const { init } = useSplitPaneStore();
+
+  // Auto-initialise if root is null
+  if (!root) {
+    init();
+    return null; // will re-render with root
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <SplitNodeView node={root} />
     </div>
   );
 }

@@ -325,11 +325,11 @@ function App() {
         useChatStore.getState().setQueued(tabId, { steering: [], followUp: [] });
       }
     },
-    'split-vertical':     () => useSplitPaneStore.getState().split('vertical'),
-    'split-horizontal':   () => useSplitPaneStore.getState().split('horizontal'),
-    'unsplit':            () => useSplitPaneStore.getState().unsplit(),
-    'terminal-split':     () => useTerminalSplitStore.getState().split('vertical'),
-    'terminal-unsplit':   () => useTerminalSplitStore.getState().unsplit(),
+    'split-vertical':     () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'vertical'),
+    'split-horizontal':   () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'horizontal'),
+    'unsplit':            () => useSplitPaneStore.getState().collapseToSingle(),
+    'terminal-split':     () => useTerminalSplitStore.getState().splitTab(useUIStore.getState().activeTerminalId ?? '', 'vertical'),
+    'terminal-unsplit':   () => useTerminalSplitStore.getState().collapseToSingle(),
   }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, projectPath, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
 
   // Build shortcut configs from keybinding defs + overrides

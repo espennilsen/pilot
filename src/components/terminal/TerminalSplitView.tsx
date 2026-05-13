@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTerminalSplitStore } from '../../stores/terminal-split-store';
+import { useTerminalSplitStore, type SplitNode } from '../../stores/terminal-split-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useProjectStore } from '../../stores/project-store';
 import { SplitContainer } from '../shared/SplitContainer';
@@ -11,6 +11,7 @@ import { getXtermTheme } from './theme';
 import { IPC } from '../../../shared/ipc';
 import { invoke, on, send } from '../../lib/ipc-client';
 import { Icon } from '../shared/Icon';
+import { Tooltip } from '../shared/Tooltip';
 import { useAppSettingsStore } from '../../stores/app-settings-store';
 import { useThemeStore } from '../../stores/theme-store';
 
@@ -22,17 +23,19 @@ interface TermInstance {
   initialized: boolean;
 }
 
-function TerminalPane({ terminalId, isFocused, onFitTrigger }: {
-  terminalId: string | null;
-  isFocused: boolean;
-  onFitTrigger: number;
-}) {
+function TerminalPaneContent({ node }: { node: SplitNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<TermInstance | null>(null);
   const projectPath = useProjectStore(s => s.projectPath);
+  const [fitTrigger, setFitTrigger] = useState(0);
+  const { splitPane, closePane, setPaneTerminalId } = useTerminalSplitStore();
+  const leaves = useTerminalSplitStore(s => s.getLeaves());
+  const isOnlyLeaf = leaves.length <= 1;
+  const activeTerminalId = useUIStore(s => s.activeTerminalId);
+  const terminalTabs = useUIStore(s => s.terminalTabs);
 
   useEffect(() => {
-    if (!terminalId || !containerRef.current || instanceRef.current) return;
+    if (!node.terminalId || !containerRef.current || instanceRef.current) return;
     const cwd = projectPath || '~';
     const xterm = new XTerm({
       cursorBlink: true, fontSize: 14,
@@ -45,9 +48,9 @@ function TerminalPane({ terminalId, isFocused, onFitTrigger }: {
     xterm.open(containerRef.current);
 
     const unsubOutput = on(IPC.TERMINAL_OUTPUT, (p: { id: string; data: string }) => {
-      if (p.id === terminalId) xterm.write(p.data);
+      if (p.id === node.terminalId) xterm.write(p.data);
     });
-    const disposable = xterm.onData((data) => send(IPC.TERMINAL_DATA, terminalId, data));
+    const disposable = xterm.onData((data) => send(IPC.TERMINAL_DATA, node.terminalId, data));
 
     const inst: TermInstance = { xterm, fitAddon, unsubOutput, disposable, initialized: false };
     instanceRef.current = inst;
@@ -56,8 +59,8 @@ function TerminalPane({ terminalId, isFocused, onFitTrigger }: {
       if (instanceRef.current !== inst) return;
       try {
         fitAddon.fit();
-        invoke(IPC.TERMINAL_CREATE, terminalId, cwd).then(() => {
-          invoke(IPC.TERMINAL_RESIZE, terminalId, xterm.cols, xterm.rows);
+        invoke(IPC.TERMINAL_CREATE, node.terminalId, cwd).then(() => {
+          invoke(IPC.TERMINAL_RESIZE, node.terminalId, xterm.cols, xterm.rows);
           inst.initialized = true;
         });
       } catch (e) { console.error('Terminal init failed:', e); }
@@ -65,32 +68,30 @@ function TerminalPane({ terminalId, isFocused, onFitTrigger }: {
 
     return () => {
       inst.unsubOutput(); inst.disposable.dispose();
-      invoke(IPC.TERMINAL_DISPOSE, terminalId).catch(() => {});
+      invoke(IPC.TERMINAL_DISPOSE, node.terminalId).catch(() => {});
       xterm.dispose(); instanceRef.current = null;
     };
-  }, [terminalId, projectPath]);
+  }, [node.terminalId, projectPath]);
 
-  // Re-fit on resize or focus change
   useEffect(() => {
     const inst = instanceRef.current;
-    if (!inst?.initialized || !terminalId) return;
+    if (!inst?.initialized || !node.terminalId) return;
     requestAnimationFrame(() => {
       try {
         inst.fitAddon.fit();
-        invoke(IPC.TERMINAL_RESIZE, terminalId, inst.xterm.cols, inst.xterm.rows);
-        if (isFocused) inst.xterm.focus();
+        invoke(IPC.TERMINAL_RESIZE, node.terminalId, inst.xterm.cols, inst.xterm.rows);
+        if (activeTerminalId === node.terminalId) inst.xterm.focus();
       } catch { /* ignore */ }
     });
-  }, [onFitTrigger, isFocused, terminalId]);
+  }, [fitTrigger, activeTerminalId, node.terminalId]);
 
-  // Theme updates
   const theme = useAppSettingsStore(s => s.theme);
   const activeCustomTheme = useThemeStore(s => s.activeCustomTheme);
   useEffect(() => {
     if (instanceRef.current) instanceRef.current.xterm.options.theme = getXtermTheme();
   }, [theme, activeCustomTheme]);
 
-  if (!terminalId) {
+  if (!node.terminalId) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-secondary">
         <p className="text-sm">No terminal in this pane</p>
@@ -99,32 +100,85 @@ function TerminalPane({ terminalId, isFocused, onFitTrigger }: {
   }
 
   return (
-    <div ref={containerRef} className={`flex-1 overflow-hidden ${isFocused ? '' : 'opacity-75'}`}
-      onClick={() => useUIStore.getState().setActiveTerminal(terminalId)} />
+    <div className="flex-1 flex flex-col overflow-hidden relative group/pane">
+      {/* Toolbar */}
+      <div className={`
+        absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded bg-bg-surface/90 border border-border
+        transition-opacity
+        ${activeTerminalId === node.terminalId ? 'opacity-100' : 'opacity-0 group-hover/pane:opacity-100'}
+      `}>
+        <Tooltip content="Split Vertically" position="bottom">
+          <button onClick={() => splitPane(node.id, 'vertical')}
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-bg-elevated transition-colors"
+            aria-label="Split vertically">
+            <Icon name="Columns" size={13} className="text-text-secondary" />
+          </button>
+        </Tooltip>
+        <Tooltip content="Split Horizontally" position="bottom">
+          <button onClick={() => splitPane(node.id, 'horizontal')}
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-bg-elevated transition-colors"
+            aria-label="Split horizontally">
+            <Icon name="Rows" size={13} className="text-text-secondary" />
+          </button>
+        </Tooltip>
+        {!isOnlyLeaf && (
+          <Tooltip content="Close Pane" position="bottom">
+            <button onClick={() => closePane(node.id)}
+              className="flex items-center justify-center w-6 h-6 rounded hover:bg-error/20 text-text-secondary hover:text-error transition-colors"
+              aria-label="Close pane">
+              <Icon name="X" size={13} />
+            </button>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Terminal tab selector */}
+      {terminalTabs.length > 1 && (
+        <div className="absolute top-1 left-1 z-10">
+          <select
+            value={node.terminalId ?? ''}
+            onChange={(e) => setPaneTerminalId(node.id, e.target.value || null)}
+            className="text-xs bg-bg-surface/90 border border-border rounded px-1.5 py-0.5 text-text-secondary"
+          >
+            {terminalTabs.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div ref={containerRef} className="flex-1 overflow-hidden"
+        onClick={() => node.terminalId && useUIStore.getState().setActiveTerminal(node.terminalId)} />
+    </div>
+  );
+}
+
+function TerminalNodeView({ node }: { node: SplitNode }) {
+  const { setRatio } = useTerminalSplitStore();
+
+  if (node.type === 'leaf') {
+    return <TerminalPaneContent node={node} />;
+  }
+
+  return (
+    <SplitContainer
+      direction={node.direction!}
+      ratio={node.ratio ?? 0.5}
+      onRatioChange={(ratio) => setRatio(node.id, ratio)}
+      firstChild={<TerminalNodeView node={node.first!} />}
+      secondChild={<TerminalNodeView node={node.second!} />}
+    />
   );
 }
 
 export default function TerminalSplitView() {
-  const layout = useTerminalSplitStore(s => s.layout);
-  const { unsplit, setSplitRatio, getPaneTerminalIds } = useTerminalSplitStore();
-  const activeTerminalId = useUIStore(s => s.activeTerminalId);
-  const [fitTrigger, setFitTrigger] = useState(0);
-  const [primaryId, secondaryId] = getPaneTerminalIds();
+  const root = useTerminalSplitStore(s => s.root);
+  const { init } = useTerminalSplitStore();
 
-  return (
-    <div className="flex-1 flex overflow-hidden relative">
-      <SplitContainer
-        direction={layout.direction}
-        ratio={layout.splitRatio}
-        onRatioChange={setSplitRatio}
-        firstChild={<TerminalPane terminalId={primaryId} isFocused={activeTerminalId === primaryId} onFitTrigger={fitTrigger} />}
-        secondChild={<TerminalPane terminalId={secondaryId} isFocused={activeTerminalId === secondaryId} onFitTrigger={fitTrigger} />}
-      />
-      <button onClick={() => { unsplit(); setFitTrigger(n => n + 1); }}
-        className="absolute top-1 right-1 z-20 p-0.5 rounded bg-bg-surface/80 border border-border hover:bg-bg-elevated transition-colors"
-        aria-label="Close split">
-        <Icon name="X" size={12} className="text-text-secondary" />
-      </button>
-    </div>
-  );
+  if (!root) {
+    init();
+    return null;
+  }
+
+  return <TerminalNodeView node={root} />;
 }

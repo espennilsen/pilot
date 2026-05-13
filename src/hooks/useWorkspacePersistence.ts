@@ -69,8 +69,8 @@ function collectWorkspaceState(): WorkspaceState {
       treeExpandedPaths: projectStore.expandedPaths ? Array.from(projectStore.expandedPaths) : undefined,
       treeSelectedPath: projectStore.selectedPath ?? undefined,
       treeScrollTop: projectStore.treeScrollTop ?? undefined,
-      splitLayout: splitStore.layout,
-      terminalSplitLayout: termSplitStore.layout,
+      splitLayout: splitStore.root ?? undefined,
+      terminalSplitLayout: termSplitStore.root ?? undefined,
     },
   };
 }
@@ -241,10 +241,10 @@ export function useWorkspacePersistence() {
 
       // Restore split layouts
       if (saved.ui.splitLayout) {
-        useSplitPaneStore.setState({ layout: saved.ui.splitLayout });
+        useSplitPaneStore.setState({ root: saved.ui.splitLayout });
       }
       if (saved.ui.terminalSplitLayout) {
-        useTerminalSplitStore.setState({ layout: saved.ui.terminalSplitLayout });
+        useTerminalSplitStore.setState({ root: saved.ui.terminalSplitLayout });
       }
 
       // ── 3. Restore project path for active tab ────────────

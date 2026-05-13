@@ -48,11 +48,11 @@ export function useDefaultCommands() {
       'command-palette':      { icon: 'Search',         action: () => {},          keywords: ['command', 'palette', 'search'] },
       'open-memory':          { icon: 'Brain',           action: () => { setSidebarPane('memory'); if (!sidebarVisible) toggleSidebar(); }, keywords: ['memory', 'remember', 'forget', 'brain'] },
       'open-tasks':           { icon: 'ListTodo',        action: () => { const pp = useProjectStore.getState().projectPath; if (pp) useTabStore.getState().addTasksTab(pp); }, keywords: ['tasks', 'kanban', 'board', 'issues', 'todo'] },
-      'split-vertical':       { icon: 'Columns',         action: () => useSplitPaneStore.getState().split('vertical'),    keywords: ['split', 'vertical'] },
-      'split-horizontal':     { icon: 'Rows',            action: () => useSplitPaneStore.getState().split('horizontal'),  keywords: ['split', 'horizontal'] },
-      'unsplit':              { icon: 'PanelLeftClose',  action: () => useSplitPaneStore.getState().unsplit(),             keywords: ['split', 'close', 'unsplit'] },
-      'terminal-split':       { icon: 'Split',           action: () => useTerminalSplitStore.getState().split('vertical'), keywords: ['split', 'terminal'] },
-      'terminal-unsplit':     { icon: 'PanelLeftClose',  action: () => useTerminalSplitStore.getState().unsplit(),         keywords: ['split', 'terminal', 'close'] },
+      'split-vertical':       { icon: 'Columns',         action: () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'vertical'),    keywords: ['split', 'vertical'] },
+      'split-horizontal':     { icon: 'Rows',            action: () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'horizontal'),  keywords: ['split', 'horizontal'] },
+      'unsplit':              { icon: 'PanelLeftClose',  action: () => useSplitPaneStore.getState().collapseToSingle(),             keywords: ['split', 'close', 'unsplit'] },
+      'terminal-split':       { icon: 'Split',           action: () => useTerminalSplitStore.getState().splitTab(useUIStore.getState().activeTerminalId ?? '', 'vertical'), keywords: ['split', 'terminal'] },
+      'terminal-unsplit':     { icon: 'PanelLeftClose',  action: () => useTerminalSplitStore.getState().collapseToSingle(),         keywords: ['split', 'terminal', 'close'] },
     };
 
     const commands: CommandAction[] = DEFAULT_KEYBINDINGS

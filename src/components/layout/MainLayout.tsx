@@ -16,7 +16,7 @@ import ArtifactPanel from '../artifacts/ArtifactPanel';
 export default function MainLayout() {
   const { sidebarVisible, contextPanelVisible, setSidebarWidth, setContextPanelWidth } = useUIStore();
   const activeTab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
-  const splitMode = useSplitPaneStore(s => s.layout.mode);
+  const splitRoot = useSplitPaneStore(s => s.root);
 
   const handleSidebarResize = (delta: number) => {
     const currentWidth = useUIStore.getState().sidebarWidth;
@@ -29,7 +29,7 @@ export default function MainLayout() {
   };
 
   const renderMainContent = () => {
-    if (splitMode === 'split') {
+    if (splitRoot) {
       return <SplitPaneView />;
     }
     switch (activeTab?.type) {

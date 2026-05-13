@@ -27,7 +27,7 @@ export default function Terminal() {
     terminalVisible, terminalHeight, setTerminalHeight, toggleTerminal,
     terminalTabs, activeTerminalId, addTerminalTab, closeTerminalTab, setActiveTerminal,
   } = useUIStore();
-  const tSplitLayout = useTerminalSplitStore(s => s.layout);
+  const tSplitRoot = useTerminalSplitStore(s => s.root);
   const { split: tSplit, unsplit: tUnsplit } = useTerminalSplitStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const instancesRef = useRef<Map<string, TermInstance>>(new Map());
@@ -228,7 +228,7 @@ export default function Terminal() {
       />
 
       {/* Body: terminal content + tab sidebar */}
-      {tSplitLayout.mode === 'split' ? (
+      {tSplitRoot ? (
         <TerminalSplitView />
       ) : (
         <div className="flex-1 flex overflow-hidden min-h-0">
