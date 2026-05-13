@@ -570,6 +570,16 @@ export interface SavedUIState {
   treeExpandedPaths?: string[];
   treeSelectedPath?: string | null;
   treeScrollTop?: number;
+  // Split pane layouts
+  splitLayout?: SplitLayout;          // chat main content
+  terminalSplitLayout?: SplitLayout;  // terminal panel
+}
+
+export interface SplitLayout {
+  mode: 'single' | 'split';
+  direction: 'horizontal' | 'vertical';
+  secondaryId: string | null;
+  splitRatio: number; // 0.0-1.0, proportion of space for first pane
 }
 
 export interface WorkspaceState {
