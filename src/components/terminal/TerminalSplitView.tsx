@@ -29,8 +29,8 @@ function TerminalPaneContent({ node }: { node: SplitNode }) {
   const projectPath = useProjectStore(s => s.projectPath);
   const [fitTrigger, setFitTrigger] = useState(0);
   const { splitPane, closePane, setPaneTerminalId } = useTerminalSplitStore();
-  const leaves = useTerminalSplitStore(s => s.getLeaves());
-  const isOnlyLeaf = leaves.length <= 1;
+  const leafCount = useTerminalSplitStore(s => s.getLeaves().length);
+  const isOnlyLeaf = leafCount <= 1;
   const activeTerminalId = useUIStore(s => s.activeTerminalId);
   const terminalTabs = useUIStore(s => s.terminalTabs);
 

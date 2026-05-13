@@ -14,8 +14,8 @@ function ChatPane({ node }: { node: SplitNode }) {
   const activeTabId = useTabStore(s => s.activeTabId);
   const { splitPane, closePane, setPaneTab } = useSplitPaneStore();
   const currentTab = tabs.find(t => t.id === node.tabId);
-  const leaves = useSplitPaneStore(s => s.getLeaves());
-  const isOnlyLeaf = leaves.length <= 1;
+  const leafCount = useSplitPaneStore(s => s.getLeaves().length);
+  const isOnlyLeaf = leafCount <= 1;
 
   if (node.type !== 'leaf') return null;
 
