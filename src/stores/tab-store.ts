@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { useProjectStore } from './project-store';
 import { useArtifactStore } from './artifact-store';
+import { type SplitNode, splitLeafNode, closeLeafNode, makeLeaf, findNode, replaceNode } from './split-pane-store';
 
 /**
  * Represents a single tab (chat, file, tasks, docs, or web).
@@ -27,6 +28,8 @@ export interface TabState {
   };
   lastActiveAt: number;
   hasUnread: boolean;
+  // Split layout within this tab (null = single chat view)
+  splitLayout?: SplitNode | null;
 }
 
 /**
@@ -65,6 +68,14 @@ interface TabStore {
   updateTab: (tabId: string, updates: Partial<TabState>) => void;
   setActiveTabTitle: (title: string) => void;
   getGroupedTabs: () => TabGroup[];
+
+  // Split pane actions (per-tab)
+  splitPane: (tabId: string, nodeId: string, direction: import('./split-pane-store').SplitDirection) => void;
+  closePane: (tabId: string, nodeId: string) => void;
+  setPaneRatio: (tabId: string, nodeId: string, ratio: number) => void;
+  setPaneChatId: (tabId: string, nodeId: string, chatId: string | null) => void;
+  splitTabLayout: (tabId: string, direction: import('./split-pane-store').SplitDirection) => void;
+  collapseSplitLayout: (tabId: string) => void;
 }
 
 const PROJECT_COLORS = [
@@ -588,6 +599,118 @@ export const useTabStore = create<TabStore>((set, get) => {
       });
 
       return groups;
+    },
+
+    // ─── Split pane actions (per-tab) ────────────────────────────────────
+
+    splitPane: (tabId, nodeId, direction) => {
+      set(state => {
+        const tab = state.tabs.find(t => t.id === tabId);
+        if (!tab || tab.type !== 'chat') return state;
+
+        // If no split layout yet, create initial single-leaf tree
+        const currentLayout = tab.splitLayout ?? makeLeaf(tab.id);
+        const newLayout = splitLeafNode(currentLayout, nodeId, direction);
+
+        return {
+          tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, splitLayout: newLayout } : t
+          ),
+        };
+      });
+    },
+
+    closePane: (tabId, nodeId) => {
+      set(state => {
+        const tab = state.tabs.find(t => t.id === tabId);
+        if (!tab || !tab.splitLayout) return state;
+
+        const newLayout = closeLeafNode(tab.splitLayout, nodeId);
+
+        // If collapsed to single leaf, clear splitLayout entirely
+        const layoutToSave = newLayout.type === 'leaf' ? null : newLayout;
+
+        return {
+          tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, splitLayout: layoutToSave } : t
+          ),
+        };
+      });
+    },
+
+    setPaneRatio: (tabId, nodeId, ratio) => {
+      set(state => {
+        const tab = state.tabs.find(t => t.id === tabId);
+        if (!tab || !tab.splitLayout) return state;
+
+        const node = findNode(tab.splitLayout, nodeId);
+        if (!node || node.type !== 'split') return state;
+
+        const clamped = Math.max(0.15, Math.min(0.85, ratio));
+        const newLayout = replaceNode(tab.splitLayout, nodeId, { ...node, ratio: clamped });
+
+        return {
+          tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, splitLayout: newLayout } : t
+          ),
+        };
+      });
+    },
+
+    setPaneChatId: (tabId, nodeId, chatId) => {
+      set(state => {
+        const tab = state.tabs.find(t => t.id === tabId);
+        if (!tab || !tab.splitLayout) return state;
+
+        const node = findNode(tab.splitLayout, nodeId);
+        if (!node || node.type !== 'leaf') return state;
+
+        const newLayout = replaceNode(tab.splitLayout, nodeId, { ...node, chatId });
+
+        return {
+          tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, splitLayout: newLayout } : t
+          ),
+        };
+      });
+    },
+
+    // Keyboard shortcut helpers
+    splitTabLayout: (tabId, direction) => {
+      set(state => {
+        const tab = state.tabs.find(t => t.id === tabId);
+        if (!tab || tab.type !== 'chat') return state;
+
+        // If no split layout, create first split
+        if (!tab.splitLayout) {
+          const firstLeaf = makeLeaf(tab.id);
+          const secondLeaf = makeLeaf(null);
+          const newLayout = makeSplit(direction, firstLeaf, secondLeaf);
+          return {
+            tabs: state.tabs.map(t =>
+              t.id === tabId ? { ...t, splitLayout: newLayout } : t
+            ),
+          };
+        }
+
+        // Otherwise split the first leaf
+        const firstLeaf = getLeaves(tab.splitLayout)[0];
+        if (!firstLeaf) return state;
+        const newLayout = splitLeafNode(tab.splitLayout, firstLeaf.id, direction);
+        return {
+          tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, splitLayout: newLayout } : t
+          ),
+        };
+      });
+    },
+
+    collapseSplitLayout: (tabId) => {
+      set(state => ({
+        tabs: state.tabs.map(t =>
+          t.id === tabId ? { ...t, splitLayout: null } : t
+        ),
+      }));
     },
   };
 });

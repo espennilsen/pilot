@@ -36,7 +36,6 @@ import { useTheme } from './hooks/useTheme';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybindings';
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
 import { useGitStore } from './stores/git-store';
-import { useSplitPaneStore } from './stores/split-pane-store';
 import { useTerminalSplitStore } from './stores/terminal-split-store';
 import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
@@ -325,9 +324,18 @@ function App() {
         useChatStore.getState().setQueued(tabId, { steering: [], followUp: [] });
       }
     },
-    'split-vertical':     () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'vertical'),
-    'split-horizontal':   () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'horizontal'),
-    'unsplit':            () => useSplitPaneStore.getState().collapseToSingle(),
+    'split-vertical':     () => {
+      const tabId = useTabStore.getState().activeTabId;
+      if (tabId) useTabStore.getState().splitTabLayout(tabId, 'vertical');
+    },
+    'split-horizontal':   () => {
+      const tabId = useTabStore.getState().activeTabId;
+      if (tabId) useTabStore.getState().splitTabLayout(tabId, 'horizontal');
+    },
+    'unsplit':            () => {
+      const tabId = useTabStore.getState().activeTabId;
+      if (tabId) useTabStore.getState().collapseSplitLayout(tabId);
+    },
     'terminal-split':     () => useTerminalSplitStore.getState().splitTab(useUIStore.getState().activeTerminalId ?? '', 'vertical'),
     'terminal-unsplit':   () => useTerminalSplitStore.getState().collapseToSingle(),
   }), [toggleCommandPalette, toggleSidebar, toggleContextPanel, toggleFocusMode, toggleScratchPad, toggleTerminal, addTerminalTab, activeTabId, toggleYolo, projectPath, setContextPanelTab, contextPanelVisible, addTab, openSettings, openProjectDialog, setSidebarPane, sidebarVisible]);
