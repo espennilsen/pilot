@@ -37,6 +37,7 @@ import { DEFAULT_KEYBINDINGS, getEffectiveCombo, parseCombo } from './lib/keybin
 import { isCompanionMode, invoke, on, send } from './lib/ipc-client';
 import { useGitStore } from './stores/git-store';
 import { useTerminalSplitStore } from './stores/terminal-split-store';
+import { getLeaves } from './stores/split-pane-store';
 import { useChatStore } from './stores/chat-store';
 import { IPC } from '../shared/ipc';
 
@@ -211,8 +212,21 @@ function App() {
 
   useEffect(() => {
     const unsub = on('menu:close-tab', () => {
-      const { activeTabId, closeTab } = useTabStore.getState();
-      if (activeTabId) closeTab(activeTabId);
+      const tabStore = useTabStore.getState();
+      const activeTab = tabStore.tabs.find(t => t.id === tabStore.activeTabId);
+      if (!activeTab) return;
+
+      // If there's a split layout, close a pane instead of the whole tab
+      if (activeTab.splitLayout) {
+        const leaves = getLeaves(activeTab.splitLayout);
+        if (leaves.length > 1) {
+          // Close the last leaf (most recently added)
+          tabStore.closePane(activeTab.id, leaves[leaves.length - 1].id);
+          return;
+        }
+      }
+
+      tabStore.closeTab(activeTab.id);
     });
     return unsub;
   }, []);

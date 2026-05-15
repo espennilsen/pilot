@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useTabStore } from '../../stores/tab-store';
 import { isValidNode, type SplitNode, type SplitDirection } from '../../stores/split-pane-store';
 import { useChatStore } from '../../stores/chat-store';
@@ -6,6 +5,7 @@ import { SplitContainer } from '../shared/SplitContainer';
 import ChatView from '../chat/ChatView';
 import { Icon } from '../shared/Icon';
 import { Tooltip } from '../shared/Tooltip';
+import { useProjectStore } from '../../stores/project-store';
 
 /**
  * Single pane cell — shows a chat for a given chatId, with split/close buttons.
@@ -100,21 +100,63 @@ function SplitNodeView({ tabId, node }: { tabId: string; node: SplitNode }) {
 
 export default function SplitPaneView() {
   const activeTab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const projectPath = useProjectStore(s => s.projectPath);
+  const { openProjectDialog } = useProjectStore();
+  const { addTab } = useTabStore();
 
-  if (!activeTab || activeTab.type !== 'chat') return null;
+  // No active tab or active tab is not a chat — show empty state
+  if (!activeTab || activeTab.type !== 'chat') {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-bg-base">
+        <div className="text-center space-y-4">
+          {projectPath ? (
+            <>
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-bg-surface border-2 border-dashed border-border flex items-center justify-center">
+                <Icon name="MessageSquare" size={28} className="text-text-secondary" />
+              </div>
+              <p className="text-text-secondary text-lg font-medium">No chat open</p>
+              <button
+                onClick={() => addTab()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors"
+              >
+                <Icon name="Plus" size={16} />
+                New Chat
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-bg-surface border-2 border-dashed border-border flex items-center justify-center">
+                <Icon name="FolderOpen" size={28} className="text-text-secondary" />
+              </div>
+              <p className="text-text-secondary text-lg font-medium">No project open</p>
+              <p className="text-text-secondary/50 text-sm">Open a project to start chatting with the agent</p>
+              <button
+                onClick={openProjectDialog}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors"
+              >
+                <Icon name="FolderOpen" size={16} />
+                Open Project
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const splitLayout = activeTab.splitLayout;
 
-  // No split layout — render single chat view
+  // No split layout — render single leaf through the same ChatPane wrapper (with split buttons)
+  // Use tab.id as leaf id so splitPane can find it when creating the first split.
   if (!splitLayout) {
-    return <ChatView tabId={activeTab.id} />;
+    return <ChatPane tabId={activeTab.id} node={{ type: 'leaf', id: activeTab.id, chatId: activeTab.id }} />;
   }
 
   // Validate split layout (guard against stale persistence data)
   if (!isValidNode(splitLayout)) {
     // Clear invalid layout
     useTabStore.getState().updateTab(activeTab.id, { splitLayout: null });
-    return <ChatView tabId={activeTab.id} />;
+    return <ChatPane tabId={activeTab.id} node={{ type: 'leaf', id: activeTab.id, chatId: activeTab.id }} />;
   }
 
   return (

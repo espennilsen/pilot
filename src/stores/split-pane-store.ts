@@ -65,14 +65,14 @@ export function replaceNode(root: SplitNode, id: string, replacement: SplitNode)
 
 /**
  * Split a leaf node into two children. First child keeps the original chatId,
- * second child gets a new chatId (new conversation).
+ * second child gets the provided newChatId.
  */
-export function splitLeafNode(root: SplitNode, nodeId: string, direction: SplitDirection): SplitNode {
+export function splitLeafNode(root: SplitNode, nodeId: string, direction: SplitDirection, newChatId?: string | null): SplitNode {
   const node = findNode(root, nodeId);
   if (!node || node.type !== 'leaf') return root;
 
   const firstChild = makeLeaf(node.chatId ?? null);
-  const secondChild = makeLeaf(null); // new chat session
+  const secondChild = makeLeaf(newChatId ?? null);
   const splitNode = makeSplit(direction, firstChild, secondChild);
 
   return replaceNode(root, nodeId, splitNode);

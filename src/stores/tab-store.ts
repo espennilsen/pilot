@@ -604,13 +604,16 @@ export const useTabStore = create<TabStore>((set, get) => {
     // ─── Split pane actions (per-tab) ────────────────────────────────────
 
     splitPane: (tabId, nodeId, direction) => {
+      const newChatId = crypto.randomUUID();
+
       set(state => {
         const tab = state.tabs.find(t => t.id === tabId);
         if (!tab || tab.type !== 'chat') return state;
 
-        // If no split layout yet, create initial single-leaf tree
-        const currentLayout = tab.splitLayout ?? makeLeaf(tab.id);
-        const newLayout = splitLeafNode(currentLayout, nodeId, direction);
+        // If no split layout yet, create initial tree with the same nodeId
+        // that the UI rendered as a synthetic leaf.
+        const currentLayout = tab.splitLayout ?? { id: nodeId, type: 'leaf' as const, chatId: tab.id };
+        const newLayout = splitLeafNode(currentLayout, nodeId, direction, newChatId);
 
         return {
           tabs: state.tabs.map(t =>
@@ -618,6 +621,14 @@ export const useTabStore = create<TabStore>((set, get) => {
           ),
         };
       });
+
+      // Start session creation for the new chatId in the background
+      const tab = get().tabs.find(t => t.id === tabId);
+      if (tab?.projectPath) {
+        import('../hooks/useWorkspacePersistence').then(({ openTabSession }) => {
+          openTabSession(newChatId, { sessionPath: null, projectPath: tab.projectPath }).catch(() => {});
+        });
+      }
     },
 
     closePane: (tabId, nodeId) => {
@@ -677,6 +688,8 @@ export const useTabStore = create<TabStore>((set, get) => {
 
     // Keyboard shortcut helpers
     splitTabLayout: (tabId, direction) => {
+      const newChatId = crypto.randomUUID();
+
       set(state => {
         const tab = state.tabs.find(t => t.id === tabId);
         if (!tab || tab.type !== 'chat') return state;
@@ -684,7 +697,7 @@ export const useTabStore = create<TabStore>((set, get) => {
         // If no split layout, create first split
         if (!tab.splitLayout) {
           const firstLeaf = makeLeaf(tab.id);
-          const secondLeaf = makeLeaf(null);
+          const secondLeaf = makeLeaf(newChatId);
           const newLayout = makeSplit(direction, firstLeaf, secondLeaf);
           return {
             tabs: state.tabs.map(t =>
@@ -696,13 +709,21 @@ export const useTabStore = create<TabStore>((set, get) => {
         // Otherwise split the first leaf
         const firstLeaf = getLeaves(tab.splitLayout)[0];
         if (!firstLeaf) return state;
-        const newLayout = splitLeafNode(tab.splitLayout, firstLeaf.id, direction);
+        const newLayout = splitLeafNode(tab.splitLayout, firstLeaf.id, direction, newChatId);
         return {
           tabs: state.tabs.map(t =>
             t.id === tabId ? { ...t, splitLayout: newLayout } : t
           ),
         };
       });
+
+      // Start session creation for the new chatId in the background
+      const tab = get().tabs.find(t => t.id === tabId);
+      if (tab?.projectPath) {
+        import('../hooks/useWorkspacePersistence').then(({ openTabSession }) => {
+          openTabSession(newChatId, { sessionPath: null, projectPath: tab.projectPath }).catch(() => {});
+        });
+      }
     },
 
     collapseSplitLayout: (tabId) => {
