@@ -32,7 +32,6 @@ function TerminalPaneContent({ node }: { node: SplitNode }) {
   const leafCount = useTerminalSplitStore(s => s.getLeaves().length);
   const isOnlyLeaf = leafCount <= 1;
   const activeTerminalId = useUIStore(s => s.activeTerminalId);
-  const terminalTabs = useUIStore(s => s.terminalTabs);
 
   useEffect(() => {
     if (!node.terminalId || !containerRef.current || instanceRef.current) return;
