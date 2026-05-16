@@ -180,17 +180,15 @@ function TerminalNodeView({ node }: { node: SplitNode }) {
 export default function TerminalSplitView() {
   const root = useTerminalSplitStore(s => s.root);
   const { init, reset } = useTerminalSplitStore();
-  const didInitRef = useRef(false);
 
   // Validate and initialise on mount — never call setState during render
   useEffect(() => {
-    if (didInitRef.current) return;
-    didInitRef.current = true;
-    if (!isValidNode(root)) {
-      if (root) reset();
+    const currentRoot = useTerminalSplitStore.getState().root;
+    if (!isValidNode(currentRoot)) {
+      if (currentRoot) reset();
       init();
     }
-  }, [root, init, reset]);
+  }, []);
 
   if (!isValidNode(root)) return null;
 
