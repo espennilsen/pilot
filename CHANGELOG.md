@@ -5,9 +5,11 @@ All notable changes to Pilot are documented here, grouped by date.
 ## 2026-05-09
 
 ### Changed
+
 - **Per-tab split layout** — split panes are now scoped per tab instead of global. Each tab contains its own recursive split tree, and each leaf pane runs an independent chat session. The global `useSplitPaneStore` was converted to a stateless utility module; split state lives in `TabState.splitLayout` and persists per-tab in `workspace.json`.
 
 ### Fixed
+
 - **Split pane buttons invisible in single-pane mode** — the split/close hover toolbar now renders even when there's no split layout, by wrapping the single chat view in the same `ChatPane` shell.
 - **Split button required two clicks** — the initial synthetic leaf now uses the correct node id so `splitLeafNode` finds it on the first click.
 - **New split panes had no input box** — splitting now generates a `chatId` and kicks off async session creation for the new pane, so `ChatView` renders immediately.

@@ -143,9 +143,19 @@ function isValidNode(node: unknown): node is SplitNode {
   const n = node as Record<string, unknown>;
   if (n.type !== 'leaf' && n.type !== 'split') return false;
   if (typeof n.id !== 'string') return false;
+  if (n.type === 'leaf') {
+    return (
+      (n.terminalId === undefined || n.terminalId === null || typeof n.terminalId === 'string') &&
+      n.direction === undefined &&
+      n.first === undefined &&
+      n.second === undefined &&
+      n.ratio === undefined
+    );
+  }
   if (n.type === 'split') {
-    if (!n.first || !n.second) return false;
-    if (typeof n.ratio !== 'number') return false;
+    if (n.direction !== 'horizontal' && n.direction !== 'vertical') return false;
+    if (typeof n.ratio !== 'number' || n.ratio <= 0 || n.ratio >= 1) return false;
+    if (!isValidNode(n.first) || !isValidNode(n.second)) return false;
   }
   return true;
 }
