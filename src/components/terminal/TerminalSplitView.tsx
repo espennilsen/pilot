@@ -153,7 +153,7 @@ function isValidNode(node: unknown): node is SplitNode {
   }
   if (n.type === 'split') {
     if (n.direction !== 'horizontal' && n.direction !== 'vertical') return false;
-    if (typeof n.ratio !== 'number' || n.ratio <= 0 || n.ratio >= 1) return false;
+    if (!Number.isFinite(n.ratio) || n.ratio <= 0 || n.ratio >= 1) return false;
     if (!isValidNode(n.first) || !isValidNode(n.second)) return false;
   }
   return true;
@@ -188,7 +188,7 @@ export default function TerminalSplitView() {
       if (currentRoot) reset();
       init();
     }
-  }, []);
+  }, [root]);
 
   if (!isValidNode(root)) return null;
 
