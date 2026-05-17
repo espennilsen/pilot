@@ -555,6 +555,8 @@ export interface SavedTabState {
     contextPanelVisible: boolean;
     contextPanelTab: 'files' | 'git' | 'changes' | 'tasks' | 'agents';
   };
+  // Split layout within this tab (null = single chat view)
+  splitLayout?: SplitNode;
 }
 
 export interface SavedUIState {
@@ -570,15 +572,14 @@ export interface SavedUIState {
   treeExpandedPaths?: string[];
   treeSelectedPath?: string | null;
   treeScrollTop?: number;
-  // Split pane layouts (recursive tree)
-  splitLayout?: SplitNode;          // chat main content
-  terminalSplitLayout?: SplitNode;  // terminal panel
+  // Terminal split layout (global, shared across tabs)
+  terminalSplitLayout?: SplitNode;
 }
 
 export interface SplitNode {
   id: string;
   type: 'leaf' | 'split';
-  tabId?: string | null;
+  chatId?: string | null;  // unique ID for the chat session in this pane
   direction?: 'horizontal' | 'vertical';
   first?: SplitNode;
   second?: SplitNode;

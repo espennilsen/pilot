@@ -29,10 +29,9 @@ function TerminalPaneContent({ node }: { node: SplitNode }) {
   const projectPath = useProjectStore(s => s.projectPath);
   const [fitTrigger, setFitTrigger] = useState(0);
   const { splitPane, closePane, setPaneTerminalId } = useTerminalSplitStore();
-  const leaves = useTerminalSplitStore(s => s.getLeaves());
-  const isOnlyLeaf = leaves.length <= 1;
+  const leafCount = useTerminalSplitStore(s => s.getLeaves().length);
+  const isOnlyLeaf = leafCount <= 1;
   const activeTerminalId = useUIStore(s => s.activeTerminalId);
-  const terminalTabs = useUIStore(s => s.terminalTabs);
 
   useEffect(() => {
     if (!node.terminalId || !containerRef.current || instanceRef.current) return;
@@ -132,25 +131,32 @@ function TerminalPaneContent({ node }: { node: SplitNode }) {
         )}
       </div>
 
-      {/* Terminal tab selector */}
-      {terminalTabs.length > 1 && (
-        <div className="absolute top-1 left-1 z-10">
-          <select
-            value={node.terminalId ?? ''}
-            onChange={(e) => setPaneTerminalId(node.id, e.target.value || null)}
-            className="text-xs bg-bg-surface/90 border border-border rounded px-1.5 py-0.5 text-text-secondary"
-          >
-            {terminalTabs.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div ref={containerRef} className="flex-1 overflow-hidden"
         onClick={() => node.terminalId && useUIStore.getState().setActiveTerminal(node.terminalId)} />
     </div>
   );
+}
+
+function isValidNode(node: unknown): node is SplitNode {
+  if (!node || typeof node !== 'object') return false;
+  const n = node as Record<string, unknown>;
+  if (n.type !== 'leaf' && n.type !== 'split') return false;
+  if (typeof n.id !== 'string') return false;
+  if (n.type === 'leaf') {
+    return (
+      (n.terminalId === undefined || n.terminalId === null || typeof n.terminalId === 'string') &&
+      n.direction === undefined &&
+      n.first === undefined &&
+      n.second === undefined &&
+      n.ratio === undefined
+    );
+  }
+  if (n.type === 'split') {
+    if (n.direction !== 'horizontal' && n.direction !== 'vertical') return false;
+    if (!Number.isFinite(n.ratio) || n.ratio <= 0 || n.ratio >= 1) return false;
+    if (!isValidNode(n.first) || !isValidNode(n.second)) return false;
+  }
+  return true;
 }
 
 function TerminalNodeView({ node }: { node: SplitNode }) {
@@ -173,12 +179,19 @@ function TerminalNodeView({ node }: { node: SplitNode }) {
 
 export default function TerminalSplitView() {
   const root = useTerminalSplitStore(s => s.root);
-  const { init } = useTerminalSplitStore();
+  const { init, reset } = useTerminalSplitStore();
 
-  if (!root) {
-    init();
-    return null;
-  }
+  // Validate and initialise on mount — never call setState during render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const currentRoot = useTerminalSplitStore.getState().root;
+    if (!isValidNode(currentRoot)) {
+      if (currentRoot) reset();
+      init();
+    }
+  }, []);
+
+  if (!isValidNode(root)) return null;
 
   return <TerminalNodeView node={root} />;
 }

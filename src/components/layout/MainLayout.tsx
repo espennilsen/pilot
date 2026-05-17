@@ -1,6 +1,5 @@
 import { useUIStore } from '../../stores/ui-store';
 import { useTabStore } from '../../stores/tab-store';
-import { useSplitPaneStore } from '../../stores/split-pane-store';
 import SplitPaneView from './SplitPaneView';
 import { ResizeHandle } from '../shared/ResizeHandle';
 import Sidebar from '../sidebar/Sidebar';
@@ -16,7 +15,6 @@ import ArtifactPanel from '../artifacts/ArtifactPanel';
 export default function MainLayout() {
   const { sidebarVisible, contextPanelVisible, setSidebarWidth, setContextPanelWidth } = useUIStore();
   const activeTab = useTabStore(s => s.tabs.find(t => t.id === s.activeTabId));
-  const splitRoot = useSplitPaneStore(s => s.root);
 
   const handleSidebarResize = (delta: number) => {
     const currentWidth = useUIStore.getState().sidebarWidth;
@@ -29,9 +27,6 @@ export default function MainLayout() {
   };
 
   const renderMainContent = () => {
-    if (splitRoot) {
-      return <SplitPaneView />;
-    }
     switch (activeTab?.type) {
       case 'file':
         return <FileEditor />;
@@ -44,7 +39,8 @@ export default function MainLayout() {
       case 'desktop':
         return <DesktopTabView />;
       default:
-        return <ChatView />;
+        // Chat tabs (and no tab) — SplitPaneView handles both single and split modes
+        return <SplitPaneView />;
     }
   };
 

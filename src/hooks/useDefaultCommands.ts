@@ -7,7 +7,6 @@ import { useProjectStore } from '../stores/project-store';
 import { useAppSettingsStore } from '../stores/app-settings-store';
 import { useMemoryStore } from '../stores/memory-store';
 import { useTaskStore } from '../stores/task-store';
-import { useSplitPaneStore } from '../stores/split-pane-store';
 import { useTerminalSplitStore } from '../stores/terminal-split-store';
 import { DEFAULT_KEYBINDINGS, getEffectiveCombo, comboToSymbol } from '../lib/keybindings';
 
@@ -48,9 +47,9 @@ export function useDefaultCommands() {
       'command-palette':      { icon: 'Search',         action: () => {},          keywords: ['command', 'palette', 'search'] },
       'open-memory':          { icon: 'Brain',           action: () => { setSidebarPane('memory'); if (!sidebarVisible) toggleSidebar(); }, keywords: ['memory', 'remember', 'forget', 'brain'] },
       'open-tasks':           { icon: 'ListTodo',        action: () => { const pp = useProjectStore.getState().projectPath; if (pp) useTabStore.getState().addTasksTab(pp); }, keywords: ['tasks', 'kanban', 'board', 'issues', 'todo'] },
-      'split-vertical':       { icon: 'Columns',         action: () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'vertical'),    keywords: ['split', 'vertical'] },
-      'split-horizontal':     { icon: 'Rows',            action: () => useSplitPaneStore.getState().splitTab(useTabStore.getState().activeTabId ?? '', 'horizontal'),  keywords: ['split', 'horizontal'] },
-      'unsplit':              { icon: 'PanelLeftClose',  action: () => useSplitPaneStore.getState().collapseToSingle(),             keywords: ['split', 'close', 'unsplit'] },
+      'split-vertical':       { icon: 'Columns',         action: () => { const tabId = useTabStore.getState().activeTabId; if (tabId) useTabStore.getState().splitTabLayout(tabId, 'vertical'); },    keywords: ['split', 'vertical'] },
+      'split-horizontal':     { icon: 'Rows',            action: () => { const tabId = useTabStore.getState().activeTabId; if (tabId) useTabStore.getState().splitTabLayout(tabId, 'horizontal'); },  keywords: ['split', 'horizontal'] },
+      'unsplit':              { icon: 'PanelLeftClose',  action: () => { const tabId = useTabStore.getState().activeTabId; if (tabId) useTabStore.getState().collapseSplitLayout(tabId); },             keywords: ['split', 'close', 'unsplit'] },
       'terminal-split':       { icon: 'Split',           action: () => useTerminalSplitStore.getState().splitTab(useUIStore.getState().activeTerminalId ?? '', 'vertical'), keywords: ['split', 'terminal'] },
       'terminal-unsplit':     { icon: 'PanelLeftClose',  action: () => useTerminalSplitStore.getState().collapseToSingle(),         keywords: ['split', 'terminal', 'close'] },
     };

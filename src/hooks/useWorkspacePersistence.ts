@@ -5,7 +5,6 @@ import { useUIStore } from '../stores/ui-store';
 import { useProjectStore } from '../stores/project-store';
 import { useChatStore } from '../stores/chat-store';
 import { useSessionStore } from '../stores/session-store';
-import { useSplitPaneStore } from '../stores/split-pane-store';
 import { useTerminalSplitStore } from '../stores/terminal-split-store';
 import { invoke } from '../lib/ipc-client';
 import { IPC } from '../../shared/ipc';
@@ -43,6 +42,7 @@ function serializeTab(tab: TabState): SavedTabState {
     order: tab.order,
     inputDraft: tab.inputDraft,
     panelConfig: { ...tab.panelConfig },
+    splitLayout: tab.splitLayout ?? undefined,
   };
 }
 
@@ -50,7 +50,6 @@ function collectWorkspaceState(): WorkspaceState {
   const tabStore = useTabStore.getState();
   const uiStore = useUIStore.getState();
   const projectStore = useProjectStore.getState();
-  const splitStore = useSplitPaneStore.getState();
   const termSplitStore = useTerminalSplitStore.getState();
 
   return {
@@ -69,7 +68,6 @@ function collectWorkspaceState(): WorkspaceState {
       treeExpandedPaths: projectStore.expandedPaths ? Array.from(projectStore.expandedPaths) : undefined,
       treeSelectedPath: projectStore.selectedPath ?? undefined,
       treeScrollTop: projectStore.treeScrollTop ?? undefined,
-      splitLayout: splitStore.root ?? undefined,
       terminalSplitLayout: termSplitStore.root ?? undefined,
     },
   };
@@ -202,6 +200,7 @@ export function useWorkspacePersistence() {
         },
         lastActiveAt: Date.now(),
         hasUnread: false,
+        splitLayout: t.splitLayout ?? undefined,
       }));
 
       const resolvedActiveId = activeTabId && restoredTabs.some((t) => t.id === activeTabId)
@@ -239,10 +238,7 @@ export function useWorkspacePersistence() {
         useProjectStore.getState().setTreeScrollTop(saved.ui.treeScrollTop);
       }
 
-      // Restore split layouts
-      if (saved.ui.splitLayout) {
-        useSplitPaneStore.setState({ root: saved.ui.splitLayout });
-      }
+      // Restore terminal split layout (chat splitLayout is now per-tab, restored above)
       if (saved.ui.terminalSplitLayout) {
         useTerminalSplitStore.setState({ root: saved.ui.terminalSplitLayout });
       }
