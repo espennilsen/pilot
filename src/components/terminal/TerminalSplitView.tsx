@@ -182,13 +182,14 @@ export default function TerminalSplitView() {
   const { init, reset } = useTerminalSplitStore();
 
   // Validate and initialise on mount — never call setState during render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const currentRoot = useTerminalSplitStore.getState().root;
     if (!isValidNode(currentRoot)) {
       if (currentRoot) reset();
       init();
     }
-  }, [root]);
+  }, []);
 
   if (!isValidNode(root)) return null;
 
