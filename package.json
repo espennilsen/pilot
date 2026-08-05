@@ -9,9 +9,9 @@
     "dev": "vite build -c vite.companion.mjs && electron-vite dev --config electron-vite.config.mjs",
     "dev:trace": "vite build -c vite.companion.mjs && NODE_OPTIONS='--trace-warnings' electron-vite dev --config electron-vite.config.mjs",
     "build": "electron-vite build --config electron-vite.config.mjs",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:win": "npm run build && electron-builder --win",
-    "build:linux": "npm run build && electron-builder --linux",
+    "build:mac": "pnpm run build && electron-builder --mac",
+    "build:win": "pnpm run build && electron-builder --win",
+    "build:linux": "pnpm run build && electron-builder --linux",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npx eslint . --ext .ts,.tsx,.js,.jsx --format stylish --max-warnings 0 --report-unused-disable-directives --ignore-pattern \"dist/**\" --ignore-pattern \"out/**\" --ignore-pattern \"node_modules/**\" --ignore-pattern \".webpack/**\" --ignore-pattern \"*.config.{js,ts}\"",
@@ -68,5 +68,6 @@
     "typescript": "^5.7.0",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
-  }
+  },
+  "packageManager": "pnpm@10.11.1"
 }
